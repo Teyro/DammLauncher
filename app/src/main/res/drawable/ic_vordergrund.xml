@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 3 × 3 Raster aus abgerundeten Kacheln -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#FFFFFF" android:pathData="M30,30h14v14h-14z M47,30h14v14h-14z M64,30h14v14h-14z M30,47h14v14h-14z M47,47h14v14h-14z M64,47h14v14h-14z M30,64h14v14h-14z M47,64h14v14h-14z" />
+    <path android:fillColor="#FFC93C" android:pathData="M64,64h14v14h-14z" />
+</vector>

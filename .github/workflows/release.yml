@@ -1,0 +1,64 @@
+name: Release
+
+# Ein Tag wie v1.2.0 baut die signierte Release-APK und hängt sie an das GitHub-Release.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: JDK 17 einrichten
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Gradle cachen
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Tag prüfen (vX.Y.Z)
+        run: echo "${GITHUB_REF_NAME}" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'
+
+      - name: Release-Keystore aus den Secrets holen
+        run: echo "$RELEASE_KEYSTORE_BASE64" | base64 -d > app/release-keystore.p12
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+
+      - name: Tests und signierte Release-APK
+        run: ./gradlew testDebugUnitTest assembleRelease
+        env:
+          VERSION_NAME: ${{ github.ref_name }}
+          RELEASE_KEYSTORE_PATH: release-keystore.p12
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+
+      - name: Keystore-Kopie wieder entfernen
+        if: always()
+        run: rm -f app/release-keystore.p12
+
+      - name: Signatur prüfen
+        run: |
+          APK=$(find app/build/outputs/apk/release -name "*.apk" | head -n1)
+          "$ANDROID_HOME"/build-tools/$(ls "$ANDROID_HOME"/build-tools | sort -V | tail -n1)/apksigner verify --print-certs "$APK" | head -n 3
+          cp "$APK" DammLauncher.apk
+          ls -l DammLauncher.apk
+
+      - name: GitHub-Release veröffentlichen
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          NOTIZEN=$(git tag -l --format='%(contents)' "$GITHUB_REF_NAME")
+          [ -z "$NOTIZEN" ] && NOTIZEN=$(git log -1 --pretty=%B)
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" DammLauncher.apk --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" DammLauncher.apk --title "DammLauncher ${GITHUB_REF_NAME#v}" --notes "$NOTIZEN"
+          fi

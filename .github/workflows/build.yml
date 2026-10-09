@@ -1,0 +1,23 @@
+name: Build
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: JDK 17 einrichten
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Gradle cachen
+        uses: gradle/actions/setup-gradle@v3
+      - name: Unit-Tests, Debug- und Release-Build
+        run: ./gradlew testDebugUnitTest assembleDebug assembleRelease
+      - name: APK-Größe
+        run: ls -l app/build/outputs/apk/release/*.apk app/build/outputs/apk/debug/*.apk
