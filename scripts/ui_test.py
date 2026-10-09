@@ -91,6 +91,18 @@ def tippe_text(feld, text):
     time.sleep(0.5)
 
 
+def zwei_felder(felder, a, b):
+    """Erstes der beiden letzten Felder antippen, tippen, mit Tab ins zweite, tippen."""
+    tap(*mitte(felder[-2]))
+    time.sleep(0.8)
+    adb("shell", "input", "text", a)
+    time.sleep(0.4)
+    adb("shell", "input", "keyevent", "61")  # Tab → nächstes Feld
+    time.sleep(0.4)
+    adb("shell", "input", "text", b)
+    time.sleep(0.6)
+
+
 def scrolle_zu(name, x, teil=False, antippen=True):
     w, h = bildschirm()
     for _ in range(16):
@@ -191,6 +203,8 @@ def main():
             felder = eingaben()
             if felder:
                 tippe_text(felder[0], "Testname")
+                adb("shell", "input", "keyevent", "111")  # Tastatur zu (Fenster bleibt)
+                time.sleep(0.6)
             if tippe("Symbol einer anderen App …"):
                 time.sleep(2)
                 for name in reversed(APPS):
@@ -262,8 +276,7 @@ def main():
         felder = eingaben()
         if len(felder) >= 2:
             # die Felder des Fensters stehen hinter denen des Panels
-            tippe_text(felder[-2], "Masterpass1")
-            tippe_text(felder[-1], "Masterpass1")
+            zwei_felder(felder, "Masterpass1", "Masterpass1")
             screenshot("15a_master_passwort.png")
             tippe("Festlegen")
             time.sleep(4)
@@ -275,8 +288,7 @@ def main():
             time.sleep(1.5)
             felder = eingaben()
             if len(felder) >= 2:
-                tippe_text(felder[-2], benutzer)
-                tippe_text(felder[-1], passwort)
+                zwei_felder(felder, benutzer, passwort)
                 tippe("Hochladen")
                 time.sleep(4)
             screenshot(bild)
