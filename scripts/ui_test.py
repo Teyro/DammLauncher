@@ -103,6 +103,19 @@ def zwei_felder(felder, a, b):
     time.sleep(0.6)
 
 
+def feld_mit_hinweis(hinweis, text):
+    """Leeres Eingabefeld über seinen Hinweistext finden (uiautomator meldet ihn als Text), antippen, tippen."""
+    z = knoten(hinweis)
+    if z is None:
+        print("WARNUNG: Feld nicht gefunden:", hinweis, file=sys.stderr)
+        return False
+    tap(*mitte(z))
+    time.sleep(2)
+    adb("shell", "input", "text", text)
+    time.sleep(0.8)
+    return True
+
+
 def scrolle_zu(name, x, teil=False, antippen=True):
     w, h = bildschirm()
     for _ in range(16):
@@ -273,10 +286,8 @@ def main():
     time.sleep(1)
     if scrolle_zu("Boss-Modus …", w * 3 // 4):
         time.sleep(1.5)
-        felder = eingaben()
-        if len(felder) >= 2:
-            # die Felder des Fensters stehen hinter denen des Panels
-            zwei_felder(felder, "Masterpass1", "Masterpass1")
+        if feld_mit_hinweis("Master-Passwort (mindestens 8 Zeichen)", "Masterpass1"):
+            feld_mit_hinweis("Wiederholen", "Masterpass1")
             screenshot("15a_master_passwort.png")
             tippe("Festlegen")
             time.sleep(4)
@@ -286,9 +297,8 @@ def main():
         for benutzer, passwort, bild in (("lesen", "lesen123", "16_hochladen_nur_lesen.png"), ("schreiben", "schreib123", "17_hochgeladen.png")):
             scrolle_zu("Als Vorlage für alle Geräte hochladen", w * 3 // 4)
             time.sleep(1.5)
-            felder = eingaben()
-            if len(felder) >= 2:
-                zwei_felder(felder, benutzer, passwort)
+            if feld_mit_hinweis("Benutzername (Schreibzugang)", benutzer):
+                feld_mit_hinweis("Passwort", passwort)
                 tippe("Hochladen")
                 time.sleep(4)
             screenshot(bild)
