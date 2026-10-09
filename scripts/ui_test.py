@@ -85,9 +85,11 @@ def eingaben():
 
 def tippe_text(feld, text):
     tap(*mitte(feld))
-    time.sleep(0.5)
+    time.sleep(0.7)
     adb("shell", "input", "text", text)
     time.sleep(0.5)
+    adb("shell", "input", "keyevent", "111")  # Tastatur zu, damit nichts verrutscht
+    time.sleep(0.7)
 
 
 def scrolle_zu(name, x, teil=False, antippen=True):

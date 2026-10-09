@@ -192,8 +192,10 @@ class GrossFenster(private val wurzel: FrameLayout, titel: String, breite: Int =
         setOnClickListener { schliessen() }
     }
 
+    private lateinit var kasten: LinearLayout
+
     init {
-        val kasten = LinearLayout(c).apply {
+        kasten = LinearLayout(c).apply {
             orientation = LinearLayout.VERTICAL
             background = runde(Farben.FLAECHE, 30f.vp)
             elevation = 24f.vp
@@ -213,7 +215,14 @@ class GrossFenster(private val wurzel: FrameLayout, titel: String, breite: Int =
         wurzel.addView(decke, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
     }
 
-    fun add(v: View, oben: Int = 14) = spalte.addView(v, lp(ViewGroup.LayoutParams.MATCH_PARENT, oben = oben.vp))
+    fun add(v: View, oben: Int = 14) {
+        spalte.addView(v, lp(ViewGroup.LayoutParams.MATCH_PARENT, oben = oben.vp))
+        // Mit Eingabefeld: oben hinsetzen, damit die Bildschirmtastatur die Knöpfe nicht verdeckt
+        if (v is EditText) (kasten.layoutParams as? FrameLayout.LayoutParams)?.let {
+            it.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+            kasten.layoutParams = it
+        }
+    }
 
     fun knoepfe(vararg k: View) = add(LinearLayout(c).apply {
         gravity = Gravity.END
