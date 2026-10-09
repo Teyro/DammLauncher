@@ -192,8 +192,6 @@ def main():
             felder = eingaben()
             if felder:
                 tippe_text(felder[0], "Testname")
-            adb("shell", "input", "keyevent", "111")
-            time.sleep(0.5)
             if tippe("Symbol einer anderen App …"):
                 time.sleep(2)
                 for name in reversed(APPS):
@@ -267,7 +265,6 @@ def main():
             # die Felder des Fensters stehen hinter denen des Panels
             tippe_text(felder[-2], "Masterpass1")
             tippe_text(felder[-1], "Masterpass1")
-            adb("shell", "input", "keyevent", "111")
             tippe("Festlegen")
             time.sleep(4)
     if scrolle_zu("Als Vorlage für alle Geräte hochladen", w * 3 // 4, antippen=False):
@@ -280,7 +277,6 @@ def main():
             if len(felder) >= 2:
                 tippe_text(felder[-2], benutzer)
                 tippe_text(felder[-1], passwort)
-                adb("shell", "input", "keyevent", "111")
                 tippe("Hochladen")
                 time.sleep(4)
             screenshot(bild)
