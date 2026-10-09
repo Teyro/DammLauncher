@@ -304,6 +304,9 @@ def main():
             screenshot(bild)
     # Vorlage „auf dem Server geändert“ (5 Spalten) → Jetzt synchronisieren
     steuer("neuer")
+    for _ in range(8):  # zurück nach oben scrollen
+        adb("shell", "input", "swipe", str(w * 3 // 4), str(h // 3), str(w * 3 // 4), str(h * 3 // 4), "400")
+        time.sleep(0.6)
     if scrolle_zu("Jetzt synchronisieren", w * 3 // 4):
         time.sleep(5)
         screenshot("18_abgeglichen.png")

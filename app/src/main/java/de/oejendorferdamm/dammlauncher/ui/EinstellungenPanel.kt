@@ -198,10 +198,8 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
                 passwort.setText("")
             })
             add(schalter(c, "Automatisch täglich abgleichen", Geraet.abgleichAn) { an -> Geraet.abgleichAn = an })
-            knoepfe(
-                knopf(c, "Als Vorlage für alle Geräte hochladen", haupt = true) { a.hochladen() },
-                knopf(c, "Boss-Modus beenden", gefahr = true) { a.bossAbmelden() }
-            )
+            knoepfe(knopf(c, "Als Vorlage für alle Geräte hochladen", haupt = true) { a.hochladen() })
+            knoepfe(knopf(c, "Boss-Modus beenden", gefahr = true) { a.bossAbmelden() })
         } else {
             knoepfe(knopf(c, "Boss-Modus …") { a.bossAnmelden() })
         }
