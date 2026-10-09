@@ -88,8 +88,7 @@ def tippe_text(feld, text):
     time.sleep(0.7)
     adb("shell", "input", "text", text)
     time.sleep(0.5)
-    adb("shell", "input", "keyevent", "111")  # Tastatur zu, damit nichts verrutscht
-    time.sleep(0.7)
+    time.sleep(0.5)
 
 
 def scrolle_zu(name, x, teil=False, antippen=True):
@@ -265,6 +264,7 @@ def main():
             # die Felder des Fensters stehen hinter denen des Panels
             tippe_text(felder[-2], "Masterpass1")
             tippe_text(felder[-1], "Masterpass1")
+            screenshot("15a_master_passwort.png")
             tippe("Festlegen")
             time.sleep(4)
     if scrolle_zu("Als Vorlage für alle Geräte hochladen", w * 3 // 4, antippen=False):
