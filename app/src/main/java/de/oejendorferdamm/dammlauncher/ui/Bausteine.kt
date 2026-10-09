@@ -235,6 +235,8 @@ class GrossFenster(private val wurzel: FrameLayout, titel: String, breite: Int =
     fun schliessen() {
         if (!offen) return
         offen = false
+        // Tastatur mit dem Fenster zumachen – sonst verdeckt sie den Startbildschirm
+        (c.getSystemService(Context.INPUT_METHOD_SERVICE) as? android.view.inputmethod.InputMethodManager)?.hideSoftInputFromWindow(decke.windowToken, 0)
         (decke.parent as? ViewGroup)?.removeView(decke)
         beimSchliessen()
     }
