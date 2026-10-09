@@ -94,7 +94,7 @@ def tippe_text(feld, text):
 def zwei_felder(felder, a, b):
     """Erstes der beiden letzten Felder antippen, tippen, mit Tab ins zweite, tippen."""
     tap(*mitte(felder[-2]))
-    time.sleep(0.8)
+    time.sleep(2.5)  # bis Fokus und Tastatur wirklich da sind
     adb("shell", "input", "text", a)
     time.sleep(0.4)
     adb("shell", "input", "keyevent", "61")  # Tab → nächstes Feld
