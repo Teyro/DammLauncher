@@ -52,6 +52,9 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
         elevation = 24f.vp
         isClickable = true
         setPadding(36.vp, 28.vp, 36.vp, 20.vp)
+        // Kein Eingabefeld bekommt von selbst den Fokus – sonst springt beim Scrollen die Tastatur auf
+        isFocusableInTouchMode = true
+        descendantFocusability = ViewGroup.FOCUS_BEFORE_DESCENDANTS
     }
     private val inhalt = LinearLayout(c).apply { orientation = LinearLayout.VERTICAL }
     private val scroll = ScrollView(c).apply { addView(inhalt); isFillViewport = false }
@@ -213,7 +216,7 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
         abschnitt("Über DammLauncher")
         add(text(c, "Freie Software unter der GNU GPL v3.\nQuelltext: github.com/Teyro/DammLauncher", 22, Farben.TEXT2))
         add(View(c), 40)
-        scroll.post { scroll.scrollTo(0, pos) }
+        scroll.post { scroll.scrollTo(0, pos); karte.requestFocus() }
     }
 
     /** Raster ändern – was nicht mehr passt, rückt in freie Zellen oder in die Ablage. */
