@@ -264,8 +264,9 @@ def main():
         time.sleep(1.5)
         felder = eingaben()
         if len(felder) >= 2:
-            tippe_text(felder[0], "Masterpass1")
-            tippe_text(felder[1], "Masterpass1")
+            # die Felder des Fensters stehen hinter denen des Panels
+            tippe_text(felder[-2], "Masterpass1")
+            tippe_text(felder[-1], "Masterpass1")
             adb("shell", "input", "keyevent", "111")
             tippe("Festlegen")
             time.sleep(4)
