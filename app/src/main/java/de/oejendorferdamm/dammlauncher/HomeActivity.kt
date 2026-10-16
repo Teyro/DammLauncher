@@ -38,7 +38,7 @@ import de.oejendorferdamm.dammlauncher.abgleich.Abgleich
 import de.oejendorferdamm.dammlauncher.apps.AppInfo
 import de.oejendorferdamm.dammlauncher.apps.AppKatalog
 import de.oejendorferdamm.dammlauncher.apps.EigeneSymbole
-import de.oejendorferdamm.dammlauncher.hintergrund.Unsplash
+import de.oejendorferdamm.dammlauncher.hintergrund.FotoDesTages
 import de.oejendorferdamm.dammlauncher.konfig.Datei
 import de.oejendorferdamm.dammlauncher.konfig.Element
 import de.oejendorferdamm.dammlauncher.konfig.Geraet
@@ -56,6 +56,10 @@ import de.oejendorferdamm.dammlauncher.ui.Masse
 import de.oejendorferdamm.dammlauncher.ui.PanelAktionen
 import de.oejendorferdamm.dammlauncher.ui.RasterAktionen
 import de.oejendorferdamm.dammlauncher.ui.RasterAnsicht
+import de.oejendorferdamm.dammlauncher.ui.UhrAnsicht
+import de.oejendorferdamm.dammlauncher.ui.WidgetRahmen
+import de.oejendorferdamm.dammlauncher.ui.regler
+import de.oejendorferdamm.dammlauncher.konfig.Grenzen
 import de.oejendorferdamm.dammlauncher.ui.PunktRaster
 import de.oejendorferdamm.dammlauncher.ui.eingabe
 import de.oejendorferdamm.dammlauncher.ui.glasKnopf
@@ -186,7 +190,7 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         vorne = true
         if (Geraet.veraltetGemeldet || System.currentTimeMillis() - Geraet.letzterUpdateCheck > 24 * 60 * 60_000L) updatePruefenStill()
         else bereitesUpdateInstallieren()
-        if (Unsplash.faellig()) unsplashLaden(false)
+        if (FotoDesTages.faellig()) unsplashLaden(false)
     }
 
     override fun onPause() {
@@ -225,25 +229,26 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
     private fun zeigen() {
         val k = KonfigSpeicher.konfig
         val anbieter = if (sicher) emptySet() else widgets.anbieter().map { it.provider.flattenToString() }.toSet()
-        val (sichtbar, _) = KonfigJson.aufloesen(k, AppKatalog::istDa) { it in anbieter }
-        raster.setze(k, sichtbar) { w -> if (sicher) null else widgets.ansicht(this, w) }
+        val (sichtbar, _) = KonfigJson.aufloesen(k, AppKatalog::istDa) { it == Element.UHR || it in anbieter }
+        raster.setze(k, sichtbar) { w -> if (w.istUhr) UhrAnsicht(this) else if (sicher) null else widgets.ansicht(this, w) }
         alleApps.visibility = if (k.alleAppsKnopf) View.VISIBLE else View.GONE
         hintergrund(k)
         // Widgets ihre Größe mitteilen, sobald sie liegen
         raster.post {
             raster.widgetRahmen().values.forEach { rahmen ->
-                ((rahmen as? ViewGroup)?.getChildAt(0) as? AppWidgetHostView)?.let { widgets.groesseMelden(it, rahmen.width, rahmen.height) }
+                val r = rahmen as? WidgetRahmen ?: return@forEach
+                (r.getChildAt(0) as? AppWidgetHostView)?.let { widgets.groesseMelden(it, r.innenBreite, r.innenHoehe) }
             }
         }
     }
 
     /** Unsplash-Foto vor eigenem Bild vor Farbe; über Fotos oben und unten ein leichter Schatten (Lesbarkeit). */
     private fun hintergrund(k: Konfig) {
-        val foto = Unsplash.datei()
+        val foto = FotoDesTages.datei()
         val mitFoto = k.hintergrund.unsplash && foto.exists()
         val datei = if (mitFoto) foto else KonfigSpeicher.hintergrundDatei
-        fotoHinweis.visibility = if (mitFoto && Geraet.unsplashFotograf.isNotEmpty()) View.VISIBLE else View.GONE
-        fotoHinweis.text = "Foto: ${Geraet.unsplashFotograf} · Unsplash"
+        fotoHinweis.visibility = if (mitFoto && Geraet.fotoNachweis.isNotEmpty()) View.VISIBLE else View.GONE
+        fotoHinweis.text = "Foto: ${Geraet.fotoNachweis}"
         if (mitFoto || (k.hintergrund.bild && datei.exists())) {
             val stand = datei.lastModified() + datei.hashCode()
             if (stand == hintergrundStand) return
@@ -264,9 +269,14 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
     }
 
     private fun fotoSeiteOeffnen() {
-        val seite = Geraet.unsplashSeite.takeIf { it.startsWith("https://unsplash.com/") } ?: return
+        val s = Geraet.unsplashSeite
+        val seite = when {
+            s.startsWith("https://unsplash.com/") -> "$s?utm_source=DammLauncher&utm_medium=referral"
+            s.startsWith("https://commons.wikimedia.org/") -> s
+            else -> return
+        }
         try {
-            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("$seite?utm_source=DammLauncher&utm_medium=referral")))
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(seite)))
         } catch (_: Exception) {
             meldung("Kein Browser vorhanden.")
         }
@@ -279,7 +289,7 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         unsplashLaeuft = true
         if (vonHand) meldung("Holt ein neues Foto …")
         arbeit.execute {
-            val t = Unsplash.laden(this, vonHand)
+            val t = FotoDesTages.laden(this, vonHand)
             haupt.post {
                 unsplashLaeuft = false
                 zeigen()
@@ -370,13 +380,40 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
                 f.add(knopf(this, "Vom Startbildschirm entfernen", gefahr = true) { f.schliessen(); entferne(e) })
             }
             is Element.Widget -> {
-                val f = neuesFenster("Widget", 900)
+                val f = neuesFenster(if (e.istUhr) "Uhr" else "Widget", 900)
                 f.add(knopf(this, "Größe ändern", haupt = true) { f.schliessen(); raster.beginneGroesse(e) })
+                if (!e.istUhr) f.add(knopf(this, "Inhalt vergrößern …") { f.schliessen(); zoomEinstellen(e) })
                 val id = Geraet.widgetId(e.kennung)
                 if (id != 0 && widgets.info(id)?.configure != null) f.add(knopf(this, "Widget einrichten …") { f.schliessen(); konfigurieren(id, null) })
                 f.add(knopf(this, "Vom Startbildschirm entfernen", gefahr = true) { f.schliessen(); entferne(e) })
             }
         }
+    }
+
+    /** Inhalt eines Widgets vergrößern – wirkt sofort (Live-Vorschau hinter dem Fenster). */
+    private fun zoomEinstellen(w: Element.Widget) {
+        val f = neuesFenster("Inhalt vergrößern", 1000)
+        f.add(text(this, "Viele Widgets (z. B. Suchleisten) haben eine feste Größe und wirken auf großen Boards winzig. " +
+            "Hier wird der Inhalt im Feld hochskaliert.", 22, Farben.TEXT2))
+        fun setze(z: Int) = KonfigSpeicher.aendere { k ->
+            k.copy(elemente = k.elemente.map { if (it.schluessel == w.schluessel) (it as Element.Widget).copy(zoom = z) else it })
+        }
+        val aktuell = (KonfigSpeicher.konfig.elemente.firstOrNull { it.schluessel == w.schluessel } as? Element.Widget)?.zoom ?: w.zoom
+        f.add(regler(this, "Vergrößerung", Grenzen.ZOOM, aktuell, 25, " %") { z -> setze(z) })
+        f.knoepfe(
+            knopf(this, "Automatisch anpassen") { f.schliessen(); setze(passenderZoom(w)) },
+            knopf(this, "Fertig", haupt = true) { f.schliessen() }
+        )
+    }
+
+    /** So weit vergrößern, dass das Widget in seiner Mindestgröße das Feld ausfüllt. */
+    private fun passenderZoom(w: Element.Widget): Int {
+        val r = raster.widgetRahmen()[w] ?: raster.widgetRahmen().entries.firstOrNull { it.key.schluessel == w.schluessel }?.value ?: return 100
+        val info = widgets.info(Geraet.widgetId(w.kennung)) ?: return 100
+        val minB = info.minWidth.coerceAtLeast(1)
+        val minH = info.minHeight.coerceAtLeast(1)
+        val z = minOf(r.width * 100 / minB, r.height * 100 / minH)
+        return (z / 25 * 25).coerceIn(100, 300)
     }
 
     // ------------------------------------------------------------ Name und Symbol einer App ändern
@@ -506,6 +543,7 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         if (sicher) { meldung("Im sicheren Start sind Widgets aus."); return }
         if (gesperrt()) { meldung("Der Startbildschirm ist gegen Verändern gesperrt (Einstellungen)."); return }
         val f = neuesFenster("Widget hinzufügen", 1100)
+        f.add(knopf(this, "🕒  Digitaluhr (DammLauncher, 3×2)", haupt = true) { f.schliessen(); uhrAnlegen() }.apply { gravity = Gravity.START or Gravity.CENTER_VERTICAL }, 10)
         val liste = widgets.anbieter()
         if (liste.isEmpty()) f.add(text(this, "Auf diesem Gerät gibt es keine Widgets.", 26))
         val k = KonfigSpeicher.konfig
@@ -516,6 +554,20 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
             val app = try { packageManager.getApplicationLabel(packageManager.getApplicationInfo(info.provider.packageName, 0)) } catch (_: Exception) { "" }
             f.add(knopf(this, "$name  ($app, ${b}×$h)") { f.schliessen(); widgetAnlegen(info, b, h) }.apply { gravity = Gravity.START or Gravity.CENTER_VERTICAL }, 10)
         }
+    }
+
+    private fun uhrAnlegen() {
+        val k = KonfigSpeicher.konfig
+        var b = 3
+        var h = 2
+        var platz = Belegung.ersteFreie(k.elemente, b, h, k.spalten, k.zeilen)
+        while (platz == null && (b > 1 || h > 1)) {
+            if (b >= h && b > 1) b-- else h--
+            platz = Belegung.ersteFreie(k.elemente, b, h, k.spalten, k.zeilen)
+        }
+        if (platz == null) { meldung("Kein freier Platz für die Uhr."); return }
+        val kennung = "uhr" + UUID.randomUUID().toString().replace("-", "").take(8)
+        KonfigSpeicher.aendere { it.copy(elemente = it.elemente + Element.Widget(Element.UHR, kennung, platz.first, platz.second, b, h)) }
     }
 
     /** Wie viele Zellen braucht das Widget mindestens? */

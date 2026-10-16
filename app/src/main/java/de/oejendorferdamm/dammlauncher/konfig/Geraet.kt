@@ -89,9 +89,10 @@ object Geraet {
     var unsplashVersuch: Long
         get() = p.getLong("unsplashVersuch", 0)
         set(v) = p.edit().putLong("unsplashVersuch", v).apply()
-    var unsplashFotograf: String
-        get() = p.getString("unsplashFotograf", "") ?: ""
-        set(v) = p.edit().putString("unsplashFotograf", v.take(60)).apply()
+    /** Fotograf · Lizenz · Quelle – steht klein unten rechts. */
+    var fotoNachweis: String
+        get() = p.getString("fotoNachweis", null) ?: p.getString("unsplashFotograf", "")?.takeIf { it.isNotEmpty() }?.let { "$it · Unsplash" } ?: ""
+        set(v) = p.edit().putString("fotoNachweis", v.take(140)).apply()
     var unsplashSeite: String
         get() = p.getString("unsplashSeite", "") ?: ""
         set(v) = p.edit().putString("unsplashSeite", v.take(300)).apply()

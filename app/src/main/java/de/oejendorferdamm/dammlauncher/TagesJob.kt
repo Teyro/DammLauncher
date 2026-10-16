@@ -9,7 +9,7 @@ import android.app.job.JobScheduler
 import android.app.job.JobService
 import android.content.ComponentName
 import android.content.Context
-import de.oejendorferdamm.dammlauncher.hintergrund.Unsplash
+import de.oejendorferdamm.dammlauncher.hintergrund.FotoDesTages
 import de.oejendorferdamm.dammlauncher.konfig.Geraet
 import de.oejendorferdamm.dammlauncher.konfig.KonfigSpeicher
 import de.oejendorferdamm.dammlauncher.update.Update
@@ -50,7 +50,7 @@ class TagesJob : JobService() {
         fun erledigen(context: Context) {
             KonfigSpeicher.init(context)
             Geraet.init(context)
-            if (Unsplash.faellig()) Unsplash.laden(context)
+            if (FotoDesTages.faellig()) FotoDesTages.laden(context)
             if (Geraet.autoUpdate && System.currentTimeMillis() - Geraet.letzterUpdateCheck > 20 * 60 * 60_000L) updateVorladen(context)
         }
 

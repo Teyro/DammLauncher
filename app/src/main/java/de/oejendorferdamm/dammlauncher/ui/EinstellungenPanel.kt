@@ -165,36 +165,55 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
             }
         })
 
-        add(schalter(c, "Jeden Tag ein neues Foto von Unsplash", k.hintergrund.unsplash) { an ->
+        val h = k.hintergrund
+        add(schalter(c, "Jeden Tag ein neues Landschaftsfoto", h.unsplash) { an ->
             aendere { it.copy(hintergrund = it.hintergrund.copy(unsplash = an)) }
-            if (an && k.hintergrund.schluessel.isNotEmpty()) a.unsplashNeu()
+            if (an && (h.quelle == Hintergrund.COMMONS || h.schluessel.isNotEmpty())) a.unsplashNeu()
             aufbauen()
         }, 18)
-        if (k.hintergrund.unsplash) {
-            val thema = eingabe(c, "Thema (englisch), z. B. landscape, mountains, sea", k.hintergrund.thema)
-            val schluessel = eingabe(c, if (k.hintergrund.schluessel.isEmpty()) "Unsplash Access Key" else "Access Key gespeichert – leer lassen = behalten")
-            add(text(c, "Den kostenlosen Access Key gibt es unter unsplash.com/developers → „New Application“. Er geht mit der Vorlage an alle Geräte; " +
-                "jedes Gerät holt sich morgens sein eigenes Foto.", 21, Farben.TEXT2), 8)
-            if (Geraet.unsplashMeldung.isNotEmpty()) add(text(c, "Zuletzt: " + Geraet.unsplashMeldung, 21, Farben.TEXT2), 6)
-            add(thema, 10)
-            add(schluessel, 10)
-            // Taste „Fertig“ auf der Bildschirmtastatur schließt sie (sonst verdeckt sie die Knöpfe)
-            schluessel.imeOptions = schluessel.imeOptions or android.view.inputmethod.EditorInfo.IME_ACTION_DONE
+        if (h.unsplash) {
+            add(text(c, "Quelle:", 24, Farben.TEXT2), 8)
             knoepfe(
-                knopf(c, "Speichern") {
-                    val t = thema.text.toString().trim().ifEmpty { Hintergrund.STANDARD_THEMA }
-                    val sch = schluessel.text.toString().trim()
-                    when {
-                        !Hintergrund.THEMA.matches(t) -> a.meldung("Thema: nur Buchstaben, Ziffern, Leerzeichen und Kommas (bis 40 Zeichen).")
-                        sch.isNotEmpty() && !Hintergrund.SCHLUESSEL.matches(sch) -> a.meldung("Das sieht nicht wie ein Unsplash Access Key aus.")
-                        else -> {
-                            aendere { it.copy(hintergrund = it.hintergrund.copy(thema = t, schluessel = sch.ifEmpty { it.hintergrund.schluessel })) }
-                            a.unsplashNeu()
-                        }
-                    }
+                knopf(c, "Wikimedia Commons (frei)", haupt = h.quelle == Hintergrund.COMMONS) {
+                    aendere { it.copy(hintergrund = it.hintergrund.copy(quelle = Hintergrund.COMMONS)) }
+                    a.unsplashNeu()
+                    aufbauen()
                 },
-                knopf(c, "Neues Foto jetzt", haupt = true) { a.unsplashNeu() }.apply { isEnabled = k.hintergrund.schluessel.isNotEmpty() }
+                knopf(c, "Unsplash (Schlüssel)", haupt = h.quelle == Hintergrund.UNSPLASH) {
+                    aendere { it.copy(hintergrund = it.hintergrund.copy(quelle = Hintergrund.UNSPLASH)) }
+                    if (h.schluessel.isNotEmpty()) a.unsplashNeu()
+                    aufbauen()
+                }
             )
+            if (Geraet.unsplashMeldung.isNotEmpty()) add(text(c, "Zuletzt: " + Geraet.unsplashMeldung, 21, Farben.TEXT2), 6)
+            if (h.quelle == Hintergrund.COMMONS) {
+                add(text(c, "Ausgezeichnete Landschaftsfotos von Wikimedia Commons – frei lizenziert, ohne Anmeldung und Schlüssel. " +
+                    "Fotograf und Lizenz stehen klein unten rechts.", 21, Farben.TEXT2), 8)
+                knoepfe(knopf(c, "Neues Foto jetzt") { a.unsplashNeu() })
+            } else {
+                val thema = eingabe(c, "Thema (englisch), z. B. landscape, mountains, sea", h.thema)
+                val schluessel = eingabe(c, if (h.schluessel.isEmpty()) "Unsplash Access Key" else "Access Key gespeichert – leer lassen = behalten")
+                add(text(c, "Den kostenlosen Access Key gibt es unter unsplash.com/developers → „New Application“. Er geht mit der Vorlage an alle Geräte.", 21, Farben.TEXT2), 8)
+                add(thema, 10)
+                add(schluessel, 10)
+                // Taste „Fertig“ auf der Bildschirmtastatur schließt sie (sonst verdeckt sie die Knöpfe)
+                schluessel.imeOptions = schluessel.imeOptions or android.view.inputmethod.EditorInfo.IME_ACTION_DONE
+                knoepfe(
+                    knopf(c, "Speichern") {
+                        val t = thema.text.toString().trim().ifEmpty { Hintergrund.STANDARD_THEMA }
+                        val sch = schluessel.text.toString().trim()
+                        when {
+                            !Hintergrund.THEMA.matches(t) -> a.meldung("Thema: nur Buchstaben, Ziffern, Leerzeichen und Kommas (bis 40 Zeichen).")
+                            sch.isNotEmpty() && !Hintergrund.SCHLUESSEL.matches(sch) -> a.meldung("Das sieht nicht wie ein Unsplash Access Key aus.")
+                            else -> {
+                                aendere { it.copy(hintergrund = it.hintergrund.copy(thema = t, schluessel = sch.ifEmpty { it.hintergrund.schluessel })) }
+                                a.unsplashNeu()
+                            }
+                        }
+                    },
+                    knopf(c, "Neues Foto jetzt", haupt = true) { a.unsplashNeu() }.apply { isEnabled = h.schluessel.isNotEmpty() }
+                )
+            }
         }
 
         abschnitt("Widgets und Ablage")

@@ -99,6 +99,13 @@ class H(BaseHTTPRequestHandler):
             return self.antwort(200, json.dumps(r).encode(), "application/json")
         if p.startswith("/unsplash/"):
             return self.unsplash(p)
+        if p == "/commons/api.php":
+            seite = {"imageinfo": [{"width": 6000, "height": 4000, "mime": "image/jpeg",
+                                    "thumburl": "http://127.0.0.1:8766/unsplash/bild.png",
+                                    "descriptionurl": "https://commons.wikimedia.org/wiki/File:Test.jpg",
+                                    "extmetadata": {"Artist": {"value": "<a href='//commons.wikimedia.org/wiki/User:Kim'>Kim Lee</a>"},
+                                                    "LicenseShortName": {"value": "CC BY-SA 4.0"}}}]}
+            return self.antwort(200, json.dumps({"query": {"pages": [seite]}}).encode(), "application/json")
         if self.wer() is None:
             return self.antwort(401, kopf={"WWW-Authenticate": 'Basic realm="test"'})
         if p in DATEIEN:

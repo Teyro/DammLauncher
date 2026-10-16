@@ -123,6 +123,7 @@ class RasterAnsicht(context: Context, private val aktionen: RasterAktionen) : Vi
                         addView(v)
                         ansichten[e.schluessel] = v
                     }
+                    (v as? WidgetRahmen)?.zoom = if (e.istUhr) 100 else e.zoom
                 }
             }
             elementVon[v] = e
@@ -403,6 +404,42 @@ class RasterAnsicht(context: Context, private val aktionen: RasterAktionen) : Vi
  * und reicht ihn ans Raster weiter.
  */
 class WidgetRahmen(context: Context, private val raster: RasterAnsicht) : FrameLayout(context) {
+    /**
+     * Inhalt vergrößern (Prozent): Das Widget bekommt ein entsprechend kleineres Feld und wird
+     * hochskaliert – so füllt z. B. eine Suchleiste mit fester Höhe auch auf 75 Zoll ihr Feld.
+     */
+    var zoom = 100
+        set(v) {
+            if (field == v) return
+            field = v
+            requestLayout()
+        }
+
+    /** Größe, die das Widget selbst sieht (vor dem Hochskalieren). */
+    val innenBreite get() = width * 100 / zoom
+    val innenHoehe get() = height * 100 / zoom
+
+    override fun onMeasure(wSpec: Int, hSpec: Int) {
+        val b = MeasureSpec.getSize(wSpec)
+        val h = MeasureSpec.getSize(hSpec)
+        setMeasuredDimension(b, h)
+        for (i in 0 until childCount) getChildAt(i).measure(
+            MeasureSpec.makeMeasureSpec((b * 100 / zoom).coerceAtLeast(1), MeasureSpec.EXACTLY),
+            MeasureSpec.makeMeasureSpec((h * 100 / zoom).coerceAtLeast(1), MeasureSpec.EXACTLY)
+        )
+    }
+
+    override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {
+        val f = zoom / 100f
+        for (i in 0 until childCount) getChildAt(i).apply {
+            layout(0, 0, measuredWidth, measuredHeight)
+            pivotX = 0f
+            pivotY = 0f
+            scaleX = f
+            scaleY = f
+        }
+    }
+
     private var x0 = 0f
     private var y0 = 0f
     private var abgefangen = false

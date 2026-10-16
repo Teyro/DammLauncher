@@ -321,13 +321,18 @@ def main():
     time.sleep(2)
     screenshot("19_nach_abgleich.png")
 
-    # Unsplash: einschalten, Schlüssel eintragen, Foto des Tages holen
+    # Foto des Tages: erst Wikimedia Commons (ohne Schlüssel), dann Unsplash mit Schlüssel
     lang(w * 85 // 100, h * 70 // 100)
     time.sleep(2)
     tippe("▶")
     time.sleep(1)
-    if scrolle_zu("Jeden Tag ein neues Foto von Unsplash", w * 3 // 4):
-        time.sleep(1.5)
+    if scrolle_zu("Jeden Tag ein neues Landschaftsfoto", w * 3 // 4):
+        time.sleep(6)
+        scrolle_zu("Neues Foto jetzt", w * 3 // 4, antippen=False)
+        screenshot("19_commons_geladen.png")
+        tippe("Unsplash (Schlüssel)")
+        time.sleep(2)
+        scrolle_zu("Unsplash Access Key", w * 3 // 4, antippen=False)
         if feld_mit_hinweis("Unsplash Access Key", "TestSchluessel_0123456789abc"):
             screenshot("19a_unsplash_einstellungen.png")
             tastatur_zu()

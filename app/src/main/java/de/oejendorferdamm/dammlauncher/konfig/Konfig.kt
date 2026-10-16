@@ -23,7 +23,8 @@ data class Konfig(
     val animationen: Boolean = false,
     /** Knopf „Alle Apps“ unten in der Mitte (Wischen klappt auf großen Displays nicht immer). */
     val alleAppsKnopf: Boolean = true,
-    val elemente: List<Element> = emptyList(),
+    /** Neu eingerichtet: oben links die Digitaluhr (3 × 2). */
+    val elemente: List<Element> = listOf(Element.Widget(Element.UHR, "uhr", 0, 0, 3, 2)),
     /** Was nach dem Verkleinern des Rasters keinen Platz mehr hatte. */
     val nichtPlatziert: List<Element> = emptyList(),
     val hintergrund: Hintergrund = Hintergrund(),
@@ -44,17 +45,22 @@ data class Raender(val oben: Int, val unten: Int, val links: Int, val rechts: In
 
 /**
  * Hintergrund: Farbe (ARGB) und ob ein Bild (Datei hintergrund.jpg) darüber liegt. [unsplash] = jeden
- * Tag ein neues Foto von Unsplash zum Suchbegriff [thema] (braucht einen kostenlosen [schluessel],
- * den „Access Key“ einer Unsplash-App) – es liegt über Farbe und eigenem Bild.
+ * Tag ein neues Foto (liegt über Farbe und eigenem Bild) – aus der [quelle] Wikimedia Commons
+ * (ausgezeichnete, frei lizenzierte Landschaftsfotos, kein Schlüssel) oder Unsplash zum Suchbegriff
+ * [thema] (braucht einen kostenlosen [schluessel], den „Access Key“ einer Unsplash-App).
  */
 data class Hintergrund(
     val farbe: Int = 0xFF1E3A5F.toInt(),
     val bild: Boolean = false,
     val unsplash: Boolean = false,
     val thema: String = Hintergrund.STANDARD_THEMA,
-    val schluessel: String = ""
+    val schluessel: String = "",
+    /** Woher das Foto des Tages kommt: [COMMONS] (frei, ohne Schlüssel) oder [UNSPLASH]. */
+    val quelle: String = COMMONS
 ) {
     companion object {
+        const val COMMONS = "commons"
+        const val UNSPLASH = "unsplash"
         const val STANDARD_THEMA = "landscape"
         val THEMA = Regex("^[\\p{L}0-9 ,-]{1,40}$")
         val SCHLUESSEL = Regex("^[A-Za-z0-9_-]{20,80}$")
@@ -66,6 +72,11 @@ data class PasswortHash(val hash: String, val salt: String, val runden: Int)
 
 /** Ein Element auf dem Startbildschirm: belegt [breite] × [hoehe] Zellen ab ([spalte], [zeile]). */
 sealed class Element {
+    companion object {
+        /** „Anbieter“ der eingebauten Uhr. */
+        const val UHR = "de.oejendorferdamm.dammlauncher/Uhr"
+    }
+
     abstract val spalte: Int
     abstract val zeile: Int
     abstract val breite: Int
@@ -104,8 +115,12 @@ sealed class Element {
         override val spalte: Int,
         override val zeile: Int,
         override val breite: Int,
-        override val hoehe: Int
+        override val hoehe: Int,
+        /** Inhalt vergrößern (Prozent): viele Widgets haben feste Größen und wirken auf großen Boards winzig. */
+        val zoom: Int = 100
     ) : Element() {
+        /** Die eingebaute Digitaluhr – kein Android-Widget, braucht keine Freigabe. */
+        val istUhr get() = provider == UHR
         override val schluessel get() = "widget:$kennung"
         override fun verschoben(spalte: Int, zeile: Int) = copy(spalte = spalte, zeile = zeile)
         override fun mitGroesse(breite: Int, hoehe: Int) = copy(breite = breite, hoehe = hoehe)
@@ -119,4 +134,5 @@ object Grenzen {
     val ABSTAND = 0..200
     val ICON = 20..100
     val TEXT = 10..60
+    val ZOOM = 50..400
 }

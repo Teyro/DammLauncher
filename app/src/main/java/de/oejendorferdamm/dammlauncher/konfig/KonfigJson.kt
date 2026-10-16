@@ -35,7 +35,7 @@ object KonfigJson {
         put("elemente", JSONArray().apply { k.elemente.forEach { put(element(it)) } })
         put("nichtPlatziert", JSONArray().apply { k.nichtPlatziert.forEach { put(element(it)) } })
         put("hintergrund", JSONObject().put("farbe", "#%08X".format(k.hintergrund.farbe)).put("bild", k.hintergrund.bild)
-            .put("unsplash", k.hintergrund.unsplash).put("thema", k.hintergrund.thema).put("schluessel", k.hintergrund.schluessel))
+            .put("unsplash", k.hintergrund.unsplash).put("thema", k.hintergrund.thema).put("schluessel", k.hintergrund.schluessel).put("quelle", k.hintergrund.quelle))
         put("bearbeitenGesperrt", k.bearbeitenGesperrt)
         put("pin", k.pin?.let { hash(it) } ?: JSONObject.NULL)
         put("boss", k.boss?.let { hash(it) } ?: JSONObject.NULL)
@@ -47,7 +47,7 @@ object KonfigJson {
         is Element.App -> JSONObject().put("typ", "app").put("paket", e.paket).put("aktivitaet", e.aktivitaet).put("spalte", e.spalte).put("zeile", e.zeile)
             .apply { e.titel?.let { put("titel", it) }; e.icon?.let { put("icon", it) } }
         is Element.Widget -> JSONObject().put("typ", "widget").put("provider", e.provider).put("kennung", e.kennung)
-            .put("spalte", e.spalte).put("zeile", e.zeile).put("breite", e.breite).put("hoehe", e.hoehe)
+            .put("spalte", e.spalte).put("zeile", e.zeile).put("breite", e.breite).put("hoehe", e.hoehe).apply { if (e.zoom != 100) put("zoom", e.zoom) }
     }
 
     private val PAKET = Regex("^[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z0-9_]+)+$")
@@ -114,7 +114,11 @@ object KonfigJson {
                         val teile = prov.split('/')
                         if (teile.size != 2 || !PAKET.matches(teile[0]) || !KLASSE.matches(teile[1]) || !KENNUNG.matches(ken)) {
                             w.add("$name[$i]: ungültiges Widget"); null
-                        } else Element.Widget(prov, ken, s, z, e.optInt("breite", 1).coerceIn(1, 10), e.optInt("hoehe", 1).coerceIn(1, 10))
+                        } else {
+                            val zoom = e.optInt("zoom", 100)
+                            if (zoom !in Grenzen.ZOOM) w.add("$name[$i]: zoom = $zoom liegt außerhalb")
+                            Element.Widget(prov, ken, s, z, e.optInt("breite", 1).coerceIn(1, 10), e.optInt("hoehe", 1).coerceIn(1, 10), zoom.coerceIn(Grenzen.ZOOM))
+                        }
                     }
                     else -> { w.add("$name[$i]: unbekannter Typ"); null }
                 }
@@ -142,6 +146,13 @@ object KonfigJson {
             if (t.isEmpty() || Hintergrund.SCHLUESSEL.matches(t)) t else { w.add("hintergrund.schluessel ungültig"); "" }
         }
 
+        // Quelle kam mit 1.2.0 – wer schon einen Unsplash-Schlüssel hat, bleibt bei Unsplash
+        val quelle = when (val q = h?.optString("quelle", "").orEmpty()) {
+            "" -> if (schluessel.isNotEmpty()) Hintergrund.UNSPLASH else Hintergrund.COMMONS
+            Hintergrund.COMMONS, Hintergrund.UNSPLASH -> q
+            else -> { w.add("hintergrund.quelle unbekannt"); Hintergrund.COMMONS }
+        }
+
         fun passwort(name: String) = o.optJSONObject(name)?.let { p ->
             val hash = p.optString("hash")
             val salt = p.optString("salt")
@@ -163,7 +174,7 @@ object KonfigJson {
             alleAppsKnopf = schalter("alleAppsKnopf", std.alleAppsKnopf),
             elemente = platziert,
             nichtPlatziert = offen,
-            hintergrund = Hintergrund(farbe, h?.optBoolean("bild", false) ?: false, h?.optBoolean("unsplash", false) ?: false, thema, schluessel),
+            hintergrund = Hintergrund(farbe, h?.optBoolean("bild", false) ?: false, h?.optBoolean("unsplash", false) ?: false, thema, schluessel, quelle),
             bearbeitenGesperrt = schalter("bearbeitenGesperrt", false),
             pin = pin,
             boss = boss,
