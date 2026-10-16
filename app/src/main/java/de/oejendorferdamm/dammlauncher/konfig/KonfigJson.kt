@@ -34,7 +34,8 @@ object KonfigJson {
         put("alleAppsKnopf", k.alleAppsKnopf)
         put("elemente", JSONArray().apply { k.elemente.forEach { put(element(it)) } })
         put("nichtPlatziert", JSONArray().apply { k.nichtPlatziert.forEach { put(element(it)) } })
-        put("hintergrund", JSONObject().put("farbe", "#%08X".format(k.hintergrund.farbe)).put("bild", k.hintergrund.bild))
+        put("hintergrund", JSONObject().put("farbe", "#%08X".format(k.hintergrund.farbe)).put("bild", k.hintergrund.bild)
+            .put("unsplash", k.hintergrund.unsplash).put("thema", k.hintergrund.thema).put("schluessel", k.hintergrund.schluessel))
         put("bearbeitenGesperrt", k.bearbeitenGesperrt)
         put("pin", k.pin?.let { hash(it) } ?: JSONObject.NULL)
         put("boss", k.boss?.let { hash(it) } ?: JSONObject.NULL)
@@ -133,6 +134,14 @@ object KonfigJson {
             runCatching { java.lang.Long.parseLong(t.removePrefix("#"), 16).toInt() }.getOrNull()?.let { if (t.length == 7) it or 0xFF000000.toInt() else it }
         } ?: run { w.add("hintergrund.farbe fehlt oder ungültig"); std.hintergrund.farbe }
 
+        // Unsplash kam mit 1.1.0 dazu – fehlt es (ältere Vorlage), ist das keine Warnung
+        val thema = h?.optString("thema", "")?.trim().orEmpty().let { t ->
+            if (t.isEmpty()) Hintergrund.STANDARD_THEMA else if (Hintergrund.THEMA.matches(t)) t else { w.add("hintergrund.thema ungültig"); Hintergrund.STANDARD_THEMA }
+        }
+        val schluessel = h?.optString("schluessel", "")?.trim().orEmpty().let { t ->
+            if (t.isEmpty() || Hintergrund.SCHLUESSEL.matches(t)) t else { w.add("hintergrund.schluessel ungültig"); "" }
+        }
+
         fun passwort(name: String) = o.optJSONObject(name)?.let { p ->
             val hash = p.optString("hash")
             val salt = p.optString("salt")
@@ -154,7 +163,7 @@ object KonfigJson {
             alleAppsKnopf = schalter("alleAppsKnopf", std.alleAppsKnopf),
             elemente = platziert,
             nichtPlatziert = offen,
-            hintergrund = Hintergrund(farbe, h?.optBoolean("bild", false) ?: false),
+            hintergrund = Hintergrund(farbe, h?.optBoolean("bild", false) ?: false, h?.optBoolean("unsplash", false) ?: false, thema, schluessel),
             bearbeitenGesperrt = schalter("bearbeitenGesperrt", false),
             pin = pin,
             boss = boss,

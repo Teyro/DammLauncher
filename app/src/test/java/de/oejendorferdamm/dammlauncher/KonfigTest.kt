@@ -21,7 +21,7 @@ class KonfigTest {
             Element.Widget("com.android.deskclock/com.android.alarmclock.DigitalAppWidgetProvider", "uhr1", 2, 0, 3, 2)
         ),
         nichtPlatziert = listOf(Element.App("com.android.settings", "com.android.settings.Settings", 0, 0)),
-        hintergrund = Hintergrund(0xFF336699.toInt(), bild = true),
+        hintergrund = Hintergrund(0xFF336699.toInt(), bild = true, unsplash = true, thema = "mountains, lake", schluessel = "abcDEF123_-abcDEF123_-xyz"),
         bearbeitenGesperrt = true,
         pin = PasswortHash("aGFzaA==", "c2FsdA==", 20000),
         boss = PasswortHash("Ym9zcw==", "c2FsejI=", 30000),
@@ -34,6 +34,26 @@ class KonfigTest {
         assertTrue(e.warnungen.toString(), e.warnungen.isEmpty())
         assertEquals(voll, e.konfig)
         assertEquals(voll, KonfigJson.streng(KonfigJson.schreibe(voll)))
+    }
+
+    @Test
+    fun aeltereVorlageOhneUnsplashIstSauber() {
+        val alt = org.json.JSONObject(KonfigJson.schreibe(voll)).apply {
+            put("hintergrund", org.json.JSONObject().put("farbe", "#FF336699").put("bild", false))
+        }.toString()
+        val k = KonfigJson.streng(alt)
+        assertEquals(Hintergrund(0xFF336699.toInt()), k.hintergrund)
+    }
+
+    @Test
+    fun unsplashWerteWerdenGeprueft() {
+        val boese = org.json.JSONObject(KonfigJson.schreibe(voll)).apply {
+            getJSONObject("hintergrund").put("thema", "<script>").put("schluessel", "kurz")
+        }.toString()
+        val e = KonfigJson.lese(boese)
+        assertEquals(Hintergrund.STANDARD_THEMA, e.konfig.hintergrund.thema)
+        assertEquals("", e.konfig.hintergrund.schluessel)
+        assertEquals(2, e.warnungen.size)
     }
 
     @Test

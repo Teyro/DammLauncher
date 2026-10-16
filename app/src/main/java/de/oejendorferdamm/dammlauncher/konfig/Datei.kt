@@ -96,21 +96,26 @@ object Datei {
     fun hintergrundSpeichern(context: Context, quelle: Uri, breite: Int, hoehe: Int) {
         val roh = context.contentResolver.openInputStream(quelle)?.use { it.readBytes() } ?: throw IOException("Bild lässt sich nicht öffnen")
         if (roh.size > 60 * 1024 * 1024) throw IOException("Bild ist zu groß")
+        einpassen(roh, breite, hoehe, KonfigSpeicher.hintergrundDatei)
+    }
+
+    /** Bild füllend auf [breite]×[hoehe] zuschneiden und als JPEG nach [ziel] schreiben (über eine .tmp-Datei). */
+    fun einpassen(roh: ByteArray, breite: Int, hoehe: Int, ziel: File) {
         val o = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeByteArray(roh, 0, roh.size, o)
         if (o.outWidth <= 0) throw IOException("Das ist kein lesbares Bild")
         var probe = 1
         while (o.outWidth / (probe * 2) >= breite && o.outHeight / (probe * 2) >= hoehe) probe *= 2
         val bild = BitmapFactory.decodeByteArray(roh, 0, roh.size, BitmapFactory.Options().apply { inSampleSize = probe }) ?: throw IOException("Das ist kein lesbares Bild")
-        val ziel = Bitmap.createBitmap(breite, hoehe, Bitmap.Config.ARGB_8888)
+        val fertig = Bitmap.createBitmap(breite, hoehe, Bitmap.Config.ARGB_8888)
         val k = maxOf(breite.toFloat() / bild.width, hoehe.toFloat() / bild.height)
         val w = bild.width * k
         val h = bild.height * k
-        Canvas(ziel).drawBitmap(bild, null, RectF((breite - w) / 2f, (hoehe - h) / 2f, (breite + w) / 2f, (hoehe + h) / 2f), Paint(Paint.FILTER_BITMAP_FLAG))
+        Canvas(fertig).drawBitmap(bild, null, RectF((breite - w) / 2f, (hoehe - h) / 2f, (breite + w) / 2f, (hoehe + h) / 2f), Paint(Paint.FILTER_BITMAP_FLAG))
         bild.recycle()
-        val tmp = File(KonfigSpeicher.hintergrundDatei.parentFile, "hintergrund.tmp")
-        tmp.outputStream().use { ziel.compress(Bitmap.CompressFormat.JPEG, 88, it) }
-        ziel.recycle()
-        tmp.renameTo(KonfigSpeicher.hintergrundDatei)
+        val tmp = File(ziel.parentFile, ziel.name + ".tmp")
+        tmp.outputStream().use { fertig.compress(Bitmap.CompressFormat.JPEG, 88, it) }
+        fertig.recycle()
+        if (!tmp.renameTo(ziel)) throw IOException("Bild lässt sich nicht speichern")
     }
 }

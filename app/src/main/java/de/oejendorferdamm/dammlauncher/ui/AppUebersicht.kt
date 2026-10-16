@@ -47,7 +47,6 @@ class AppUebersicht(
         override fun getItemId(i: Int) = i.toLong()
         override fun getView(i: Int, alt: View?, eltern: ViewGroup): View {
             val z = (alt as? AppZelle) ?: AppZelle(context).apply {
-                dunkel = true
                 isClickable = false // Klicks übernimmt das GridView
                 isLongClickable = false
                 layoutParams = AbsListView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 200.vp)
@@ -59,22 +58,29 @@ class AppUebersicht(
     }
 
     init {
-        setBackgroundColor(0xF5F4F6F9.toInt())
+        // Dunkles Glas über dem Startbildschirm
+        setBackgroundColor(0xF0111827.toInt())
+        suche.apply {
+            setTextColor(android.graphics.Color.WHITE)
+            setHintTextColor(0x99FFFFFF.toInt())
+            background = runde(0x1FFFFFFF, 50f.vp, 2.vp, 0x33FFFFFF)
+            setPadding(34.vp, 18.vp, 34.vp, 18.vp)
+        }
         isClickable = true
         val spalte = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL; setPadding(50.vp, 30.vp, 50.vp, 0) }
         spalte.addView(LinearLayout(context).apply {
             gravity = Gravity.CENTER_VERTICAL
-            addView(text(context, titel, 40, fett = true), lp(rechts = 30.vp))
+            addView(text(context, titel, 40, android.graphics.Color.WHITE, fett = true), lp(rechts = 30.vp))
             addView(suche, lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f, rechts = 20.vp))
             zusatzKnopf?.let { addView(it, lp(rechts = 20.vp)) }
-            addView(knopf(context, "✕  Schließen", haupt = true) { schliessen() }, lp())
+            addView(glasKnopf(context, "✕  Schließen") { schliessen() }, lp())
         })
         raster.apply {
             numColumns = ((resources.displayMetrics.widthPixels - 100.vp) / 210.vp).coerceIn(3, 12)
             stretchMode = GridView.STRETCH_COLUMN_WIDTH
             verticalSpacing = 10.vp
             isFastScrollEnabled = true
-            selector = runde(0x221E6FD9, 20f.vp)
+            selector = runde(0x26FFFFFF, 24f.vp)
             this.adapter = this@AppUebersicht.adapter
             setOnItemClickListener { _, v, i, _ ->
                 val a = liste[i]

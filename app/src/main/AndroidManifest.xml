@@ -54,11 +54,15 @@
             android:exported="false"
             android:permission="android.permission.BIND_JOB_SERVICE" />
 
-        <!-- Übergibt die geladene Update-APK an den Installer (nicht exportiert, nur mit Freigabe) -->
-        <provider
-            android:name=".update.ApkProvider"
-            android:authorities="de.oejendorferdamm.dammlauncher.apk"
+        <!-- Täglich: Unsplash-Foto und Update im Hintergrund holen -->
+        <service
+            android:name=".TagesJob"
             android:exported="false"
-            android:grantUriPermissions="true" />
+            android:permission="android.permission.BIND_JOB_SERVICE" />
+
+        <!-- Ergebnis der Update-Installation (nur über das eigene PendingIntent erreichbar) -->
+        <receiver
+            android:name=".update.InstallErgebnis"
+            android:exported="false" />
     </application>
 </manifest>

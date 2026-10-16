@@ -40,9 +40,11 @@ android {
         debug {
             // Testversion fragt den Test-Server im Emulator statt GitHub (siehe scripts/testserver.py)
             buildConfigField("String", "UPDATE_API", "\"http://127.0.0.1:8766/api/releases/latest\"")
+            buildConfigField("String", "UNSPLASH_API", "\"http://127.0.0.1:8766/unsplash\"")
         }
         release {
             buildConfigField("String", "UPDATE_API", "\"https://api.github.com/repos/Teyro/DammLauncher/releases/latest\"")
+            buildConfigField("String", "UNSPLASH_API", "\"https://api.unsplash.com\"")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")

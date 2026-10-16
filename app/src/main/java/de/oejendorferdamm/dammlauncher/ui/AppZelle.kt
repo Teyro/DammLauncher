@@ -30,7 +30,7 @@ class AppZelle(context: Context) : View(context) {
     private var mitText = true
     private val textPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
-        setShadowLayer(4f, 0f, 1.5f, 0xCC000000.toInt())
+        setShadowLayer(6f, 0f, 2f, 0xE6000000.toInt())
     }
     private val bildPaint = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG)
     private val ziel = RectF()
@@ -40,7 +40,7 @@ class AppZelle(context: Context) : View(context) {
         set(v) {
             field = v
             textPaint.color = if (v) 0xFF1F2328.toInt() else Color.WHITE
-            if (v) textPaint.clearShadowLayer() else textPaint.setShadowLayer(4f, 0f, 1.5f, 0xCC000000.toInt())
+            if (v) textPaint.clearShadowLayer() else textPaint.setShadowLayer(6f, 0f, 2f, 0xE6000000.toInt())
             invalidate()
         }
 
@@ -94,8 +94,15 @@ class AppZelle(context: Context) : View(context) {
         if (sofort != null) bild = sofort
     }
 
+    // Antippen sichtbar machen: Zelle wird kurz etwas kleiner
+    override fun drawableStateChanged() {
+        super.drawableStateChanged()
+        invalidate()
+    }
+
     override fun onDraw(canvas: Canvas) {
         lade()
+        if (isPressed) canvas.scale(0.92f, 0.92f, width / 2f, height / 2f)
         val g = iconGroesse().toFloat()
         val textH = if (mitText) textPaint.textSize * 1.5f else 0f
         val gesamt = g + textH

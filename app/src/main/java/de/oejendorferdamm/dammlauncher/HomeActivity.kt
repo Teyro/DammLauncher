@@ -20,6 +20,8 @@ import android.graphics.Color
 import android.graphics.Rect
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.ColorDrawable
+import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.LayerDrawable
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
@@ -36,6 +38,7 @@ import de.oejendorferdamm.dammlauncher.abgleich.Abgleich
 import de.oejendorferdamm.dammlauncher.apps.AppInfo
 import de.oejendorferdamm.dammlauncher.apps.AppKatalog
 import de.oejendorferdamm.dammlauncher.apps.EigeneSymbole
+import de.oejendorferdamm.dammlauncher.hintergrund.Unsplash
 import de.oejendorferdamm.dammlauncher.konfig.Datei
 import de.oejendorferdamm.dammlauncher.konfig.Element
 import de.oejendorferdamm.dammlauncher.konfig.Geraet
@@ -53,7 +56,9 @@ import de.oejendorferdamm.dammlauncher.ui.Masse
 import de.oejendorferdamm.dammlauncher.ui.PanelAktionen
 import de.oejendorferdamm.dammlauncher.ui.RasterAktionen
 import de.oejendorferdamm.dammlauncher.ui.RasterAnsicht
+import de.oejendorferdamm.dammlauncher.ui.PunktRaster
 import de.oejendorferdamm.dammlauncher.ui.eingabe
+import de.oejendorferdamm.dammlauncher.ui.glasKnopf
 import de.oejendorferdamm.dammlauncher.ui.groesse
 import de.oejendorferdamm.dammlauncher.ui.knopf
 import de.oejendorferdamm.dammlauncher.ui.lp
@@ -72,6 +77,8 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
     private lateinit var wurzel: FrameLayout
     private lateinit var raster: RasterAnsicht
     private lateinit var alleApps: TextView
+    private lateinit var fotoHinweis: TextView
+    private var vorne = false
     private lateinit var widgets: WidgetVerwaltung
     private var uebersicht: AppUebersicht? = null
     private var panel: EinstellungenPanel? = null
@@ -106,19 +113,28 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         if (sicher) Geraet.vergissAbstuerze()
         KonfigSpeicher.init(this, sicher)
         Masse.aktualisiere(this)
+        resources.displayMetrics.let { m ->
+            Geraet.bildBreite = maxOf(m.widthPixels, m.heightPixels)
+            Geraet.bildHoehe = minOf(m.widthPixels, m.heightPixels)
+        }
         AppKatalog.init(this)
         widgets = WidgetVerwaltung(this)
 
         wurzel = FrameLayout(this)
         raster = RasterAnsicht(this, this)
         wurzel.addView(raster, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
-        alleApps = knopf(this, "▲  Alle Apps") { oeffneUebersicht() }.apply {
-            groesse(28)
-            background = runde(0xCC1F2328.toInt(), 44f.vp, 2.vp, 0x66FFFFFF)
-            setTextColor(Color.WHITE)
-            setPadding(46.vp, 18.vp, 46.vp, 18.vp)
+        alleApps = glasKnopf(this, "Alle Apps") { oeffneUebersicht() }.apply {
+            setCompoundDrawablesRelativeWithIntrinsicBounds(PunktRaster(30.vp, Color.WHITE), null, null, null)
+            compoundDrawablePadding = 18.vp
         }
-        wurzel.addView(alleApps, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply { bottomMargin = 14.vp })
+        wurzel.addView(alleApps, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply { bottomMargin = 18.vp })
+        fotoHinweis = text(this, "", 17, 0xE6FFFFFF.toInt()).apply {
+            background = runde(0x40000000, 30f.vp)
+            setPadding(20.vp, 8.vp, 20.vp, 8.vp)
+            visibility = View.GONE
+            setOnClickListener { fotoSeiteOeffnen() }
+        }
+        wurzel.addView(fotoHinweis, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM or Gravity.END).apply { bottomMargin = 26.vp; rightMargin = 26.vp })
         setContentView(wurzel)
 
         KonfigSpeicher.beobachte(konfigBeobachter)
@@ -132,6 +148,7 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         // Läuft er 30 Sekunden stabil, ist die Absturzschleife vorbei
         haupt.postDelayed({ Geraet.vergissAbstuerze() }, 30_000)
         Abgleich.planen(this)
+        TagesJob.planen(this)
         hintergrundPruefungen()
     }
 
@@ -166,7 +183,15 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
             bossSeit = 0
             panel?.aufbauen()
         }
+        vorne = true
         if (Geraet.veraltetGemeldet || System.currentTimeMillis() - Geraet.letzterUpdateCheck > 24 * 60 * 60_000L) updatePruefenStill()
+        else bereitesUpdateInstallieren()
+        if (Unsplash.faellig()) unsplashLaden(false)
+    }
+
+    override fun onPause() {
+        vorne = false
+        super.onPause()
     }
 
     override fun onDestroy() {
@@ -212,21 +237,59 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         }
     }
 
+    /** Unsplash-Foto vor eigenem Bild vor Farbe; über Fotos oben und unten ein leichter Schatten (Lesbarkeit). */
     private fun hintergrund(k: Konfig) {
-        val datei = KonfigSpeicher.hintergrundDatei
-        if (k.hintergrund.bild && datei.exists()) {
-            val stand = datei.lastModified()
+        val foto = Unsplash.datei()
+        val mitFoto = k.hintergrund.unsplash && foto.exists()
+        val datei = if (mitFoto) foto else KonfigSpeicher.hintergrundDatei
+        fotoHinweis.visibility = if (mitFoto && Geraet.unsplashFotograf.isNotEmpty()) View.VISIBLE else View.GONE
+        fotoHinweis.text = "Foto: ${Geraet.unsplashFotograf} · Unsplash"
+        if (mitFoto || (k.hintergrund.bild && datei.exists())) {
+            val stand = datei.lastModified() + datei.hashCode()
             if (stand == hintergrundStand) return
             hintergrundStand = stand
             arbeit.execute {
                 val b = try { BitmapFactory.decodeFile(datei.absolutePath) } catch (_: Throwable) { null }
-                haupt.post { wurzel.background = if (b != null) BitmapDrawable(resources, b) else ColorDrawable(k.hintergrund.farbe) }
+                haupt.post {
+                    wurzel.background = if (b == null) ColorDrawable(k.hintergrund.farbe) else LayerDrawable(arrayOf(
+                        BitmapDrawable(resources, b),
+                        GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(0x59000000, 0x00000000, 0x00000000, 0x73000000))
+                    ))
+                }
             }
         } else {
             hintergrundStand = -1
             wurzel.background = ColorDrawable(k.hintergrund.farbe)
         }
     }
+
+    private fun fotoSeiteOeffnen() {
+        val seite = Geraet.unsplashSeite.takeIf { it.startsWith("https://unsplash.com/") } ?: return
+        try {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("$seite?utm_source=DammLauncher&utm_medium=referral")))
+        } catch (_: Exception) {
+            meldung("Kein Browser vorhanden.")
+        }
+    }
+
+    private var unsplashLaeuft = false
+
+    private fun unsplashLaden(vonHand: Boolean) {
+        if (unsplashLaeuft) return
+        unsplashLaeuft = true
+        if (vonHand) meldung("Holt ein neues Foto …")
+        arbeit.execute {
+            val t = Unsplash.laden(this, vonHand)
+            haupt.post {
+                unsplashLaeuft = false
+                zeigen()
+                panel?.aufbauen()
+                if (vonHand) meldung(t, lang = t.startsWith("Fehler"))
+            }
+        }
+    }
+
+    override fun unsplashNeu() = unsplashLaden(true)
 
     /** Großer Hinweis unten (ein Toast wäre auf 75 Zoll kaum zu sehen). */
     override fun meldung(text: String) = meldung(text, false)
@@ -583,7 +646,8 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
                     haupt.post {
                         if (fehler != null) meldung("Hintergrund: $fehler") else {
                             hintergrundStand = -1
-                            KonfigSpeicher.aendere { it.copy(hintergrund = it.hintergrund.copy(bild = true)) }
+                            KonfigSpeicher.aendere { it.copy(hintergrund = it.hintergrund.copy(bild = true, unsplash = false)) }
+                            panel?.aufbauen()
                             zeigen()
                         }
                     }
@@ -827,8 +891,10 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
     private fun updatePruefenStill(vonHand: Boolean = false) {
         if (pruefungLaeuft) return
         pruefungLaeuft = true
+        val automatisch = Geraet.autoUpdate && Update.darfInstallieren(this)
         arbeit.execute {
-            val e = Update.pruefen()
+            // Automatisch: gleich mitladen und prüfen, installiert wird danach ohne Nachfrage
+            val e = if (automatisch) TagesJob.updateVorladen(this) else Update.pruefen()
             haupt.post {
                 pruefungLaeuft = false
                 if (e == null) {
@@ -840,9 +906,11 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
                     Geraet.veraltetGemeldet = e.gesperrt
                     updateInfo = e
                     updateStatus = if (e.neuer) "Neue Version ${e.info.version} verfügbar." else "Auf dem neuesten Stand."
-                    if (e.gesperrt) zeigeSperre(e) else {
-                        sperreAufheben()
-                        if (e.neuer) updateAnbieten(e)
+                    if (e.gesperrt) zeigeSperre(e) else sperreAufheben()
+                    when {
+                        !e.neuer -> Unit
+                        automatisch && Geraet.updateBereit == e.info.version -> bereitesUpdateInstallieren()
+                        !e.gesperrt -> updateAnbieten(e)
                     }
                 }
                 if (vonHand) panel?.aufbauen()
@@ -850,10 +918,37 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         }
     }
 
+    /**
+     * Liegt ein geprüftes Update bereit: installieren, sobald der Startbildschirm ein paar Sekunden
+     * unbenutzt vorne ist (nie mitten in einer Eingabe).
+     */
+    private fun bereitesUpdateInstallieren() {
+        val v = Geraet.updateBereit
+        if (v.isEmpty()) return
+        if (!Update.istNeuer(v, BuildConfig.VERSION_NAME) || !Update.apkDatei(this).exists()) {
+            // schon installiert (oder Datei weg): aufräumen
+            Geraet.updateBereit = ""
+            Update.apkDatei(this).delete()
+            return
+        }
+        if (!Geraet.autoUpdate || !Update.darfInstallieren(this)) return
+        haupt.removeCallbacks(autoInstallation)
+        haupt.postDelayed(autoInstallation, 5_000)
+    }
+
+    private val autoInstallation = Runnable {
+        val ruhig = vorne && fenster.isEmpty() && panel == null && uebersicht == null && !laedt
+        if (!ruhig) return@Runnable
+        meldung("DammLauncher wird aktualisiert …")
+        try { Update.installieren(this) } catch (_: Exception) { Geraet.updateBereit = "" }
+    }
+
     private fun updateAnbieten(e: Update.Ergebnis) {
         val f = neuesFenster("Neue Version ${e.info.version}", 1100)
         if (e.info.notizen.isNotBlank()) f.add(text(this, e.info.notizen.take(1500), 22, Farben.TEXT2))
         f.add(text(this, "Wichtig: 7 Tage nach Erscheinen einer neuen Version sperrt sich die alte aus Sicherheitsgründen.", 22, Farben.ROT), 18)
+        if (Geraet.autoUpdate && !Update.darfInstallieren(this))
+            f.add(text(this, "Für automatische Updates einmal „Apps installieren“ erlauben – „Jetzt aktualisieren“ führt dorthin.", 22, Farben.TEXT2), 12)
         f.knoepfe(knopf(this, "Später") { f.schliessen() }, knopf(this, "Jetzt aktualisieren", haupt = true) { f.schliessen(); updateLaden(e, null) })
     }
 
@@ -901,15 +996,8 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         laedt = true
         status?.text = "Lädt …"
         arbeit.execute {
-            val fehler = try {
-                val apk = Update.laden(this, e.info) { p -> haupt.post { status?.text = "Lädt … ${(p * 100).toInt()} %" } }
-                if (!Update.signaturPasst(this, apk)) {
-                    apk.delete()
-                    "Die geladene Datei ist nicht korrekt signiert – Update abgebrochen."
-                } else null
-            } catch (x: Exception) {
-                "Herunterladen fehlgeschlagen: ${x.message}"
-            }
+            val fehler = Update.vorbereiten(this, e.info) { p -> haupt.post { status?.text = "Lädt … ${(p * 100).toInt()} %" } }
+            if (fehler == null) Geraet.updateBereit = e.info.version
             haupt.post {
                 laedt = false
                 if (fehler != null) {
@@ -917,7 +1005,7 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
                     meldung(fehler, lang = true)
                 } else {
                     status?.text = "Installation wird gestartet …"
-                    try { Update.installieren(this) } catch (_: Exception) { meldung("Installer lässt sich nicht öffnen.") }
+                    try { Update.installieren(this) } catch (x: Exception) { meldung("Installation nicht möglich: ${x.message}") }
                 }
             }
         }

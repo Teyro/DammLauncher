@@ -6,7 +6,9 @@ Steuerung: GET /_steuer/neuer (Vorlage serverseitig „neuer“ machen), /_steue
 import base64
 import datetime
 import json
+import struct
 import sys
+import zlib
 from email.utils import formatdate
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import unquote, urlparse
@@ -14,7 +16,34 @@ from urllib.parse import unquote, urlparse
 DATEIEN = {}
 ORDNER = {"/webdav"}
 NUTZER = {"lesen": ("lesen123", False), "schreiben": ("schreib123", True)}
-ZUSTAND = {"update": "aus"}
+ZUSTAND = {"update": "aus", "unsplash": 0}
+UNSPLASH_SCHLUESSEL = "TestSchluessel_0123456789abc"
+
+
+def landschaft(b=640, h=360):
+    """Kleines PNG ohne Zusatzbibliothek: Himmel, Sonne, zwei Hügel."""
+    zeilen = bytearray()
+    for y in range(h):
+        zeilen.append(0)
+        for x in range(b):
+            if y > h * 0.62 + 30 * ((x / b - 0.3) ** 2) * 4:
+                p = (46, 125, 50)
+            elif y > h * 0.5 + 40 * ((x / b - 0.75) ** 2) * 6:
+                p = (102, 160, 90)
+            elif (x - b * 0.7) ** 2 + (y - h * 0.25) ** 2 < 900:
+                p = (255, 214, 102)
+            else:
+                t = y / h
+                p = (int(90 + 120 * t), int(150 + 80 * t), int(230 - 10 * t))
+            zeilen += bytes(p)
+
+    def block(art, daten):
+        return struct.pack(">I", len(daten)) + art + daten + struct.pack(">I", zlib.crc32(art + daten) & 0xFFFFFFFF)
+    return (b"\x89PNG\r\n\x1a\n" + block(b"IHDR", struct.pack(">IIBBBBB", b, h, 8, 2, 0, 0, 0))
+            + block(b"IDAT", zlib.compress(bytes(zeilen), 6)) + block(b"IEND", b""))
+
+
+BILD = landschaft()
 
 
 class H(BaseHTTPRequestHandler):
@@ -68,10 +97,27 @@ class H(BaseHTTPRequestHandler):
                  "assets": [{"name": "DammLauncher.apk", "size": 100,
                              "browser_download_url": "https://github.com/Teyro/DammLauncher/releases/download/v9.9.9/DammLauncher.apk"}]}
             return self.antwort(200, json.dumps(r).encode(), "application/json")
+        if p.startswith("/unsplash/"):
+            return self.unsplash(p)
         if self.wer() is None:
             return self.antwort(401, kopf={"WWW-Authenticate": 'Basic realm="test"'})
         if p in DATEIEN:
             return self.antwort(200, DATEIEN[p])
+        self.antwort(404)
+
+    def unsplash(self, p):
+        if p == "/unsplash/bild.png":
+            return self.antwort(200, BILD, "image/png")
+        if self.headers.get("Authorization") != "Client-ID " + UNSPLASH_SCHLUESSEL:
+            return self.antwort(401, b'{"errors":["OAuth error: The access token is invalid"]}', "application/json")
+        if p == "/unsplash/photos/random":
+            ZUSTAND["unsplash"] += 1
+            r = {"urls": {"raw": "http://127.0.0.1:8766/unsplash/bild.png?ixid=test"},
+                 "user": {"name": "Erika Muster", "links": {"html": "https://unsplash.com/@erika"}},
+                 "links": {"html": "https://unsplash.com/photos/test", "download_location": "http://127.0.0.1:8766/unsplash/photos/test/download"}}
+            return self.antwort(200, json.dumps(r).encode(), "application/json")
+        if p == "/unsplash/photos/test/download":
+            return self.antwort(200, b'{"url":"x"}', "application/json")
         self.antwort(404)
 
     def schreibend(self):

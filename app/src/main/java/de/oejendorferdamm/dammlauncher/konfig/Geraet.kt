@@ -69,6 +69,44 @@ object Geraet {
         get() = p.getBoolean("veraltet", false)
         set(v) = p.edit().putBoolean("veraltet", v).apply()
 
+    /** Updates im Hintergrund laden und gleich installieren (sonst nur anbieten). */
+    var autoUpdate: Boolean
+        get() = p.getBoolean("autoUpdate", true)
+        set(v) = p.edit().putBoolean("autoUpdate", v).apply()
+
+    /** Version, deren APK schon geladen und geprüft im Cache liegt ("" = keine). */
+    var updateBereit: String
+        get() = p.getString("updateBereit", "") ?: ""
+        set(v) = p.edit().putString("updateBereit", v).apply()
+
+    // ---- Tägliches Unsplash-Foto (gehört zu diesem Gerät, jedes Board hat sein eigenes)
+    var unsplashTag: String
+        get() = p.getString("unsplashTag", "") ?: ""
+        set(v) = p.edit().putString("unsplashTag", v).apply()
+    var unsplashThema: String
+        get() = p.getString("unsplashThema", "") ?: ""
+        set(v) = p.edit().putString("unsplashThema", v).apply()
+    var unsplashVersuch: Long
+        get() = p.getLong("unsplashVersuch", 0)
+        set(v) = p.edit().putLong("unsplashVersuch", v).apply()
+    var unsplashFotograf: String
+        get() = p.getString("unsplashFotograf", "") ?: ""
+        set(v) = p.edit().putString("unsplashFotograf", v.take(60)).apply()
+    var unsplashSeite: String
+        get() = p.getString("unsplashSeite", "") ?: ""
+        set(v) = p.edit().putString("unsplashSeite", v.take(300)).apply()
+    var unsplashMeldung: String
+        get() = p.getString("unsplashMeldung", "") ?: ""
+        set(v) = p.edit().putString("unsplashMeldung", v.take(300)).apply()
+
+    /** Bildschirmgröße (quer) – damit auch der Hintergrund-Job passende Fotos holt. */
+    var bildBreite: Int
+        get() = p.getInt("bildBreite", 1920)
+        set(v) = p.edit().putInt("bildBreite", v.coerceIn(640, 3840)).apply()
+    var bildHoehe: Int
+        get() = p.getInt("bildHoehe", 1080)
+        set(v) = p.edit().putInt("bildHoehe", v.coerceIn(360, 2160)).apply()
+
     /** Einmalige Widget-Freigabe erledigt? */
     var widgetFreigabeGefragt: Boolean
         get() = p.getBoolean("widgetFreigabe", false)

@@ -170,7 +170,7 @@ def main():
     for name in APPS:
         if gelegt >= 5:
             break
-        tippe("▲  Alle Apps")
+        tippe("Alle Apps")
         time.sleep(2)
         if gelegt == 0:
             screenshot("02_uebersicht.png")
@@ -189,7 +189,7 @@ def main():
     screenshot("03_apps_abgelegt.png")
 
     # Suche
-    tippe("▲  Alle Apps")
+    tippe("Alle Apps")
     time.sleep(2)
     felder = eingaben()
     if felder:
@@ -314,6 +314,28 @@ def main():
     time.sleep(2)
     screenshot("19_nach_abgleich.png")
 
+    # Unsplash: einschalten, Schlüssel eintragen, Foto des Tages holen
+    lang(w * 85 // 100, h * 70 // 100)
+    time.sleep(2)
+    tippe("▶")
+    time.sleep(1)
+    if scrolle_zu("Jeden Tag ein neues Foto von Unsplash", w * 3 // 4):
+        time.sleep(1.5)
+        if feld_mit_hinweis("Unsplash Access Key", "TestSchluessel_0123456789abc"):
+            screenshot("19a_unsplash_einstellungen.png")
+            tippe("Speichern")
+            time.sleep(6)
+            scrolle_zu("Neues Foto jetzt", w * 3 // 4, antippen=False)
+            screenshot("19b_unsplash_geladen.png")
+    tippe("Fertig")
+    time.sleep(2)
+    screenshot("19c_unsplash_startbildschirm.png")
+    tippe("Alle Apps")
+    time.sleep(2)
+    screenshot("19d_uebersicht_dunkel.png")
+    adb("shell", "input", "keyevent", "4")
+    time.sleep(1)
+
     # Update-Pflicht: neue Version seit 30 Tagen → Sperre; Server weg → keine Sperre
     steuer("update_alt")
     adb("shell", "am", "start", "-a", "android.settings.SETTINGS")
@@ -335,7 +357,7 @@ def main():
     if not laeuft():
         print("FEHLER: Launcher läuft am Ende nicht", file=sys.stderr)
         sys.exit(1)
-    if "FATAL EXCEPTION" in log and PAKET in log:
+    if "FATAL EXCEPTION" in log and f"Process: {PAKET}," in log:
         print("FEHLER: Absturz im Logcat", file=sys.stderr)
         sys.exit(1)
 

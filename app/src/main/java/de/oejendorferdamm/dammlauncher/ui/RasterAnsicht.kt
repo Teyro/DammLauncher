@@ -206,12 +206,12 @@ class RasterAnsicht(context: Context, private val aktionen: RasterAktionen) : Vi
         }
         groesse?.let { g ->
             val f = r().feld(g.s, g.z, g.b, g.h)
-            linie.color = 0xFF1E6FD9.toInt()
+            linie.color = 0xFF2563EB.toInt()
             linie.strokeWidth = 6f.vp
             canvas.drawRoundRect(f.links, f.oben, f.rechts, f.unten, 14f.vp, 14f.vp, linie)
             malen.color = Color.WHITE
             griffe(g).forEach { (x, y) ->
-                malen.color = 0xFF1E6FD9.toInt()
+                malen.color = 0xFF2563EB.toInt()
                 canvas.drawCircle(x, y, 34f.vp, malen)
                 malen.color = Color.WHITE
                 canvas.drawCircle(x, y, 22f.vp, malen)

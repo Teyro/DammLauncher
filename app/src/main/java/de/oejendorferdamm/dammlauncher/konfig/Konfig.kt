@@ -42,8 +42,24 @@ data class Raender(val oben: Int, val unten: Int, val links: Int, val rechts: In
     val gleich get() = oben == unten && oben == links && oben == rechts
 }
 
-/** Hintergrund: Farbe (ARGB) und ob ein Bild (Datei hintergrund.jpg) darüber liegt. */
-data class Hintergrund(val farbe: Int = 0xFF1E3A5F.toInt(), val bild: Boolean = false)
+/**
+ * Hintergrund: Farbe (ARGB) und ob ein Bild (Datei hintergrund.jpg) darüber liegt. [unsplash] = jeden
+ * Tag ein neues Foto von Unsplash zum Suchbegriff [thema] (braucht einen kostenlosen [schluessel],
+ * den „Access Key“ einer Unsplash-App) – es liegt über Farbe und eigenem Bild.
+ */
+data class Hintergrund(
+    val farbe: Int = 0xFF1E3A5F.toInt(),
+    val bild: Boolean = false,
+    val unsplash: Boolean = false,
+    val thema: String = Hintergrund.STANDARD_THEMA,
+    val schluessel: String = ""
+) {
+    companion object {
+        const val STANDARD_THEMA = "landscape"
+        val THEMA = Regex("^[\\p{L}0-9 ,-]{1,40}$")
+        val SCHLUESSEL = Regex("^[A-Za-z0-9_-]{20,80}$")
+    }
+}
 
 /** PBKDF2-Hash mit Salt (beides Base64), Iterationen. */
 data class PasswortHash(val hash: String, val salt: String, val runden: Int)

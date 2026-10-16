@@ -12,6 +12,7 @@ import android.widget.ScrollView
 import de.oejendorferdamm.dammlauncher.BuildConfig
 import de.oejendorferdamm.dammlauncher.konfig.Geraet
 import de.oejendorferdamm.dammlauncher.konfig.Grenzen
+import de.oejendorferdamm.dammlauncher.konfig.Hintergrund
 import de.oejendorferdamm.dammlauncher.konfig.Konfig
 import de.oejendorferdamm.dammlauncher.konfig.KonfigSpeicher
 import de.oejendorferdamm.dammlauncher.raster.Belegung
@@ -32,6 +33,7 @@ interface PanelAktionen {
     fun jetztAbgleichen()
     fun zugangSpeichern(server: String, ordner: String, benutzer: String, passwort: String)
     fun updatePruefen()
+    fun unsplashNeu()
     fun bossAktiv(): Boolean
     fun updateText(): String
     fun meldung(text: String)
@@ -48,8 +50,8 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
     private val ebene = FrameLayout(c).apply { isClickable = false }
     private val karte = LinearLayout(c).apply {
         orientation = LinearLayout.VERTICAL
-        background = runde(Farben.PANEL, 30f.vp)
-        elevation = 24f.vp
+        background = runde(Farben.PANEL, 36f.vp)
+        elevation = 30f.vp
         isClickable = true
         setPadding(36.vp, 28.vp, 36.vp, 20.vp)
         // Kein Eingabefeld bekommt von selbst den Fokus – sonst springt beim Scrollen die Tastatur auf
@@ -65,8 +67,8 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
         karte.addView(LinearLayout(c).apply {
             gravity = Gravity.CENTER_VERTICAL
             addView(text(c, "Einstellungen", 40, fett = true), lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-            addView(knopf(c, "◀") { lage = (lage - 1).coerceAtLeast(0); setzeLage() }, lp(90.vp, 86.vp, rechts = 10.vp))
-            addView(knopf(c, "▶") { lage = (lage + 1).coerceAtMost(2); setzeLage() }, lp(90.vp, 86.vp, rechts = 20.vp))
+            addView(knopf(c, "◀") { lage = (lage - 1).coerceAtLeast(0); setzeLage() }.apply { background = rundKnopf() }, lp(86.vp, 86.vp, rechts = 10.vp))
+            addView(knopf(c, "▶") { lage = (lage + 1).coerceAtMost(2); setzeLage() }.apply { background = rundKnopf() }, lp(86.vp, 86.vp, rechts = 20.vp))
             addView(knopf(c, "Fertig", haupt = true) { a.panelZu() }, lp())
         })
         karte.addView(scroll, lp(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f, oben = 16.vp))
@@ -90,12 +92,17 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
 
     private fun aendere(f: (Konfig) -> Konfig) = KonfigSpeicher.aendere(f)
 
+    /** Jeder Abschnitt ist eine eigene weiße Karte; [add] füllt immer die zuletzt begonnene. */
+    private var aktuelleKarte: LinearLayout? = null
+
     private fun abschnitt(titel: String) {
-        inhalt.addView(text(c, titel, 30, Farben.AKZENT, fett = true), lp(ViewGroup.LayoutParams.MATCH_PARENT, oben = 30.vp))
-        inhalt.addView(View(c).apply { setBackgroundColor(0xFFD5DCE4.toInt()) }, lp(ViewGroup.LayoutParams.MATCH_PARENT, 2.vp, oben = 6.vp))
+        val k = karte(c)
+        k.addView(text(c, titel.uppercase(Locale.GERMAN), 21, Farben.AKZENT, fett = true).apply { letterSpacing = 0.06f }, lp(ViewGroup.LayoutParams.MATCH_PARENT))
+        inhalt.addView(k, lp(ViewGroup.LayoutParams.MATCH_PARENT, oben = 22.vp))
+        aktuelleKarte = k
     }
 
-    private fun add(v: View, oben: Int = 8) = inhalt.addView(v, lp(ViewGroup.LayoutParams.MATCH_PARENT, oben = oben.vp))
+    private fun add(v: View, oben: Int = 8) = (aktuelleKarte ?: inhalt).addView(v, lp(ViewGroup.LayoutParams.MATCH_PARENT, oben = oben.vp))
 
     private fun knoepfe(vararg k: View) = add(LinearLayout(c).apply {
         orientation = LinearLayout.HORIZONTAL
@@ -106,6 +113,7 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
     fun aufbauen() {
         val pos = scroll.scrollY
         inhalt.removeAllViews()
+        aktuelleKarte = null
         val k = KonfigSpeicher.konfig
 
         abschnitt("Raster")
@@ -145,17 +153,47 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
         abschnitt("Hintergrund")
         knoepfe(
             knopf(c, "Bild wählen …") { a.bildWaehlen() },
-            knopf(c, "Kein Bild") { aendere { it.copy(hintergrund = it.hintergrund.copy(bild = false)) } }.apply { isEnabled = k.hintergrund.bild }
+            knopf(c, "Kein Bild") { aendere { it.copy(hintergrund = it.hintergrund.copy(bild = false, unsplash = false)) }; aufbauen() }.apply { isEnabled = k.hintergrund.bild || k.hintergrund.unsplash }
         )
         add(text(c, "Farbe:", 24, Farben.TEXT2), 14)
         add(LinearLayout(c).apply {
             FARBEN.forEach { f ->
                 addView(View(c).apply {
                     background = runde(f, 40f.vp, if (f == k.hintergrund.farbe) 6.vp else 2.vp, if (f == k.hintergrund.farbe) Farben.AKZENT else 0xFFB8C2CE.toInt())
-                    setOnClickListener { aendere { it.copy(hintergrund = it.hintergrund.copy(farbe = f, bild = false)) }; aufbauen() }
+                    setOnClickListener { aendere { it.copy(hintergrund = it.hintergrund.copy(farbe = f, bild = false, unsplash = false)) }; aufbauen() }
                 }, lp(80.vp, 80.vp, rechts = 14.vp))
             }
         })
+
+        add(schalter(c, "Jeden Tag ein neues Foto von Unsplash", k.hintergrund.unsplash) { an ->
+            aendere { it.copy(hintergrund = it.hintergrund.copy(unsplash = an)) }
+            if (an && k.hintergrund.schluessel.isNotEmpty()) a.unsplashNeu()
+            aufbauen()
+        }, 18)
+        if (k.hintergrund.unsplash) {
+            val thema = eingabe(c, "Thema (englisch), z. B. landscape, mountains, sea", k.hintergrund.thema)
+            val schluessel = eingabe(c, if (k.hintergrund.schluessel.isEmpty()) "Unsplash Access Key" else "Access Key gespeichert – leer lassen = behalten")
+            add(thema, 10)
+            add(schluessel, 10)
+            add(text(c, "Den kostenlosen Access Key gibt es unter unsplash.com/developers → „New Application“. Er geht mit der Vorlage an alle Geräte; " +
+                "jedes Gerät holt sich morgens sein eigenes Foto.", 21, Farben.TEXT2), 8)
+            if (Geraet.unsplashMeldung.isNotEmpty()) add(text(c, "Zuletzt: " + Geraet.unsplashMeldung, 21, Farben.TEXT2), 6)
+            knoepfe(
+                knopf(c, "Speichern") {
+                    val t = thema.text.toString().trim().ifEmpty { Hintergrund.STANDARD_THEMA }
+                    val sch = schluessel.text.toString().trim()
+                    when {
+                        !Hintergrund.THEMA.matches(t) -> a.meldung("Thema: nur Buchstaben, Ziffern, Leerzeichen und Kommas (bis 40 Zeichen).")
+                        sch.isNotEmpty() && !Hintergrund.SCHLUESSEL.matches(sch) -> a.meldung("Das sieht nicht wie ein Unsplash Access Key aus.")
+                        else -> {
+                            aendere { it.copy(hintergrund = it.hintergrund.copy(thema = t, schluessel = sch.ifEmpty { it.hintergrund.schluessel })) }
+                            a.unsplashNeu()
+                        }
+                    }
+                },
+                knopf(c, "Neues Foto jetzt", haupt = true) { a.unsplashNeu() }.apply { isEnabled = k.hintergrund.schluessel.isNotEmpty() }
+            )
+        }
 
         abschnitt("Widgets und Ablage")
         knoepfe(knopf(c, "Widget hinzufügen …") { a.widgetHinzufuegen() })
@@ -206,13 +244,17 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
 
         abschnitt("Updates")
         add(text(c, "Installiert: ${BuildConfig.VERSION_NAME}\n" + a.updateText(), 24, Farben.TEXT2))
+        add(schalter(c, "Updates automatisch installieren", Geraet.autoUpdate) { an -> Geraet.autoUpdate = an })
         knoepfe(knopf(c, "Jetzt nach Updates suchen") { a.updatePruefen() })
         add(text(c,
-            "Sicherheit: Ist eine neuere Version schon länger als 7 Tage veröffentlicht, sperrt sich der Launcher, bis aktualisiert ist. " +
-                "Ist GitHub nicht erreichbar, wird nie gesperrt.", 22, Farben.TEXT2))
+            "Automatisch: Neue Versionen werden im Hintergrund geladen, geprüft und installiert, sobald der Startbildschirm unbenutzt vorne ist " +
+                "(bis Android 11 fragt Android dabei einmal „Installieren?“).\n" +
+                "Sicherheit: Ist eine neuere Version schon länger als 7 Tage veröffentlicht, sperrt sich der Launcher, bis aktualisiert ist. " +
+                "Ist GitHub nicht erreichbar, wird nie gesperrt.", 21, Farben.TEXT2))
 
         abschnitt("Über DammLauncher")
         add(text(c, "Freie Software unter der GNU GPL v3.\nQuelltext: github.com/Teyro/DammLauncher", 22, Farben.TEXT2))
+        aktuelleKarte = null
         add(View(c), 40)
         scroll.post { scroll.scrollTo(0, pos); karte.requestFocus() }
     }

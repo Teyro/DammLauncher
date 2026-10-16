@@ -22,13 +22,16 @@ import android.widget.TextView
 
 /** Farben der Bedienung. */
 object Farben {
-    const val AKZENT = 0xFF1E6FD9.toInt()
-    const val TEXT = 0xFF1F2328.toInt()
-    const val TEXT2 = 0xFF5B6470.toInt()
-    const val FLAECHE = 0xFFF4F6F9.toInt()
-    const val PANEL = 0xF2FFFFFF.toInt()
-    const val ROT = 0xFFC62828.toInt()
-    const val GRUEN = 0xFF2E9E4F.toInt()
+    const val AKZENT = 0xFF2563EB.toInt()
+    const val AKZENT_DUNKEL = 0xFF1D4ED8.toInt()
+    const val TEXT = 0xFF111827.toInt()
+    const val TEXT2 = 0xFF6B7280.toInt()
+    const val FLAECHE = 0xFFF3F4F6.toInt()
+    const val KARTE = 0xFFFFFFFF.toInt()
+    const val LINIE = 0xFFE5E7EB.toInt()
+    const val PANEL = 0xF7F3F4F6.toInt()
+    const val ROT = 0xFFDC2626.toInt()
+    const val GRUEN = 0xFF16A34A.toInt()
 }
 
 fun runde(farbe: Int, radius: Float, rand: Int = 0, randFarbe: Int = 0) = GradientDrawable().apply {
@@ -58,17 +61,58 @@ fun knopf(c: Context, beschriftung: String, haupt: Boolean = false, gefahr: Bool
         haupt -> Farben.AKZENT
         else -> Color.WHITE
     }
-    setTextColor(if (haupt || gefahr) Color.WHITE else Farben.TEXT)
-    background = StateListDrawable().apply {
-        addState(intArrayOf(android.R.attr.state_pressed), runde(0xFFB8C4D2.toInt(), 18f.vp))
-        addState(intArrayOf(-android.R.attr.state_enabled), runde(0xFFE3E7EC.toInt(), 18f.vp))
-        addState(intArrayOf(), runde(grund, 18f.vp, if (haupt || gefahr) 0 else 2.vp, 0xFFC9D1DB.toInt()))
+    val gedrueckt = when {
+        gefahr -> 0xFFB91C1C.toInt()
+        haupt -> Farben.AKZENT_DUNKEL
+        else -> 0xFFE5E7EB.toInt()
     }
+    background = StateListDrawable().apply {
+        addState(intArrayOf(android.R.attr.state_pressed), runde(gedrueckt, 22f.vp))
+        addState(intArrayOf(-android.R.attr.state_enabled), runde(0xFFF3F4F6.toInt(), 22f.vp, 2.vp, Farben.LINIE))
+        addState(intArrayOf(), runde(grund, 22f.vp, if (haupt || gefahr) 0 else 2.vp, 0xFFD1D5DB.toInt()))
+    }
+    setTextColor(android.content.res.ColorStateList(
+        arrayOf(intArrayOf(-android.R.attr.state_enabled), intArrayOf()),
+        intArrayOf(0xFFA1A7B0.toInt(), if (haupt || gefahr) Color.WHITE else Farben.TEXT)
+    ))
     minHeight = 76.vp
     minWidth = 76.vp
     setPadding(26.vp, 10.vp, 26.vp, 10.vp)
     isClickable = true
     setOnClickListener { klick() }
+}
+
+/** Halbdurchsichtige Pille für den Startbildschirm (liest sich auf jedem Hintergrund). */
+fun glasKnopf(c: Context, beschriftung: String, klick: () -> Unit) = TextView(c).apply {
+    text = beschriftung
+    contentDescription = beschriftung
+    groesse(26)
+    gravity = Gravity.CENTER
+    typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+    setTextColor(Color.WHITE)
+    background = StateListDrawable().apply {
+        addState(intArrayOf(android.R.attr.state_pressed), runde(0x99000000.toInt(), 50f.vp, 2.vp, 0xB3FFFFFF.toInt()))
+        addState(intArrayOf(), runde(0x59000000, 50f.vp, 2.vp, 0x66FFFFFF))
+    }
+    setPadding(40.vp, 18.vp, 46.vp, 18.vp)
+    isClickable = true
+    setOnClickListener { klick() }
+}
+
+/** 3 × 3 Punkte – das Zeichen für „alle Apps“, ohne Bilddatei. */
+class PunktRaster(private val g: Int, farbe: Int) : android.graphics.drawable.Drawable() {
+    private val malen = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { color = farbe }
+    override fun getIntrinsicWidth() = g
+    override fun getIntrinsicHeight() = g
+    override fun draw(canvas: android.graphics.Canvas) {
+        val b = bounds
+        val r = b.width() / 9f
+        for (i in 0..2) for (j in 0..2) canvas.drawCircle(b.left + r * (1.5f + 3 * i), b.top + r * (1.5f + 3 * j), r, malen)
+    }
+    override fun setAlpha(alpha: Int) { malen.alpha = alpha }
+    override fun setColorFilter(cf: android.graphics.ColorFilter?) { malen.colorFilter = cf }
+    @Deprecated("Drawable")
+    override fun getOpacity() = android.graphics.PixelFormat.TRANSLUCENT
 }
 
 fun lp(b: Int = ViewGroup.LayoutParams.WRAP_CONTENT, h: Int = ViewGroup.LayoutParams.WRAP_CONTENT, gewicht: Float = 0f, oben: Int = 0, rechts: Int = 0) =
@@ -168,7 +212,10 @@ fun eingabe(c: Context, hinweis: String, wert: String = "", geheim: Boolean = fa
     setSingleLine(true)
     setTextColor(Farben.TEXT)
     setHintTextColor(0xFF9AA3AE.toInt())
-    background = runde(Color.WHITE, 14f.vp, 2.vp, 0xFFB8C2CE.toInt())
+    background = StateListDrawable().apply {
+        addState(intArrayOf(android.R.attr.state_focused), runde(Color.WHITE, 18f.vp, 3.vp, Farben.AKZENT))
+        addState(intArrayOf(), runde(Color.WHITE, 18f.vp, 2.vp, 0xFFD1D5DB.toInt()))
+    }
     setPadding(20.vp, 16.vp, 20.vp, 16.vp)
     inputType = when {
         zahl && geheim -> InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD
@@ -187,7 +234,7 @@ class GrossFenster(private val wurzel: FrameLayout, titel: String, breite: Int =
     val c: Context = wurzel.context
     val spalte = LinearLayout(c).apply { orientation = LinearLayout.VERTICAL }
     private val decke = FrameLayout(c).apply {
-        setBackgroundColor(0x99000000.toInt())
+        setBackgroundColor(0xA6000000.toInt())
         isClickable = true // nichts darunter antippen
         setOnClickListener { schliessen() }
     }
@@ -197,14 +244,14 @@ class GrossFenster(private val wurzel: FrameLayout, titel: String, breite: Int =
     init {
         kasten = LinearLayout(c).apply {
             orientation = LinearLayout.VERTICAL
-            background = runde(Farben.FLAECHE, 30f.vp)
-            elevation = 24f.vp
-            setPadding(40.vp, 34.vp, 40.vp, 34.vp)
+            background = runde(Farben.FLAECHE, 36f.vp)
+            elevation = 30f.vp
+            setPadding(44.vp, 36.vp, 44.vp, 38.vp)
             isClickable = true
             addView(LinearLayout(c).apply {
                 gravity = Gravity.CENTER_VERTICAL
                 addView(text(c, titel, 36, fett = true), lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-                addView(knopf(c, "✕") { schliessen() }, lp(86.vp, 86.vp))
+                addView(knopf(c, "✕") { schliessen() }.apply { background = rundKnopf() }, lp(86.vp, 86.vp))
             })
             addView(ScrollView(c).apply { addView(spalte); isVerticalScrollBarEnabled = true }, lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, oben = 16.vp))
         }
@@ -213,6 +260,10 @@ class GrossFenster(private val wurzel: FrameLayout, titel: String, breite: Int =
             topMargin = 30.vp; bottomMargin = 30.vp
         })
         wurzel.addView(decke, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        decke.alpha = 0f
+        decke.animate().alpha(1f).setDuration(120).start()
+        kasten.scaleX = 0.96f; kasten.scaleY = 0.96f
+        kasten.animate().scaleX(1f).scaleY(1f).setDuration(160).start()
     }
 
     fun add(v: View, oben: Int = 14) {
@@ -240,4 +291,17 @@ class GrossFenster(private val wurzel: FrameLayout, titel: String, breite: Int =
         (decke.parent as? ViewGroup)?.removeView(decke)
         beimSchliessen()
     }
+}
+
+/** Runder, heller Symbolknopf (✕, ◀, ▶). */
+fun rundKnopf() = StateListDrawable().apply {
+    addState(intArrayOf(android.R.attr.state_pressed), runde(0xFFD1D5DB.toInt(), 60f.vp))
+    addState(intArrayOf(), runde(0xFFE5E7EB.toInt(), 60f.vp))
+}
+
+/** Weiße Karte mit runden Ecken – fasst einen Abschnitt der Einstellungen zusammen. */
+fun karte(c: Context) = LinearLayout(c).apply {
+    orientation = LinearLayout.VERTICAL
+    background = runde(Farben.KARTE, 26f.vp, 1.vp, Farben.LINIE)
+    setPadding(30.vp, 22.vp, 30.vp, 24.vp)
 }

@@ -3,18 +3,15 @@
  */
 package de.oejendorferdamm.dammlauncher.update
 
-import android.content.ContentProvider
-import android.content.ContentValues
+import android.app.PendingIntent
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
-import android.database.Cursor
-import android.database.MatrixCursor
-import android.net.Uri
+import android.content.pm.PackageInstaller
 import android.os.Build
-import android.os.ParcelFileDescriptor
-import android.provider.OpenableColumns
+import android.util.Log
 import de.oejendorferdamm.dammlauncher.BuildConfig
 import org.json.JSONObject
 import java.io.File
@@ -108,7 +105,7 @@ object Update {
     /** APK laden: nur von den Release-Adressen dieses Repos (GitHub leitet auf seinen Speicher weiter). */
     fun laden(context: Context, info: Info, fortschritt: (Float) -> Unit): File {
         if (!info.url.startsWith(DOWNLOAD)) throw IOException("Unerwartete Download-Adresse")
-        val ziel = File(context.cacheDir, "update.apk")
+        val ziel = apkDatei(context)
         var url = URL(info.url)
         var c: HttpURLConnection
         var sprung = 0
@@ -180,36 +177,61 @@ object Update {
 
     fun darfInstallieren(context: Context) = context.packageManager.canRequestPackageInstalls()
 
+    fun apkDatei(context: Context) = File(context.cacheDir, "update.apk")
+
+    /** Laden und prüfen; null = fertig zum Installieren, sonst die Fehlermeldung. */
+    fun vorbereiten(context: Context, info: Info, fortschritt: (Float) -> Unit = {}): String? = try {
+        val apk = laden(context, info, fortschritt)
+        if (!signaturPasst(context, apk)) {
+            apk.delete()
+            "Die geladene Datei ist nicht korrekt signiert – Update abgebrochen."
+        } else null
+    } catch (x: Exception) {
+        "Herunterladen fehlgeschlagen: ${x.message}"
+    }
+
+    /**
+     * Über den PackageInstaller installieren. Ab Android 12 geht das ohne Rückfrage, sobald
+     * DammLauncher sich einmal selbst aktualisiert hat; vorher zeigt Android einmal „Installieren?“.
+     */
     fun installieren(context: Context) {
-        val uri = Uri.parse("content://${ApkProvider.AUTORITAET}/update.apk")
-        context.startActivity(
-            Intent(Intent.ACTION_VIEW).setDataAndType(uri, "application/vnd.android.package-archive")
-                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
-        )
+        val apk = apkDatei(context)
+        if (!signaturPasst(context, apk)) throw IOException("Update-Datei fehlt oder ist nicht korrekt signiert")
+        val installer = context.packageManager.packageInstaller
+        val p = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL).apply {
+            setAppPackageName(context.packageName)
+            if (Build.VERSION.SDK_INT >= 31) setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED)
+        }
+        val id = installer.createSession(p)
+        try {
+            installer.openSession(id).use { sitzung ->
+                sitzung.openWrite("DammLauncher.apk", 0, apk.length()).use { aus ->
+                    apk.inputStream().use { it.copyTo(aus) }
+                    sitzung.fsync(aus)
+                }
+                // Das System füllt den Status ein – daher veränderbar
+                val flags = PendingIntent.FLAG_UPDATE_CURRENT or (if (Build.VERSION.SDK_INT >= 31) PendingIntent.FLAG_MUTABLE else 0)
+                val antwort = PendingIntent.getBroadcast(context, id, Intent(context, InstallErgebnis::class.java), flags)
+                sitzung.commit(antwort.intentSender)
+            }
+        } catch (e: Exception) {
+            try { installer.abandonSession(id) } catch (_: Exception) {}
+            throw e
+        }
     }
 }
 
-/** Gibt nur die geladene Update-APK frei – nicht exportiert, Zugriff nur mit Einzelfreigabe. */
-class ApkProvider : ContentProvider() {
-    companion object { const val AUTORITAET = "de.oejendorferdamm.dammlauncher.apk" }
-
-    private fun datei(): File = File(context!!.cacheDir, "update.apk")
-
-    override fun onCreate() = true
-    override fun getType(uri: Uri) = "application/vnd.android.package-archive"
-
-    override fun openFile(uri: Uri, mode: String): ParcelFileDescriptor {
-        if (uri.lastPathSegment != "update.apk" || mode != "r") throw SecurityException("nicht erlaubt")
-        return ParcelFileDescriptor.open(datei(), ParcelFileDescriptor.MODE_READ_ONLY)
+/** Antwort des PackageInstallers – nicht exportiert, kommt nur über das eigene PendingIntent. */
+class InstallErgebnis : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        when (intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)) {
+            PackageInstaller.STATUS_PENDING_USER_ACTION -> {
+                @Suppress("DEPRECATION")
+                val bestaetigen = intent.getParcelableExtra<Intent>(Intent.EXTRA_INTENT) ?: return
+                try { context.startActivity(bestaetigen.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } catch (_: Exception) {}
+            }
+            PackageInstaller.STATUS_SUCCESS -> Unit // der Prozess wird gleich neu gestartet
+            else -> Log.w("DammLauncher", "Update nicht installiert: " + intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE))
+        }
     }
-
-    override fun query(uri: Uri, p: Array<out String>?, s: String?, a: Array<out String>?, o: String?): Cursor {
-        val c = MatrixCursor(arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE))
-        c.addRow(arrayOf<Any>("DammLauncher.apk", datei().length()))
-        return c
-    }
-
-    override fun insert(uri: Uri, v: ContentValues?): Uri? = null
-    override fun delete(uri: Uri, s: String?, a: Array<out String>?) = 0
-    override fun update(uri: Uri, v: ContentValues?, s: String?, a: Array<out String>?) = 0
 }
