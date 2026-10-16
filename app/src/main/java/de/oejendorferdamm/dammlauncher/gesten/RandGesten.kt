@@ -30,7 +30,8 @@ import kotlin.math.abs
  * Wischgesten am Bildschirmrand – auch während eine andere App (Firefox, Anton …) vorne ist. Dazu
  * liegen schmale, unsichtbare Leisten am Rand („Über anderen Apps einblenden“). Wer vom Rand zur
  * Mitte wischt, kommt zum Startbildschirm bzw. zu allen Apps. Läuft als Vordergrunddienst, damit
- * Android die Leisten nicht nach ein paar Minuten entfernt.
+ * Android die Leisten nicht nach ein paar Minuten entfernt. Über den Android-Einstellungen blendet
+ * das System fremde Leisten aus (Schutz vor untergeschobenen Eingaben) – dort wirkt die Geste nicht.
  */
 class RandGesten : Service() {
     private val leisten = ArrayList<View>()
@@ -101,7 +102,6 @@ class RandGesten : Service() {
     }
 
     private fun zeigen(an: Boolean) {
-        android.util.Log.i("DammLauncher", "Randgeste: Leisten ${if (an) "sichtbar" else "aus"} (${leisten.size})")
         leisten.forEach { it.visibility = if (an) View.VISIBLE else View.GONE }
     }
 
@@ -133,7 +133,6 @@ class RandGesten : Service() {
 
         @SuppressLint("ClickableViewAccessibility")
         override fun onTouchEvent(ev: MotionEvent): Boolean {
-            if (ev.actionMasked == MotionEvent.ACTION_DOWN) android.util.Log.i("DammLauncher", "Randgeste: Berührung $rand")
             when (ev.actionMasked) {
                 MotionEvent.ACTION_DOWN -> { x0 = ev.rawX; y0 = ev.rawY; erledigt = false }
                 MotionEvent.ACTION_MOVE -> if (!erledigt) {

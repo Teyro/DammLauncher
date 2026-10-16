@@ -435,11 +435,12 @@ def main():
             time.sleep(1)
     else:
         print("WARNUNG: Uhr nicht gefunden", file=sys.stderr)
-    # Randgeste über einer anderen App: Einstellungen öffnen, vom unteren Rand nach oben wischen → Launcher
+    # Randgeste über einer anderen App (nicht die Einstellungen – über denen blendet Android fremde
+    # Leisten absichtlich aus): Uhr-App öffnen, vom unteren Rand nach oben wischen → Launcher
     adb("shell", "appops", "set", PAKET, "SYSTEM_ALERT_WINDOW", "allow")
     home()
     time.sleep(2)
-    adb("shell", "am", "start", "-a", "android.settings.SETTINGS")
+    adb("shell", "am", "start", "-a", "android.intent.action.SHOW_ALARMS")
     time.sleep(3)
     leiste = geste_leiste()
     if leiste is None:
@@ -448,15 +449,10 @@ def main():
         x = (leiste[0] + leiste[2]) // 2
         y = (leiste[1] + leiste[3]) // 2
         print("Gesten-Leiste:", leiste)
-        t = adb("shell", "dumpsys", "window", "windows").stdout
-        i = t.find("DammLauncher-Geste")
-        print("Fenster:", " | ".join(z.strip() for z in t[i:i + 2500].splitlines() if "isVisible" in z or "mViewVisibility" in z or "mHasSurface" in z or "fl=" in z or "Visib" in z)[:900])
-        print("Log:", [z for z in adb("logcat", "-d", "-s", "DammLauncher").stdout.splitlines() if "Randgeste" in z][-6:])
         screenshot("19f_andere_app.png")
         adb("shell", "input", "swipe", str(x), str(y), str(x), str(h // 2), "350")
         time.sleep(2.5)
         screenshot("19g_randgeste_zurueck.png")
-        print("Log danach:", [z for z in adb("logcat", "-d").stdout.splitlines() if "Randgeste" in z or "Background activity start" in z or "BAL" in z][-8:])
         if PAKET not in adb("shell", "dumpsys", "window").stdout.split("mCurrentFocus", 1)[-1][:300]:
             print("WARNUNG: Randgeste hat nicht zum Launcher geführt", file=sys.stderr)
     home()
