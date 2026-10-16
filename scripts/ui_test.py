@@ -130,6 +130,13 @@ def scrolle_zu(name, x, teil=False, antippen=True):
     return False
 
 
+def tastatur_zu():
+    """Bildschirmtastatur schließen – nur wenn sie offen ist (sonst schlösse Zurück das Fenster)."""
+    if "mInputShown=true" in adb("shell", "dumpsys", "input_method").stdout:
+        adb("shell", "input", "keyevent", "4")
+        time.sleep(1)
+
+
 def steuer(befehl):
     try:
         urllib.request.urlopen("http://127.0.0.1:8766/_steuer/" + befehl, timeout=5).read()
@@ -323,7 +330,8 @@ def main():
         time.sleep(1.5)
         if feld_mit_hinweis("Unsplash Access Key", "TestSchluessel_0123456789abc"):
             screenshot("19a_unsplash_einstellungen.png")
-            tippe("Speichern")
+            tastatur_zu()
+            scrolle_zu("Speichern", w * 3 // 4)
             time.sleep(6)
             scrolle_zu("Neues Foto jetzt", w * 3 // 4, antippen=False)
             screenshot("19b_unsplash_geladen.png")

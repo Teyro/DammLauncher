@@ -173,11 +173,13 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
         if (k.hintergrund.unsplash) {
             val thema = eingabe(c, "Thema (englisch), z. B. landscape, mountains, sea", k.hintergrund.thema)
             val schluessel = eingabe(c, if (k.hintergrund.schluessel.isEmpty()) "Unsplash Access Key" else "Access Key gespeichert – leer lassen = behalten")
-            add(thema, 10)
-            add(schluessel, 10)
             add(text(c, "Den kostenlosen Access Key gibt es unter unsplash.com/developers → „New Application“. Er geht mit der Vorlage an alle Geräte; " +
                 "jedes Gerät holt sich morgens sein eigenes Foto.", 21, Farben.TEXT2), 8)
             if (Geraet.unsplashMeldung.isNotEmpty()) add(text(c, "Zuletzt: " + Geraet.unsplashMeldung, 21, Farben.TEXT2), 6)
+            add(thema, 10)
+            add(schluessel, 10)
+            // Taste „Fertig“ auf der Bildschirmtastatur schließt sie (sonst verdeckt sie die Knöpfe)
+            schluessel.imeOptions = schluessel.imeOptions or android.view.inputmethod.EditorInfo.IME_ACTION_DONE
             knoepfe(
                 knopf(c, "Speichern") {
                     val t = thema.text.toString().trim().ifEmpty { Hintergrund.STANDARD_THEMA }

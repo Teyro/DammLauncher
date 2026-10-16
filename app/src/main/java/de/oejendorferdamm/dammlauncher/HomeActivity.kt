@@ -932,6 +932,8 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
             return
         }
         if (!Geraet.autoUpdate || !Update.darfInstallieren(this)) return
+        // Abgelehnt (Android fragt bis Version 11 nach)? Dann nicht bei jedem Zurückkehren neu fragen
+        if (System.currentTimeMillis() - letzteAutoInstallation < 4 * 60 * 60_000L && !Geraet.veraltetGemeldet) return
         haupt.removeCallbacks(autoInstallation)
         haupt.postDelayed(autoInstallation, 5_000)
     }
@@ -939,6 +941,7 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
     private val autoInstallation = Runnable {
         val ruhig = vorne && fenster.isEmpty() && panel == null && uebersicht == null && !laedt
         if (!ruhig) return@Runnable
+        letzteAutoInstallation = System.currentTimeMillis()
         meldung("DammLauncher wird aktualisiert …")
         try { Update.installieren(this) } catch (_: Exception) { Geraet.updateBereit = "" }
     }
@@ -1012,6 +1015,8 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
     }
 
     companion object {
+        /** Wann zuletzt automatisch installiert wurde (hält, solange der Prozess lebt). */
+        private var letzteAutoInstallation = 0L
         private const val REQ_BIND = 11
         private const val REQ_KONF = 12
         private const val REQ_BILD = 13
