@@ -91,15 +91,12 @@ nicht zur Sperre.
 
 ## Berechtigungen
 
-- **Über anderen Apps einblenden** (optional, einmal pro Board): für die Wischgesten am
-  Bildschirmrand – schmale, unsichtbare Leisten, die auch in anderen Apps zum Startbildschirm führen.
-  Dazu läuft ein Vordergrunddienst mit einer stillen Benachrichtigung.
-
 | Berechtigung | Wofür |
 |---|---|
 | `INTERNET` | Update-Check bei GitHub und Vorlagen-Abgleich mit dem IServ-WebDAV – sonst nichts |
 | `ACCESS_NETWORK_STATE` | Der tägliche Abgleich startet erst, wenn Netz da ist |
 | `REQUEST_INSTALL_PACKAGES` | Die geladene, geprüfte Update-APK an den System-Installer übergeben |
+| `SYSTEM_ALERT_WINDOW`, `FOREGROUND_SERVICE(_SPECIAL_USE)` | Nur wenn erlaubt: Wischgesten am Bildschirmrand – schmale, unsichtbare Leisten, die auch in anderen Apps zum Startbildschirm führen (Vordergrunddienst mit stiller Benachrichtigung) |
 | `<queries>` (MAIN/LAUNCHER, Widget-Anbieter) | Apps mit Startsymbol und Widgets anzeigen – statt der weitreichenden `QUERY_ALL_PACKAGES` |
 
 Exportiert ist nur die Startbildschirm-Activity. Es werden keine persönlichen Daten gespeichert.
