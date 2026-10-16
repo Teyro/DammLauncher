@@ -144,8 +144,13 @@ def geste_leiste():
     i = text.find("DammLauncher-Geste")
     if i < 0:
         return None
-    m = re.search(r"(?:mFrame|frame)=\[(\d+),(\d+)\]\[(\d+),(\d+)\]", text[i:i + 4000])
-    return [int(x) for x in m.groups()] if m else None
+    # nur Rahmen, die nicht den ganzen Bildschirm umfassen (Eltern-/Anzeigefenster überspringen)
+    w, h = bildschirm()
+    for m in re.finditer(r"(?:mFrame|frame)=\[(\d+),(\d+)\]\[(\d+),(\d+)\]", text[i:i + 6000]):
+        r = [int(x) for x in m.groups()]
+        if (r[3] - r[1]) < h // 4 and (r[2] - r[0]) > 0:
+            return r
+    return None
 
 
 def steuer(befehl):
@@ -442,6 +447,7 @@ def main():
     else:
         x = (leiste[0] + leiste[2]) // 2
         y = (leiste[1] + leiste[3]) // 2
+        print("Gesten-Leiste:", leiste)
         screenshot("19f_andere_app.png")
         adb("shell", "input", "swipe", str(x), str(y), str(x), str(h // 2), "350")
         time.sleep(2.5)

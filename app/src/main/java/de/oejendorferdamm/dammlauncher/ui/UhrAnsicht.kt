@@ -135,13 +135,13 @@ class UhrAnsicht(context: Context, transparent: Boolean = false, stil: UhrStil =
         if (schluessel != gemessenFuer) {
             gemessenFuer = schluessel
             // „00:00“ als Maß: alle Uhrzeiten gleich groß, auch wenn die Schrift keine gleich breiten Ziffern hat
-            zeit.textSize = passend(zeit, "00:00", w * 0.84f, if (mitDatum) h * 0.48f else h * 0.66f)
+            zeit.textSize = passendeZeit(w * 0.84f, if (mitDatum) h * 0.48f else h * 0.66f)
             if (mitDatum) datum.textSize = passend(datum, d, w * 0.86f, h * 0.15f)
         }
         zeit.getTextBounds("0123456789", 0, 10, masse)
         val zOben = -masse.top.toFloat() // Höhe der Ziffern über der Grundlinie
         if (!mitDatum) {
-            canvas.drawText(z, w / 2f, (h + zOben) / 2f, zeit)
+            zeitMalen(canvas, z, w / 2f, (h + zOben) / 2f)
             return
         }
         val dm = datum.fontMetrics
@@ -150,11 +150,50 @@ class UhrAnsicht(context: Context, transparent: Boolean = false, stil: UhrStil =
         val oben = (h - zOben - luecke - dHoehe) / 2f
         if (stil.datum == UhrStil.OBEN) {
             canvas.drawText(d, w / 2f, oben - dm.ascent, datum)
-            canvas.drawText(z, w / 2f, oben + dHoehe + luecke + zOben, zeit)
+            zeitMalen(canvas, z, w / 2f, oben + dHoehe + luecke + zOben)
         } else {
-            canvas.drawText(z, w / 2f, oben + zOben, zeit)
+            zeitMalen(canvas, z, w / 2f, oben + zOben)
             canvas.drawText(d, w / 2f, oben + zOben + luecke - dm.ascent, datum)
         }
+    }
+
+    /**
+     * Uhrzeit aus drei Teilen setzen: Stunden, Doppelpunkt, Minuten – mit engem, festem Abstand.
+     * Manche Schriften (z. B. die Grundschrift) haben einen sehr breiten Doppelpunkt; so sieht
+     * „11:27“ in jeder Schrift gleich aus. Stunden und Minuten bekommen je die Breite von „00“.
+     */
+    private fun zeitTeile(): Triple<Float, Float, Float> {
+        val ziffern = zeit.measureText("00")
+        zeit.getTextBounds(":", 0, 1, masse)
+        val punkt = masse.width().toFloat()
+        val luecke = zeit.textSize * 0.07f
+        return Triple(ziffern, punkt, luecke)
+    }
+
+    private fun zeitBreite(): Float {
+        val (ziffern, punkt, luecke) = zeitTeile()
+        return 2 * ziffern + punkt + 2 * luecke
+    }
+
+    private fun zeitMalen(canvas: Canvas, z: String, mitte: Float, grundlinie: Float) {
+        val (ziffern, punkt, luecke) = zeitTeile()
+        val links = mitte - zeitBreite() / 2f
+        zeit.getTextBounds(":", 0, 1, masse)
+        canvas.drawText(z.substring(0, 2), links + ziffern / 2f, grundlinie, zeit)
+        // Doppelpunkt: sichtbarer Teil genau in die Lücke (seine eigene Laufweite zählt nicht)
+        val px = links + ziffern + luecke - masse.left
+        zeit.textAlign = Paint.Align.LEFT
+        canvas.drawText(":", px, grundlinie, zeit)
+        zeit.textAlign = Paint.Align.CENTER
+        canvas.drawText(z.substring(3), links + ziffern + 2 * luecke + punkt + ziffern / 2f, grundlinie, zeit)
+    }
+
+    private fun passendeZeit(b: Float, h: Float): Float {
+        zeit.textSize = 100f
+        val breite = zeitBreite().coerceAtLeast(1f)
+        zeit.getTextBounds("0123456789", 0, 10, masse)
+        val hoehe = maxOf(masse.height().toFloat(), 1f)
+        return minOf(100f * b / breite, 100f * h / hoehe)
     }
 
     /** Größte Schrift, mit der [text] in [b]×[h] passt (Höhe: sichtbare Zeichen). */
