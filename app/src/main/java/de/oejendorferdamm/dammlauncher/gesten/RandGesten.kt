@@ -100,7 +100,10 @@ class RandGesten : Service() {
         }
     }
 
-    private fun zeigen(an: Boolean) = leisten.forEach { it.visibility = if (an) View.VISIBLE else View.GONE }
+    private fun zeigen(an: Boolean) {
+        android.util.Log.i("DammLauncher", "Randgeste: Leisten ${if (an) "sichtbar" else "aus"} (${leisten.size})")
+        leisten.forEach { it.visibility = if (an) View.VISIBLE else View.GONE }
+    }
 
     private fun ausloesen(aktion: String) {
         try {
@@ -130,6 +133,7 @@ class RandGesten : Service() {
 
         @SuppressLint("ClickableViewAccessibility")
         override fun onTouchEvent(ev: MotionEvent): Boolean {
+            if (ev.actionMasked == MotionEvent.ACTION_DOWN) android.util.Log.i("DammLauncher", "Randgeste: Berührung $rand")
             when (ev.actionMasked) {
                 MotionEvent.ACTION_DOWN -> { x0 = ev.rawX; y0 = ev.rawY; erledigt = false }
                 MotionEvent.ACTION_MOVE -> if (!erledigt) {
