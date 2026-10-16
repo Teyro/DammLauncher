@@ -266,7 +266,10 @@ def main():
     if scrolle_zu("Widget hinzufügen …", w * 3 // 4):
         time.sleep(2)
         screenshot("13_widget_liste.png")
-        if tippe("×", teil=True):
+        # erstes Android-Widget (nicht die eingebaute Uhr, die steht ganz oben)
+        eintrag = next((grenzen(k) for k in knoten_alle() if "×" in (k.get("text") or "") and "Digitaluhr" not in (k.get("text") or "")), None)
+        if eintrag:
+            tap(*mitte(eintrag))
             time.sleep(2.5)
             for k in knoten_alle():
                 if k.get("class") == "android.widget.CheckBox":
@@ -281,6 +284,25 @@ def main():
     tippe("Fertig")
     time.sleep(2)
     screenshot("14_mit_widget.png")
+
+    # Inhalt eines Android-Widgets vergrößern (Zoom)
+    hv = next((grenzen(k) for k in knoten_alle() if "AppWidgetHostView" in (k.get("class") or "")), None)
+    if hv is None:
+        print("WARNUNG: kein Android-Widget gefunden", file=sys.stderr)
+    else:
+        lang(*mitte(hv))
+        time.sleep(1.5)
+        if tippe("Inhalt vergrößern …"):
+            time.sleep(1.5)
+            for _ in range(4):
+                tippe("+")
+                time.sleep(0.6)
+            screenshot("14b_widget_zoom.png")
+            tippe("Fertig")
+            time.sleep(1.5)
+        else:
+            adb("shell", "input", "keyevent", "4")
+            time.sleep(1)
 
     # Boss-Modus + zentrale Verteilung über den Test-WebDAV
     adb("shell", "am", "start", "-n", f"{PAKET}/.TestEinrichtungActivity",
