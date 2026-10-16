@@ -137,6 +137,17 @@ def tastatur_zu():
         time.sleep(1)
 
 
+def geste_leiste():
+    """Lage der unteren Gesten-Leiste (Overlay-Fenster) aus dumpsys window – oder None."""
+    import re
+    text = adb("shell", "dumpsys", "window", "windows").stdout
+    i = text.find("DammLauncher-Geste")
+    if i < 0:
+        return None
+    m = re.search(r"(?:mFrame|frame)=\[(\d+),(\d+)\]\[(\d+),(\d+)\]", text[i:i + 4000])
+    return [int(x) for x in m.groups()] if m else None
+
+
 def steuer(befehl):
     try:
         urllib.request.urlopen("http://127.0.0.1:8766/_steuer/" + befehl, timeout=5).read()
@@ -170,6 +181,43 @@ def main():
     if not laeuft():
         print("FEHLER: Launcher läuft nicht", file=sys.stderr)
         sys.exit(1)
+    screenshot("00_standard_einrichtung.png")  # Schul-Standard: fehlende Apps als Platzhalter
+
+    # Aus der Mitte nach oben wischen → Alle Apps
+    adb("shell", "input", "swipe", str(w * 58 // 100), str(h * 70 // 100), str(w * 58 // 100), str(h * 25 // 100), "400")
+    time.sleep(2)
+    screenshot("00b_wischen_alle_apps.png")
+    adb("shell", "input", "keyevent", "4")
+    time.sleep(1)
+
+    # Platzhalter antippen → Hinweis „fehlt“
+    if tippe("Anton (nicht installiert)", "DammBoard (nicht installiert)"):
+        time.sleep(1.5)
+        screenshot("00c_platzhalter.png")
+        tippe("Schließen")
+        time.sleep(1)
+
+    # Uhr einstellen: Datum oben, als Zahl, Grundschrift fett
+    uhr = knoten("Uhr")
+    if uhr:
+        lang(*mitte(uhr))
+        time.sleep(1.5)
+        if tippe("Uhr einstellen …"):
+            time.sleep(1.5)
+            tippe("Oben")
+            time.sleep(0.8)
+            tippe("16.10.2026")
+            time.sleep(0.8)
+            tippe("Grundschrift fett")
+            time.sleep(1)
+            screenshot("00d_uhr_einstellen.png")
+            tippe("Fertig")
+            time.sleep(1.5)
+            screenshot("00e_uhr_eingestellt.png")
+
+    # Für die folgenden Schritte: schlichte Einrichtung (6 × 4, Knopf „Alle Apps“)
+    adb("shell", "am", "start", "-n", f"{PAKET}/.TestEinrichtungActivity", "--ez", "leer", "true")
+    time.sleep(3)
     screenshot("01_leer.png")
 
     # App-Übersicht: Apps auf den Startbildschirm legen
@@ -370,7 +418,11 @@ def main():
     if uhr:
         lang(*mitte(uhr))
         time.sleep(1.5)
-        if tippe("Transparent (ohne Fläche)"):
+        if tippe("Uhr einstellen …"):
+            time.sleep(1.5)
+            tippe("Transparent")
+            time.sleep(1)
+            tippe("Fertig")
             time.sleep(2)
             screenshot("19e_uhr_transparent.png")
         else:
@@ -378,6 +430,26 @@ def main():
             time.sleep(1)
     else:
         print("WARNUNG: Uhr nicht gefunden", file=sys.stderr)
+    # Randgeste über einer anderen App: Einstellungen öffnen, vom unteren Rand nach oben wischen → Launcher
+    adb("shell", "appops", "set", PAKET, "SYSTEM_ALERT_WINDOW", "allow")
+    home()
+    time.sleep(2)
+    adb("shell", "am", "start", "-a", "android.settings.SETTINGS")
+    time.sleep(3)
+    leiste = geste_leiste()
+    if leiste is None:
+        print("WARNUNG: Gesten-Leiste nicht gefunden", file=sys.stderr)
+    else:
+        x = (leiste[0] + leiste[2]) // 2
+        y = (leiste[1] + leiste[3]) // 2
+        screenshot("19f_andere_app.png")
+        adb("shell", "input", "swipe", str(x), str(y), str(x), str(h // 2), "350")
+        time.sleep(2.5)
+        screenshot("19g_randgeste_zurueck.png")
+        if PAKET not in adb("shell", "dumpsys", "window").stdout.split("mCurrentFocus", 1)[-1][:300]:
+            print("WARNUNG: Randgeste hat nicht zum Launcher geführt", file=sys.stderr)
+    home()
+
     tippe("Alle Apps")
     time.sleep(2)
     screenshot("19d_uebersicht_dunkel.png")

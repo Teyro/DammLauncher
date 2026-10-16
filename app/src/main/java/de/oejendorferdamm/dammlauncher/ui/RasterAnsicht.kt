@@ -34,6 +34,9 @@ interface RasterAktionen {
     fun menue(e: Element)
     fun gesperrt(): Boolean
     fun widgetEinrichten(w: Element.Widget)
+    /** Platzhalter angetippt: App bzw. Widget-App ist auf diesem Gerät nicht installiert. */
+    fun fehlt(e: Element)
+    fun nachUnten()
 }
 
 /**
@@ -85,15 +88,40 @@ class RasterAnsicht(context: Context, private val aktionen: RasterAktionen) : Vi
     }
 
     /** Neue Konfiguration bzw. sichtbare Elemente übernehmen – vorhandene Ansichten werden wiederverwendet. */
-    fun setze(k: Konfig, sichtbar: List<Element>, widgetAnsicht: (Element.Widget) -> View?) {
+    /** Elemente, die gerade als Platzhalter gezeigt werden (App bzw. Widget fehlt). */
+    private val platzhalter = HashSet<String>()
+
+    /**
+     * Neue Konfiguration übernehmen – vorhandene Ansichten werden wiederverwendet. Elemente aus
+     * [fehlt] (App nicht installiert) erscheinen als Platzhalter.
+     */
+    fun setze(k: Konfig, elemente: List<Element>, fehlt: Set<String>, widgetAnsicht: (Element.Widget) -> View?) {
         konfig = k
         rechner = null
-        val schluessel = sichtbar.map { it.schluessel }.toSet()
-        // Weg damit, was nicht mehr da ist
-        ansichten.keys.filter { it !in schluessel }.forEach { s -> ansichten.remove(s)?.let { removeView(it); elementVon.remove(it) } }
+        val schluessel = elemente.map { it.schluessel }.toSet()
+        // Weg damit, was nicht mehr da ist – und Platzhalter, deren App jetzt da ist (bzw. umgekehrt)
+        ansichten.keys.filter { it !in schluessel || (it in platzhalter) != (it in fehlt) }.forEach { s ->
+            ansichten.remove(s)?.let { removeView(it); elementVon.remove(it) }
+            platzhalter.remove(s)
+        }
         val textPx = k.textGroesse.vp.toFloat()
-        for (e in sichtbar) {
+        val schrift = Schriften.von(context, k.schrift)
+        for (e in elemente) {
             var v = ansichten[e.schluessel]
+            if (e.schluessel in fehlt) {
+                if (v == null) {
+                    v = PlatzhalterAnsicht(context, e).also { neu ->
+                        neu.setOnClickListener { elementVon[neu]?.let { aktionen.fehlt(it) } }
+                        neu.setOnLongClickListener { elementVon[neu]?.let { beginneZiehen(it, neu) }; true }
+                        addView(neu)
+                        ansichten[e.schluessel] = neu
+                        platzhalter.add(e.schluessel)
+                    }
+                }
+                (v as PlatzhalterAnsicht).setze(e, textPx, schrift, k.beschriftung)
+                elementVon[v] = e
+                continue
+            }
             when (e) {
                 is Element.App -> {
                     val zelle = (v as? AppZelle) ?: AppZelle(context).also { neu ->
@@ -103,7 +131,7 @@ class RasterAnsicht(context: Context, private val aktionen: RasterAktionen) : Vi
                         ansichten[e.schluessel] = neu
                     }
                     val info = AppKatalog.finde(e.paket, e.aktivitaet)
-                    zelle.setze(android.content.ComponentName(e.paket, e.aktivitaet), e.titel ?: info?.name ?: e.paket, e.icon, k.iconProzent, textPx, k.beschriftung)
+                    zelle.setze(android.content.ComponentName(e.paket, e.aktivitaet), e.titel ?: info?.name ?: e.paket, e.icon, k.iconProzent, textPx, k.beschriftung, schrift)
                     v = zelle
                 }
                 is Element.Widget -> {
@@ -125,7 +153,10 @@ class RasterAnsicht(context: Context, private val aktionen: RasterAktionen) : Vi
                     }
                     (v as? WidgetRahmen)?.let { r ->
                         r.zoom = if (e.istUhr) 100 else e.zoom
-                        (r.getChildAt(0) as? UhrAnsicht)?.transparent = e.provider == Element.UHR_TRANSPARENT
+                        (r.getChildAt(0) as? UhrAnsicht)?.let { u ->
+                            u.transparent = e.provider == Element.UHR_TRANSPARENT
+                            u.stil = e.uhr
+                        }
                     }
                 }
             }
@@ -337,11 +368,18 @@ class RasterAnsicht(context: Context, private val aktionen: RasterAktionen) : Vi
             MotionEvent.ACTION_DOWN -> {
                 downX = ev.x; downY = ev.y
                 nachObenErledigt = false
-                startInWidget = elementVon.any { (v, _) -> v is WidgetRahmen && ev.x >= v.left && ev.x < v.right && ev.y >= v.top && ev.y < v.bottom }
+                // Über der eingebauten Uhr darf gewischt werden, über fremden Widgets nicht (die scrollen evtl. selbst)
+                startInWidget = elementVon.any { (v, e) -> v is WidgetRahmen && !(e as Element.Widget).istUhr && ev.x >= v.left && ev.x < v.right && ev.y >= v.top && ev.y < v.bottom }
             }
-            MotionEvent.ACTION_MOVE -> if (istNachOben(ev)) return true
+            MotionEvent.ACTION_MOVE -> if (istNachOben(ev) || istNachUnten(ev)) return true
         }
         return false
+    }
+
+    private fun istNachUnten(ev: MotionEvent): Boolean {
+        if (startInWidget || nachObenErledigt) return false
+        val dy = ev.y - downY
+        return dy > 140f.vp && dy > 2 * abs(ev.x - downX)
     }
 
     /** Deutlich nach oben gewischt (nicht in einem Widget, das selbst scrollen könnte)? */
@@ -386,7 +424,12 @@ class RasterAnsicht(context: Context, private val aktionen: RasterAktionen) : Vi
                 if (hypot(ev.x - downX, ev.y - downY) > slop) removeCallbacks(langerDruck)
                 if (istNachOben(ev)) {
                     nachObenErledigt = true
+                    removeCallbacks(langerDruck)
                     aktionen.nachOben()
+                } else if (istNachUnten(ev)) {
+                    nachObenErledigt = true
+                    removeCallbacks(langerDruck)
+                    aktionen.nachUnten()
                 }
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> removeCallbacks(langerDruck)
@@ -468,4 +511,83 @@ class WidgetRahmen(context: Context, private val raster: RasterAnsicht) : FrameL
         if (ev.actionMasked == MotionEvent.ACTION_UP || ev.actionMasked == MotionEvent.ACTION_CANCEL) removeCallbacks(lang)
         return abgefangen || super.onTouchEvent(ev)
     }
+}
+
+/**
+ * Platzhalter für ein Element, dessen App auf diesem Gerät fehlt: gestrichelte Fläche mit Namen.
+ * Antippen bietet die Installation an; verschieben und entfernen geht wie bei allen Elementen.
+ */
+class PlatzhalterAnsicht(context: Context, private var e: Element) : View(context) {
+    private val flaeche = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x33FFFFFF }
+    private val rand = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xB3FFFFFF.toInt(); style = Paint.Style.STROKE
+        pathEffect = android.graphics.DashPathEffect(floatArrayOf(14f.vp, 10f.vp), 0f)
+    }
+    private val schrift = android.text.TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE; textAlign = Paint.Align.CENTER
+        setShadowLayer(6f, 0f, 2f, 0xE6000000.toInt())
+    }
+    private val plus = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xE6FFFFFF.toInt(); textAlign = Paint.Align.CENTER }
+    private val feld = RectF()
+    private var mitText = true
+
+    init {
+        isClickable = true
+        isLongClickable = true
+        isHapticFeedbackEnabled = false
+    }
+
+    fun setze(e: Element, textPx: Float, typeface: android.graphics.Typeface, mitText: Boolean) {
+        this.e = e
+        this.mitText = mitText
+        schrift.textSize = textPx
+        schrift.typeface = typeface
+        contentDescription = name() + " (nicht installiert)"
+        invalidate()
+    }
+
+    private fun name(): String = when (val x = e) {
+        is Element.App -> x.titel ?: AppNamen.raten(x.paket)
+        is Element.Widget -> AppNamen.raten(x.provider.substringBefore('/')) + "-Widget"
+    }
+
+    override fun onDraw(canvas: Canvas) {
+        val textH = if (mitText) schrift.textSize * 1.6f else 0f
+        val g = if (e is Element.App) minOf(width.toFloat(), height - textH) * 0.6f else 0f
+        rand.strokeWidth = maxOf(2f, 3f.vp)
+        if (e is Element.App) {
+            val oben = (height - g - textH) / 2f
+            feld.set((width - g) / 2f, oben, (width + g) / 2f, oben + g)
+            canvas.drawRoundRect(feld, g * 0.22f, g * 0.22f, flaeche)
+            canvas.drawRoundRect(feld, g * 0.22f, g * 0.22f, rand)
+            plus.textSize = g * 0.6f
+            canvas.drawText("+", feld.centerX(), feld.centerY() + plus.textSize * 0.35f, plus)
+            if (mitText) {
+                val t = android.text.TextUtils.ellipsize(name(), schrift, width * 0.96f, android.text.TextUtils.TruncateAt.END).toString()
+                canvas.drawText(t, width / 2f, oben + g + schrift.textSize * 1.25f, schrift)
+            }
+        } else {
+            val r = minOf(width, height) * 0.08f
+            feld.set(rand.strokeWidth, rand.strokeWidth, width - rand.strokeWidth, height - rand.strokeWidth)
+            canvas.drawRoundRect(feld, r, r, flaeche)
+            canvas.drawRoundRect(feld, r, r, rand)
+            val t = android.text.TextUtils.ellipsize(name(), schrift, width * 0.9f, android.text.TextUtils.TruncateAt.END).toString()
+            canvas.drawText(t, width / 2f, height / 2f - schrift.textSize * 0.2f, schrift)
+            val zeile2 = android.text.TextUtils.ellipsize("nicht installiert – antippen", schrift, width * 0.9f, android.text.TextUtils.TruncateAt.END).toString()
+            canvas.drawText(zeile2, width / 2f, height / 2f + schrift.textSize * 1.1f, schrift)
+        }
+    }
+}
+
+/** Lesbare Namen für Apps, die (noch) nicht installiert sind – bekannte zuerst, sonst aus dem Paketnamen. */
+object AppNamen {
+    private val BEKANNT = mapOf(
+        "de.oejendorferdamm.dammboard" to "DammBoard", "de.oejendorferdamm.dammzeit" to "DammZeit",
+        "de.oejendorferdamm.dammtable" to "DammTable", "org.mozilla.firefox" to "Firefox",
+        "com.spotify.music" to "Spotify", "com.solocode.anton" to "Anton", "com.seewo.easifinder" to "EasiFinder",
+        "com.android.chrome" to "Chrome", "com.google.android.youtube" to "YouTube"
+    )
+
+    fun raten(paket: String): String = BEKANNT[paket] ?: paket.split('.').lastOrNull { it !in setOf("android", "app", "mobile", "music") }
+        ?.replaceFirstChar { it.uppercase() } ?: paket
 }

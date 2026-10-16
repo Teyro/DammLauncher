@@ -6,6 +6,11 @@ Clevertouch-Einschubgeräte und ältere CTOUCH-Panels ab Android 8. Ziele in die
 
 Freie Software unter der **GNU GPL v3** (siehe `LICENSE`).
 
+Eingebaute Schrift: **Grundschrift** von Christian Urff (www.urff.info), Lizenz
+[CC BY 3.0](http://creativecommons.org/licenses/by/3.0/) – Dateien in `app/src/main/res/font/`.
+Fotos des Tages: Wikimedia Commons (frei lizenziert) bzw. Unsplash; Fotograf und Lizenz stehen
+auf dem Startbildschirm unten rechts.
+
 ## Funktionen
 
 - **Frei einstellbares Raster**: Spalten und Zeilen je 1–10, Randabstand oben/unten/links/rechts
@@ -85,6 +90,10 @@ Uhr des Geräts). **Ist GitHub nicht erreichbar, wird nie gesperrt** – eine St
 nicht zur Sperre.
 
 ## Berechtigungen
+
+- **Über anderen Apps einblenden** (optional, einmal pro Board): für die Wischgesten am
+  Bildschirmrand – schmale, unsichtbare Leisten, die auch in anderen Apps zum Startbildschirm führen.
+  Dazu läuft ein Vordergrunddienst mit einer stillen Benachrichtigung.
 
 | Berechtigung | Wofür |
 |---|---|

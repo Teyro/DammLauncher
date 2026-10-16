@@ -13,6 +13,8 @@ import de.oejendorferdamm.dammlauncher.BuildConfig
 import de.oejendorferdamm.dammlauncher.konfig.Geraet
 import de.oejendorferdamm.dammlauncher.konfig.Grenzen
 import de.oejendorferdamm.dammlauncher.konfig.Hintergrund
+import de.oejendorferdamm.dammlauncher.konfig.Gesten
+import de.oejendorferdamm.dammlauncher.konfig.Schrift
 import de.oejendorferdamm.dammlauncher.konfig.Konfig
 import de.oejendorferdamm.dammlauncher.konfig.KonfigSpeicher
 import de.oejendorferdamm.dammlauncher.raster.Belegung
@@ -35,6 +37,8 @@ interface PanelAktionen {
     fun updatePruefen()
     fun unsplashNeu()
     fun bossAktiv(): Boolean
+    fun gestenErlaubt(): Boolean
+    fun gestenErlauben()
     fun updateText(): String
     fun meldung(text: String)
     fun panelZu()
@@ -140,6 +144,23 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
         add(regler(c, "Symbolgröße", Grenzen.ICON, k.iconProzent, 5, " %") { n -> aendere { it.copy(iconProzent = n) } })
         add(schalter(c, "Namen unter den Symbolen", k.beschriftung) { an -> aendere { it.copy(beschriftung = an) } })
         add(regler(c, "Schriftgröße", Grenzen.TEXT, k.textGroesse) { n -> aendere { it.copy(textGroesse = n) } })
+        auswahl("Schrift der App-Namen", Schrift.ALLE.map { it to Schriften.name(it) }, k.schrift, schriftVorschau = true) { s -> aendere { it.copy(schrift = s) } }
+
+        abschnitt("Gesten")
+        val wahlLauncher = listOf(Gesten.APPS to "Alle Apps", Gesten.EINSTELLUNGEN to "Einstellungen", Gesten.AUS to "Nichts")
+        auswahl("Auf dem Startbildschirm nach oben wischen", wahlLauncher, k.gesten.hoch) { v -> aendere { it.copy(gesten = it.gesten.copy(hoch = v)) } }
+        auswahl("Auf dem Startbildschirm nach unten wischen", wahlLauncher, k.gesten.runter) { v -> aendere { it.copy(gesten = it.gesten.copy(runter = v)) } }
+        add(text(c, "Vom Bildschirmrand zur Mitte wischen – wirkt auch in anderen Apps (Firefox, Anton …):", 24, Farben.TEXT), 20)
+        val wahlRand = listOf(Gesten.START to "Startbildschirm", Gesten.APPS to "Alle Apps", Gesten.AUS to "Aus")
+        auswahl("Vom unteren Rand", wahlRand, k.gesten.randUnten) { v -> aendere { it.copy(gesten = it.gesten.copy(randUnten = v)) } }
+        auswahl("Vom linken Rand", wahlRand, k.gesten.randLinks) { v -> aendere { it.copy(gesten = it.gesten.copy(randLinks = v)) } }
+        auswahl("Vom rechten Rand", wahlRand, k.gesten.randRechts) { v -> aendere { it.copy(gesten = it.gesten.copy(randRechts = v)) } }
+        if (k.gesten.randAn && !a.gestenErlaubt()) {
+            add(text(c, "Dafür braucht DammLauncher einmal die Erlaubnis „Über anderen Apps einblenden“ (auf jedem Board).", 22, Farben.ROT), 12)
+            knoepfe(knopf(c, "Erlaubnis erteilen …", haupt = true) { a.gestenErlauben() })
+        } else if (k.gesten.randAn) {
+            add(text(c, "Aktiv. Unten am Rand zeigt ein feiner Strich, wo man wischen kann.", 21, Farben.TEXT2), 8)
+        }
 
         abschnitt("Bedienung")
         add(schalter(c, "Knopf „Alle Apps“ unten anzeigen", k.alleAppsKnopf) { an -> aendere { it.copy(alleAppsKnopf = an) } })
@@ -274,10 +295,30 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
                 "Ist GitHub nicht erreichbar, wird nie gesperrt.", 21, Farben.TEXT2))
 
         abschnitt("Über DammLauncher")
-        add(text(c, "Freie Software unter der GNU GPL v3.\nQuelltext: github.com/Teyro/DammLauncher", 22, Farben.TEXT2))
+        add(text(c, "Freie Software unter der GNU GPL v3.\nQuelltext: github.com/Teyro/DammLauncher\n" +
+            "Schrift: Grundschrift von Christian Urff (www.urff.info), Lizenz CC BY 3.0.\n" +
+            "Fotos des Tages: Wikimedia Commons bzw. Unsplash – Fotograf und Lizenz stehen unten rechts.", 22, Farben.TEXT2))
         aktuelleKarte = null
         add(View(c), 40)
         scroll.post { scroll.scrollTo(0, pos); karte.requestFocus() }
+    }
+
+    /**
+     * Auswahl als Reihe von Knöpfen (die gewählte Möglichkeit blau). [schriftVorschau]: jeder Knopf
+     * in seiner eigenen Schrift.
+     */
+    private fun auswahl(titel: String, moeglich: List<Pair<String, String>>, wert: String, schriftVorschau: Boolean = false, setze: (String) -> Unit) {
+        add(text(c, titel, 22, Farben.TEXT2), 14)
+        add(android.widget.HorizontalScrollView(c).apply {
+            isHorizontalScrollBarEnabled = false
+            addView(LinearLayout(c).apply {
+                moeglich.forEach { (schluessel, name) ->
+                    addView(knopf(c, name, haupt = schluessel == wert) { setze(schluessel); aufbauen() }.apply {
+                        if (schriftVorschau) typeface = Schriften.von(c, schluessel, fettFallsSystem = true)
+                    }, lp(rechts = 12.vp))
+                }
+            })
+        }, 6)
     }
 
     /** Raster ändern – was nicht mehr passt, rückt in freie Zellen oder in die Ablage. */

@@ -41,6 +41,13 @@ class WidgetVerwaltung(context: Context) {
         emptyList()
     }
 
+    /** Nur die Anbieter-Namen – schnell, ohne Beschriftungen zu laden (für jedes Neuzeichnen). */
+    fun anbieterNamen(): Set<String> = try {
+        manager.installedProviders.map { it.provider.flattenToString() }.toSet()
+    } catch (_: Exception) {
+        emptySet()
+    }
+
     fun anbieterDa(provider: String): Boolean {
         val c = ComponentName.unflattenFromString(provider) ?: return false
         return anbieter().any { it.provider == c }
@@ -77,9 +84,10 @@ class WidgetVerwaltung(context: Context) {
         } catch (_: Exception) {
         }
         val offen = ArrayList<Element.Widget>()
+        val da = anbieterNamen()
         for (w in gewollt) {
             val provider = ComponentName.unflattenFromString(w.provider) ?: continue
-            if (!anbieter().any { it.provider == provider }) continue // App fehlt: Zelle bleibt leer
+            if (w.provider !in da) continue // App fehlt (oder eingebaute Uhr): nichts zu binden
             val id = Geraet.widgetId(w.kennung)
             val inf = if (id != 0) info(id) else null
             if (inf != null && inf.provider == provider) continue

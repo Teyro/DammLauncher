@@ -38,7 +38,16 @@ object KonfigSpeicher {
     fun init(context: Context, sicher: Boolean = false) {
         if (::ordner.isInitialized && !sicher) return
         ordner = context.applicationContext.filesDir
-        konfig = if (sicher) ladeAus(sicherung) ?: Konfig() else ladeAus(datei) ?: ladeAus(sicherung) ?: Konfig()
+        konfig = if (sicher) ladeAus(sicherung) ?: Konfig() else ladeAus(datei) ?: ladeAus(sicherung) ?: standard(context)
+    }
+
+    /** Erster Start: die Standard-Einrichtung der Schule (assets/standard_einrichtung.json). */
+    private fun standard(context: Context): Konfig = try {
+        val text = context.assets.open("standard_einrichtung.json").use { it.readBytes() }.toString(Charsets.UTF_8)
+        KonfigJson.lese(text).konfig
+    } catch (e: Exception) {
+        Log.w("DammLauncher", "Standard-Einrichtung unlesbar: ${e.message}")
+        Konfig()
     }
 
     private fun ladeAus(f: File): Konfig? = try {
@@ -68,7 +77,17 @@ object KonfigSpeicher {
         melde()
     }
 
+    /** Gespeichert wird im Hintergrund – beim Ziehen eines Reglers zählt nur der letzte Stand. */
+    private val schreiber = java.util.concurrent.Executors.newSingleThreadExecutor()
+    private val offen = java.util.concurrent.atomic.AtomicReference<Konfig?>(null)
+
     private fun schreibe(k: Konfig) {
+        if (offen.getAndSet(k) != null) return // es wartet schon ein Auftrag, der nimmt den neuesten Stand
+        schreiber.execute { offen.getAndSet(null)?.let { schreibeJetzt(it) } }
+    }
+
+    @Synchronized
+    private fun schreibeJetzt(k: Konfig) {
         try {
             val tmp = File(ordner, "konfig.json.tmp")
             tmp.writeText(KonfigJson.schreibe(k))

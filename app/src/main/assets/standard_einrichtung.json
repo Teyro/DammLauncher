@@ -1,0 +1,111 @@
+{
+  "format": 1,
+  "app": "DammLauncher",
+  "stand": 1792142552350,
+  "spalten": 6,
+  "zeilen": 5,
+  "rand": {
+    "oben": 40,
+    "unten": 40,
+    "links": 40,
+    "rechts": 40
+  },
+  "abstand": 16,
+  "iconProzent": 60,
+  "textGroesse": 22,
+  "beschriftung": true,
+  "animationen": true,
+  "alleAppsKnopf": false,
+  "elemente": [
+    {
+      "typ": "widget",
+      "provider": "de.oejendorferdamm.dammlauncher/UhrTransparent",
+      "kennung": "uhr",
+      "spalte": 0,
+      "zeile": 0,
+      "breite": 3,
+      "hoehe": 2
+    },
+    {
+      "typ": "widget",
+      "provider": "de.oejendorferdamm.dammzeit/de.oejendorferdamm.dammzeit.widget.WidgetKlein",
+      "kennung": "2c17cb508894",
+      "spalte": 4,
+      "zeile": 0,
+      "breite": 2,
+      "hoehe": 2
+    },
+    {
+      "typ": "widget",
+      "provider": "de.oejendorferdamm.dammtable/de.oejendorferdamm.dammtable.widget.StundenplanWidget",
+      "kennung": "6110ac07129b",
+      "spalte": 4,
+      "zeile": 2,
+      "breite": 2,
+      "hoehe": 3
+    },
+    {
+      "typ": "app",
+      "paket": "de.oejendorferdamm.dammboard",
+      "aktivitaet": "de.oejendorferdamm.dammboard.MainActivity",
+      "spalte": 0,
+      "zeile": 3
+    },
+    {
+      "typ": "app",
+      "paket": "org.mozilla.firefox",
+      "aktivitaet": "org.mozilla.firefox.App",
+      "spalte": 2,
+      "zeile": 3
+    },
+    {
+      "typ": "app",
+      "paket": "de.oejendorferdamm.dammzeit",
+      "aktivitaet": "de.oejendorferdamm.dammzeit.MainActivity",
+      "spalte": 1,
+      "zeile": 3
+    },
+    {
+      "typ": "app",
+      "paket": "com.seewo.easifinder",
+      "aktivitaet": "com.seewo.easifinder.FileBrowseMainActivity",
+      "spalte": 0,
+      "zeile": 4
+    },
+    {
+      "typ": "app",
+      "paket": "com.spotify.music",
+      "aktivitaet": "com.spotify.music.MainActivity",
+      "spalte": 1,
+      "zeile": 4
+    },
+    {
+      "typ": "app",
+      "paket": "com.solocode.anton",
+      "aktivitaet": "com.solocode.anton.MainActivity",
+      "spalte": 2,
+      "zeile": 4
+    },
+    {
+      "typ": "widget",
+      "provider": "org.mozilla.firefox/org.mozilla.gecko.search.SearchWidgetProvider",
+      "kennung": "a01d5a0e6902",
+      "spalte": 0,
+      "zeile": 2,
+      "breite": 3,
+      "hoehe": 1
+    }
+  ],
+  "nichtPlatziert": [],
+  "hintergrund": {
+    "farbe": "#FF1E3A5F",
+    "bild": false,
+    "unsplash": true,
+    "thema": "landscape",
+    "schluessel": "",
+    "quelle": "commons"
+  },
+  "bearbeitenGesperrt": false,
+  "pin": null,
+  "boss": null
+}

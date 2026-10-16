@@ -15,10 +15,12 @@ import org.junit.Test
 class KonfigTest {
     private val voll = Konfig(
         spalten = 8, zeilen = 3, rand = Raender(0, 120, 10, 10), abstand = 4, iconProzent = 70, textGroesse = 30,
-        beschriftung = false, alleAppsKnopf = true,
+        beschriftung = false, alleAppsKnopf = true, schrift = "grundschrift",
+        gesten = de.oejendorferdamm.dammlauncher.konfig.Gesten(hoch = "einstellungen", runter = "apps", randUnten = "apps", randLinks = "start", randRechts = "aus"),
         elemente = listOf(
             Element.App("org.mozilla.firefox", "org.mozilla.fenix.HomeActivity", 0, 0, titel = "Internet", icon = "0123abcd.png"),
-            Element.Widget("com.android.deskclock/com.android.alarmclock.DigitalAppWidgetProvider", "uhr1", 2, 0, 3, 2)
+            Element.Widget("com.android.deskclock/com.android.alarmclock.DigitalAppWidgetProvider", "uhr1", 2, 0, 3, 2, zoom = 250),
+            Element.Widget(Element.UHR_TRANSPARENT, "uhr2", 5, 0, 2, 1, uhr = de.oejendorferdamm.dammlauncher.konfig.UhrStil("grundschrift_punkt", "oben", "zahl"))
         ),
         nichtPlatziert = listOf(Element.App("com.android.settings", "com.android.settings.Settings", 0, 0)),
         hintergrund = Hintergrund(0xFF336699.toInt(), bild = true, unsplash = true, thema = "mountains, lake", schluessel = "abcDEF123_-abcDEF123_-xyz"),
@@ -53,7 +55,7 @@ class KonfigTest {
         val e = KonfigJson.lese(boese)
         assertEquals(Hintergrund.STANDARD_THEMA, e.konfig.hintergrund.thema)
         assertEquals("", e.konfig.hintergrund.schluessel)
-        assertEquals(2, e.warnungen.size)
+        assertEquals(e.warnungen.toString(), 2, e.warnungen.size)
     }
 
     @Test
@@ -110,12 +112,21 @@ class KonfigTest {
     fun fehlendeAppsUndWidgets() {
         val (sichtbar, protokoll) = KonfigJson.aufloesen(voll, { p, _ -> p != "org.mozilla.firefox" }, { false })
         assertTrue(sichtbar.isEmpty())
-        assertEquals(2, protokoll.size)
+        assertEquals(3, protokoll.size)
         assertTrue(protokoll[0].contains("firefox"))
         // Konfiguration selbst bleibt unverändert (App kann später installiert werden)
-        assertEquals(2, voll.elemente.size)
+        assertEquals(3, voll.elemente.size)
         val (alle, leer) = KonfigJson.aufloesen(voll, { _, _ -> true }, { true })
-        assertEquals(2, alle.size)
+        assertEquals(3, alle.size)
         assertTrue(leer.isEmpty())
+    }
+
+    @Test
+    fun standardEinrichtungIstSauber() {
+        val text = java.io.File("src/main/assets/standard_einrichtung.json").readText()
+        val k = KonfigJson.streng(text)
+        assertTrue(k.elemente.any { it is Element.Widget && it.istUhr })
+        assertEquals(null, k.pin)
+        assertEquals(null, k.boss)
     }
 }

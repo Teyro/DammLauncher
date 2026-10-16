@@ -8,6 +8,11 @@
     <!-- Update-APK an den System-Installer übergeben -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
+    <!-- Wischgesten am Bildschirmrand auch über anderen Apps (schmale unsichtbare Leisten) -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+
     <!-- Statt QUERY_ALL_PACKAGES: nur Apps mit Startsymbol und Widget-Anbieter sehen -->
     <queries>
         <intent>
@@ -59,6 +64,16 @@
             android:name=".TagesJob"
             android:exported="false"
             android:permission="android.permission.BIND_JOB_SERVICE" />
+
+        <!-- Wischgesten am Bildschirmrand (läuft nur, wenn eingeschaltet und erlaubt) -->
+        <service
+            android:name=".gesten.RandGesten"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Wischgesten am Bildschirmrand, um aus anderen Apps zum Startbildschirm zurückzukehren" />
+        </service>
 
         <!-- Ergebnis der Update-Installation (nur über das eigene PendingIntent erreichbar) -->
         <receiver

@@ -23,6 +23,9 @@ data class Konfig(
     val animationen: Boolean = false,
     /** Knopf „Alle Apps“ unten in der Mitte (Wischen klappt auf großen Displays nicht immer). */
     val alleAppsKnopf: Boolean = true,
+    /** Schrift der App-Namen: [Schrift.SYSTEM] oder eine der Grundschriften. */
+    val schrift: String = Schrift.SYSTEM,
+    val gesten: Gesten = Gesten(),
     /** Neu eingerichtet: oben links die Digitaluhr (3 × 2). */
     val elemente: List<Element> = listOf(Element.Widget(Element.UHR, "uhr", 0, 0, 3, 2)),
     /** Was nach dem Verkleinern des Rasters keinen Platz mehr hatte. */
@@ -64,6 +67,61 @@ data class Hintergrund(
         const val STANDARD_THEMA = "landscape"
         val THEMA = Regex("^[\\p{L}0-9 ,-]{1,40}$")
         val SCHLUESSEL = Regex("^[A-Za-z0-9_-]{20,80}$")
+    }
+}
+
+/** Aussehen der eingebauten Uhr. */
+data class UhrStil(
+    val schrift: String = Schrift.GRUNDSCHRIFT,
+    /** [OBEN], [UNTEN] oder [AUS]. */
+    val datum: String = UNTEN,
+    /** [LANG] „Freitag, 16. Oktober“, [OHNE_WOCHENTAG] „16. Oktober 2026“, [ZAHL] „16.10.2026“, [WOCHENTAG] „Freitag“. */
+    val format: String = LANG
+) {
+    companion object {
+        const val OBEN = "oben"
+        const val UNTEN = "unten"
+        const val AUS = "aus"
+        const val LANG = "lang"
+        const val OHNE_WOCHENTAG = "ohne_wochentag"
+        const val ZAHL = "zahl"
+        const val WOCHENTAG = "wochentag"
+        val DATUM = setOf(OBEN, UNTEN, AUS)
+        val FORMATE = setOf(LANG, OHNE_WOCHENTAG, ZAHL, WOCHENTAG)
+    }
+}
+
+/** Die eingebauten Schriften (Grundschrift von Christian Urff, CC BY 3.0). */
+object Schrift {
+    const val SYSTEM = "system"
+    const val GRUNDSCHRIFT = "grundschrift"
+    const val FETT = "grundschrift_fett"
+    const val LEICHT = "grundschrift_leicht"
+    const val PUNKT = "grundschrift_punkt"
+    const val KONTUR = "grundschrift_kontur"
+    val ALLE = listOf(GRUNDSCHRIFT, FETT, LEICHT, PUNKT, KONTUR, SYSTEM)
+}
+
+/**
+ * Wischgesten. Im Startbildschirm: [hoch]/[runter] aus der Mitte. Am Bildschirmrand (auch über
+ * anderen Apps, braucht „Über anderen Apps einblenden“): vom Rand zur Mitte hin.
+ */
+data class Gesten(
+    val hoch: String = APPS,
+    val runter: String = AUS,
+    val randUnten: String = START,
+    val randLinks: String = AUS,
+    val randRechts: String = AUS
+) {
+    val randAn get() = listOf(randUnten, randLinks, randRechts).any { it != AUS }
+
+    companion object {
+        const val AUS = "aus"
+        const val START = "start"
+        const val APPS = "apps"
+        const val EINSTELLUNGEN = "einstellungen"
+        val IM_LAUNCHER = setOf(AUS, APPS, EINSTELLUNGEN)
+        val AM_RAND = setOf(AUS, START, APPS)
     }
 }
 
@@ -119,7 +177,9 @@ sealed class Element {
         override val breite: Int,
         override val hoehe: Int,
         /** Inhalt vergrößern (Prozent): viele Widgets haben feste Größen und wirken auf großen Boards winzig. */
-        val zoom: Int = 100
+        val zoom: Int = 100,
+        /** Nur für die eingebaute Uhr: Schrift und Datum. */
+        val uhr: UhrStil = UhrStil()
     ) : Element() {
         /** Die eingebaute Digitaluhr – kein Android-Widget, braucht keine Freigabe. */
         val istUhr get() = provider == UHR || provider == UHR_TRANSPARENT

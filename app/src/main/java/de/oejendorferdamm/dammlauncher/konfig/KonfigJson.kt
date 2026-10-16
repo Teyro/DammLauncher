@@ -32,6 +32,9 @@ object KonfigJson {
         put("beschriftung", k.beschriftung)
         put("animationen", k.animationen)
         put("alleAppsKnopf", k.alleAppsKnopf)
+        put("schrift", k.schrift)
+        put("gesten", JSONObject().put("hoch", k.gesten.hoch).put("runter", k.gesten.runter)
+            .put("randUnten", k.gesten.randUnten).put("randLinks", k.gesten.randLinks).put("randRechts", k.gesten.randRechts))
         put("elemente", JSONArray().apply { k.elemente.forEach { put(element(it)) } })
         put("nichtPlatziert", JSONArray().apply { k.nichtPlatziert.forEach { put(element(it)) } })
         put("hintergrund", JSONObject().put("farbe", "#%08X".format(k.hintergrund.farbe)).put("bild", k.hintergrund.bild)
@@ -47,7 +50,10 @@ object KonfigJson {
         is Element.App -> JSONObject().put("typ", "app").put("paket", e.paket).put("aktivitaet", e.aktivitaet).put("spalte", e.spalte).put("zeile", e.zeile)
             .apply { e.titel?.let { put("titel", it) }; e.icon?.let { put("icon", it) } }
         is Element.Widget -> JSONObject().put("typ", "widget").put("provider", e.provider).put("kennung", e.kennung)
-            .put("spalte", e.spalte).put("zeile", e.zeile).put("breite", e.breite).put("hoehe", e.hoehe).apply { if (e.zoom != 100) put("zoom", e.zoom) }
+            .put("spalte", e.spalte).put("zeile", e.zeile).put("breite", e.breite).put("hoehe", e.hoehe).apply {
+                if (e.zoom != 100) put("zoom", e.zoom)
+                if (e.istUhr) put("uhr", JSONObject().put("schrift", e.uhr.schrift).put("datum", e.uhr.datum).put("format", e.uhr.format))
+            }
     }
 
     private val PAKET = Regex("^[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z0-9_]+)+$")
@@ -117,7 +123,13 @@ object KonfigJson {
                         } else {
                             val zoom = e.optInt("zoom", 100)
                             if (zoom !in Grenzen.ZOOM) w.add("$name[$i]: zoom = $zoom liegt außerhalb")
-                            Element.Widget(prov, ken, s, z, e.optInt("breite", 1).coerceIn(1, 10), e.optInt("hoehe", 1).coerceIn(1, 10), zoom.coerceIn(Grenzen.ZOOM))
+                            val u = e.optJSONObject("uhr")
+                            fun wahl(n: String, erlaubt: Collection<String>, std: String): String {
+                                val v = u?.optString(n, "").orEmpty()
+                                return if (v.isEmpty()) std else if (v in erlaubt) v else { w.add("$name[$i]: uhr.$n unbekannt"); std }
+                            }
+                            val uhr = UhrStil(wahl("schrift", Schrift.ALLE, Schrift.GRUNDSCHRIFT), wahl("datum", UhrStil.DATUM, UhrStil.UNTEN), wahl("format", UhrStil.FORMATE, UhrStil.LANG))
+                            Element.Widget(prov, ken, s, z, e.optInt("breite", 1).coerceIn(1, 10), e.optInt("hoehe", 1).coerceIn(1, 10), zoom.coerceIn(Grenzen.ZOOM), uhr)
                         }
                     }
                     else -> { w.add("$name[$i]: unbekannter Typ"); null }
@@ -153,6 +165,19 @@ object KonfigJson {
             else -> { w.add("hintergrund.quelle unbekannt"); Hintergrund.COMMONS }
         }
 
+        // Schrift und Gesten kamen mit 1.3.0 – fehlen sie, gilt der Standard (keine Warnung)
+        fun wahl(quelle: JSONObject?, n: String, erlaubt: Collection<String>, std: String): String {
+            val v = quelle?.optString(n, "").orEmpty()
+            return if (v.isEmpty()) std else if (v in erlaubt) v else { w.add("$n unbekannt"); std }
+        }
+        val schrift = wahl(o, "schrift", Schrift.ALLE, Schrift.SYSTEM)
+        val g = o.optJSONObject("gesten")
+        val sg = Gesten()
+        val gesten = Gesten(
+            wahl(g, "hoch", Gesten.IM_LAUNCHER, sg.hoch), wahl(g, "runter", Gesten.IM_LAUNCHER, sg.runter),
+            wahl(g, "randUnten", Gesten.AM_RAND, sg.randUnten), wahl(g, "randLinks", Gesten.AM_RAND, sg.randLinks), wahl(g, "randRechts", Gesten.AM_RAND, sg.randRechts)
+        )
+
         fun passwort(name: String) = o.optJSONObject(name)?.let { p ->
             val hash = p.optString("hash")
             val salt = p.optString("salt")
@@ -172,6 +197,8 @@ object KonfigJson {
             beschriftung = schalter("beschriftung", std.beschriftung),
             animationen = schalter("animationen", std.animationen),
             alleAppsKnopf = schalter("alleAppsKnopf", std.alleAppsKnopf),
+            schrift = schrift,
+            gesten = gesten,
             elemente = platziert,
             nichtPlatziert = offen,
             hintergrund = Hintergrund(farbe, h?.optBoolean("bild", false) ?: false, h?.optBoolean("unsplash", false) ?: false, thema, schluessel, quelle),

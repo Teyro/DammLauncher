@@ -39,6 +39,7 @@ import de.oejendorferdamm.dammlauncher.apps.AppInfo
 import de.oejendorferdamm.dammlauncher.apps.AppKatalog
 import de.oejendorferdamm.dammlauncher.apps.EigeneSymbole
 import de.oejendorferdamm.dammlauncher.hintergrund.FotoDesTages
+import de.oejendorferdamm.dammlauncher.gesten.RandGesten
 import de.oejendorferdamm.dammlauncher.konfig.Datei
 import de.oejendorferdamm.dammlauncher.konfig.Element
 import de.oejendorferdamm.dammlauncher.konfig.Geraet
@@ -57,6 +58,11 @@ import de.oejendorferdamm.dammlauncher.ui.PanelAktionen
 import de.oejendorferdamm.dammlauncher.ui.RasterAktionen
 import de.oejendorferdamm.dammlauncher.ui.RasterAnsicht
 import de.oejendorferdamm.dammlauncher.ui.UhrAnsicht
+import de.oejendorferdamm.dammlauncher.ui.AppNamen
+import de.oejendorferdamm.dammlauncher.ui.Schriften
+import de.oejendorferdamm.dammlauncher.konfig.Gesten
+import de.oejendorferdamm.dammlauncher.konfig.Schrift
+import de.oejendorferdamm.dammlauncher.konfig.UhrStil
 import de.oejendorferdamm.dammlauncher.ui.WidgetRahmen
 import de.oejendorferdamm.dammlauncher.ui.regler
 import de.oejendorferdamm.dammlauncher.konfig.Grenzen
@@ -106,7 +112,11 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
 
     private class Bearbeitung(val app: Element.App, var name: String, var icon: String?, val vorschau: ImageView, val fenster: GrossFenster)
 
-    private val konfigBeobachter: (Konfig) -> Unit = { zeigen() }
+    private var gestenStand: Gesten? = null
+    private val konfigBeobachter: (Konfig) -> Unit = { k ->
+        zeigen()
+        if (k.gesten != gestenStand) { gestenStand = k.gesten; RandGesten.abgleichen(this, neu = true) }
+    }
     private val appBeobachter: (String?) -> Unit = { entfernt -> paketeGeaendert(entfernt) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -132,13 +142,17 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
             compoundDrawablePadding = 18.vp
         }
         wurzel.addView(alleApps, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply { bottomMargin = 18.vp })
-        fotoHinweis = text(this, "", 17, 0xE6FFFFFF.toInt()).apply {
-            background = runde(0x40000000, 30f.vp)
-            setPadding(20.vp, 8.vp, 20.vp, 8.vp)
+        // Bildnachweis: klein und zurückhaltend (auf 85 Zoll sonst viel zu groß)
+        fotoHinweis = text(this, "", 11, 0xCCFFFFFF.toInt()).apply {
+            background = runde(0x33000000, 20f.vp)
+            setPadding(12.vp, 4.vp, 12.vp, 4.vp)
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
+            maxWidth = (resources.displayMetrics.widthPixels * 0.3f).toInt()
             visibility = View.GONE
             setOnClickListener { fotoSeiteOeffnen() }
         }
-        wurzel.addView(fotoHinweis, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM or Gravity.END).apply { bottomMargin = 26.vp; rightMargin = 26.vp })
+        wurzel.addView(fotoHinweis, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM or Gravity.END).apply { bottomMargin = 10.vp; rightMargin = 12.vp })
         setContentView(wurzel)
 
         KonfigSpeicher.beobachte(konfigBeobachter)
@@ -188,6 +202,8 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
             panel?.aufbauen()
         }
         vorne = true
+        RandGesten.vorne(true)
+        RandGesten.abgleichen(this)
         if (Geraet.veraltetGemeldet || System.currentTimeMillis() - Geraet.letzterUpdateCheck > 24 * 60 * 60_000L) updatePruefenStill()
         else bereitesUpdateInstallieren()
         if (FotoDesTages.faellig()) unsplashLaden(false)
@@ -195,6 +211,7 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
 
     override fun onPause() {
         vorne = false
+        RandGesten.vorne(false)
         super.onPause()
     }
 
@@ -211,6 +228,8 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         fenster.toList().forEach { it.schliessen() }
         uebersichtZu()
         panelZu()
+        // Randgeste aus einer anderen App: „Alle Apps“ gleich öffnen
+        if (intent?.getStringExtra(EXTRA_GESTE) == Gesten.APPS) haupt.post { oeffneUebersicht() }
     }
 
     @Deprecated("Zurück-Taste")
@@ -228,9 +247,15 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
 
     private fun zeigen() {
         val k = KonfigSpeicher.konfig
-        val anbieter = if (sicher) emptySet() else widgets.anbieter().map { it.provider.flattenToString() }.toSet()
+        val anbieter = if (sicher) emptySet() else widgets.anbieterNamen()
         val (sichtbar, _) = KonfigJson.aufloesen(k, AppKatalog::istDa) { it == Element.UHR || it == Element.UHR_TRANSPARENT || it in anbieter }
-        raster.setze(k, sichtbar) { w -> if (w.istUhr) UhrAnsicht(this, w.provider == Element.UHR_TRANSPARENT) else if (sicher) null else widgets.ansicht(this, w) }
+        // Was fehlt (App nicht installiert), erscheint als Platzhalter – im sicheren Start fehlen Widgets absichtlich
+        val da = sichtbar.map { it.schluessel }.toSet()
+        val fehlt = k.elemente.filter { it.schluessel !in da && !(sicher && it is Element.Widget) }.map { it.schluessel }.toSet()
+        val elemente = k.elemente.filter { it.schluessel in da || it.schluessel in fehlt }
+        raster.setze(k, elemente, fehlt) { w ->
+            if (w.istUhr) UhrAnsicht(this, w.provider == Element.UHR_TRANSPARENT, w.uhr) else if (sicher) null else widgets.ansicht(this, w)
+        }
         alleApps.visibility = if (k.alleAppsKnopf) View.VISIBLE else View.GONE
         hintergrund(k)
         // Widgets ihre Größe mitteilen, sobald sie liegen
@@ -346,7 +371,38 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         }
     }
 
-    override fun nachOben() = oeffneUebersicht()
+    override fun nachOben() = geste(KonfigSpeicher.konfig.gesten.hoch)
+
+    override fun nachUnten() = geste(KonfigSpeicher.konfig.gesten.runter)
+
+    private fun geste(aktion: String) {
+        when (aktion) {
+            Gesten.APPS -> oeffneUebersicht()
+            Gesten.EINSTELLUNGEN -> langerDruckLeer()
+        }
+    }
+
+    /** Platzhalter angetippt: App im App-Store (Play Store, F-Droid …) anbieten. */
+    override fun fehlt(e: Element) {
+        val paket = when (e) {
+            is Element.App -> e.paket
+            is Element.Widget -> e.provider.substringBefore('/')
+        }
+        val name = AppNamen.raten(paket)
+        val f = neuesFenster("$name fehlt", 900)
+        f.add(text(this, "„$name“ ist auf diesem Board nicht installiert. Sobald die App da ist, erscheint sie hier von selbst.", 24, Farben.TEXT2))
+        f.knoepfe(
+            knopf(this, "Schließen") { f.schliessen() },
+            knopf(this, "Im App-Store suchen", haupt = true) {
+                f.schliessen()
+                try {
+                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=$paket")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                } catch (_: Exception) {
+                    meldung("Auf diesem Board gibt es keinen App-Store.")
+                }
+            }
+        )
+    }
 
     override fun gesperrt() = KonfigSpeicher.konfig.bearbeitenGesperrt
 
@@ -383,19 +439,52 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
                 val f = neuesFenster(if (e.istUhr) "Uhr" else "Widget", 900)
                 f.add(knopf(this, "Größe ändern", haupt = true) { f.schliessen(); raster.beginneGroesse(e) })
                 if (!e.istUhr) f.add(knopf(this, "Inhalt vergrößern …") { f.schliessen(); zoomEinstellen(e) })
-                if (e.istUhr) {
-                    val durchsichtig = e.provider == Element.UHR_TRANSPARENT
-                    f.add(knopf(this, if (durchsichtig) "Mit weißer Fläche" else "Transparent (ohne Fläche)") {
-                        f.schliessen()
-                        val neu = if (durchsichtig) Element.UHR else Element.UHR_TRANSPARENT
-                        KonfigSpeicher.aendere { k -> k.copy(elemente = k.elemente.map { if (it.schluessel == e.schluessel) (it as Element.Widget).copy(provider = neu) else it }) }
-                    })
-                }
+                if (e.istUhr) f.add(knopf(this, "Uhr einstellen …") { f.schliessen(); uhrEinstellen(e) })
                 val id = Geraet.widgetId(e.kennung)
                 if (id != 0 && widgets.info(id)?.configure != null) f.add(knopf(this, "Widget einrichten …") { f.schliessen(); konfigurieren(id, null) })
                 f.add(knopf(this, "Vom Startbildschirm entfernen", gefahr = true) { f.schliessen(); entferne(e) })
             }
         }
+    }
+
+    /** Aussehen der Uhr: Fläche, Schrift, Datum – jede Wahl wirkt sofort. */
+    private fun uhrEinstellen(e: Element.Widget) {
+        val f = neuesFenster("Uhr einstellen", 1300)
+        fun aktuell() = KonfigSpeicher.konfig.elemente.firstOrNull { it.schluessel == e.schluessel } as? Element.Widget ?: e
+        fun aendere(neu: (Element.Widget) -> Element.Widget) = KonfigSpeicher.aendere { k ->
+            k.copy(elemente = k.elemente.map { if (it.schluessel == e.schluessel) neu(it as Element.Widget) else it })
+        }
+        val zeilen = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        f.add(zeilen, 0)
+        fun aufbauen() {
+            zeilen.removeAllViews()
+            val u = aktuell()
+            fun reihe(titel: String, vararg k: View) {
+                zeilen.addView(text(this, titel, 22, Farben.TEXT2), lp(oben = 18.vp))
+                zeilen.addView(android.widget.HorizontalScrollView(this).apply {
+                    isHorizontalScrollBarEnabled = false
+                    addView(LinearLayout(context).apply { k.forEach { addView(it, lp(rechts = 12.vp)) } })
+                }, lp(ViewGroup.LayoutParams.MATCH_PARENT, oben = 8.vp))
+            }
+            fun wahl(t: String, an: Boolean, klick: () -> Unit) = knopf(this, t, haupt = an) { klick(); aufbauen() }
+            reihe("Aussehen",
+                wahl("Weiße Fläche", !u.istUhr || u.provider == Element.UHR) { aendere { it.copy(provider = Element.UHR) } },
+                wahl("Transparent", u.provider == Element.UHR_TRANSPARENT) { aendere { it.copy(provider = Element.UHR_TRANSPARENT) } })
+            reihe("Schrift", *Schrift.ALLE.map { s ->
+                wahl(Schriften.name(s), u.uhr.schrift == s) { aendere { it.copy(uhr = it.uhr.copy(schrift = s)) } }.apply { typeface = Schriften.von(context, s, fettFallsSystem = true) }
+            }.toTypedArray())
+            reihe("Datum",
+                wahl("Unten", u.uhr.datum == UhrStil.UNTEN) { aendere { it.copy(uhr = it.uhr.copy(datum = UhrStil.UNTEN)) } },
+                wahl("Oben", u.uhr.datum == UhrStil.OBEN) { aendere { it.copy(uhr = it.uhr.copy(datum = UhrStil.OBEN)) } },
+                wahl("Ausblenden", u.uhr.datum == UhrStil.AUS) { aendere { it.copy(uhr = it.uhr.copy(datum = UhrStil.AUS)) } })
+            if (u.uhr.datum != UhrStil.AUS) reihe("Datumsform",
+                wahl("Freitag, 16. Oktober", u.uhr.format == UhrStil.LANG) { aendere { it.copy(uhr = it.uhr.copy(format = UhrStil.LANG)) } },
+                wahl("16. Oktober 2026", u.uhr.format == UhrStil.OHNE_WOCHENTAG) { aendere { it.copy(uhr = it.uhr.copy(format = UhrStil.OHNE_WOCHENTAG)) } },
+                wahl("16.10.2026", u.uhr.format == UhrStil.ZAHL) { aendere { it.copy(uhr = it.uhr.copy(format = UhrStil.ZAHL)) } },
+                wahl("Freitag", u.uhr.format == UhrStil.WOCHENTAG) { aendere { it.copy(uhr = it.uhr.copy(format = UhrStil.WOCHENTAG)) } })
+        }
+        aufbauen()
+        f.knoepfe(knopf(this, "Fertig", haupt = true) { f.schliessen() })
     }
 
     /** Inhalt eines Widgets vergrößern – wirkt sofort (Live-Vorschau hinter dem Fenster). */
@@ -1075,7 +1164,18 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         }
     }
 
+    override fun gestenErlaubt() = RandGesten.erlaubt(this)
+
+    override fun gestenErlauben() {
+        try {
+            startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
+        } catch (_: Exception) {
+            meldung("Dieses Board bietet die Einstellung „Über anderen Apps einblenden“ nicht an.")
+        }
+    }
+
     companion object {
+        const val EXTRA_GESTE = "geste"
         /** Wann zuletzt automatisch installiert wurde (hält, solange der Prozess lebt). */
         private var letzteAutoInstallation = 0L
         private const val REQ_BIND = 11

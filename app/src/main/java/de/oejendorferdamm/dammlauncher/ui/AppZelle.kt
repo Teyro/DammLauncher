@@ -50,7 +50,8 @@ class AppZelle(context: Context) : View(context) {
         isHapticFeedbackEnabled = false
     }
 
-    fun setze(app: ComponentName, name: String, eigenesIcon: String?, iconProzent: Int, textGroesse: Float, mitText: Boolean) {
+    fun setze(app: ComponentName, name: String, eigenesIcon: String?, iconProzent: Int, textGroesse: Float, mitText: Boolean, schrift: android.graphics.Typeface? = null) {
+        if (schrift != null) textPaint.typeface = schrift
         val neu = komponente != app || this.eigenesIcon != eigenesIcon
         komponente = app
         this.eigenesIcon = eigenesIcon
