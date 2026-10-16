@@ -365,6 +365,19 @@ def main():
     tippe("Fertig")
     time.sleep(2)
     screenshot("19c_unsplash_startbildschirm.png")
+    # Uhr: über das Menü auf „transparent“ umstellen
+    uhr = knoten("Uhr")
+    if uhr:
+        lang(*mitte(uhr))
+        time.sleep(1.5)
+        if tippe("Transparent (ohne Fläche)"):
+            time.sleep(2)
+            screenshot("19e_uhr_transparent.png")
+        else:
+            adb("shell", "input", "keyevent", "4")
+            time.sleep(1)
+    else:
+        print("WARNUNG: Uhr nicht gefunden", file=sys.stderr)
     tippe("Alle Apps")
     time.sleep(2)
     screenshot("19d_uebersicht_dunkel.png")

@@ -20,7 +20,14 @@ import java.util.Locale
  * Die eingebaute Digitaluhr: weiße Fläche mit dunklem Rahmen, große Uhrzeit, darunter das Datum.
  * Alles wird aus der Größe des Feldes berechnet – die Uhr wächst mit, wenn man sie größer zieht.
  */
-class UhrAnsicht(context: Context) : View(context) {
+class UhrAnsicht(context: Context, transparent: Boolean = false) : View(context) {
+    /** Ohne Fläche: weiße Schrift mit Schatten direkt auf dem Hintergrund. */
+    var transparent = transparent
+        set(v) {
+            field = v
+            stil()
+        }
+
     private val flaeche = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFFFFFFF.toInt() }
     private val rahmen = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF1F2937.toInt(); style = Paint.Style.STROKE }
     private val zeit = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -45,7 +52,21 @@ class UhrAnsicht(context: Context) : View(context) {
 
     init {
         contentDescription = "Uhr"
-        elevation = 10f.vp
+        stil()
+    }
+
+    private fun stil() {
+        elevation = if (transparent) 0f else 10f.vp
+        zeit.color = if (transparent) 0xFFFFFFFF.toInt() else 0xFF111827.toInt()
+        datum.color = if (transparent) 0xF2FFFFFF.toInt() else 0xFF4B5563.toInt()
+        if (transparent) {
+            zeit.setShadowLayer(10f.vp, 0f, 3f.vp, 0xB3000000.toInt())
+            datum.setShadowLayer(8f.vp, 0f, 2f.vp, 0xB3000000.toInt())
+        } else {
+            zeit.clearShadowLayer()
+            datum.clearShadowLayer()
+        }
+        invalidate()
     }
 
     override fun onAttachedToWindow() {
@@ -79,8 +100,10 @@ class UhrAnsicht(context: Context) : View(context) {
         val dick = maxOf(2f, minOf(w, h) * 0.025f)
         rahmen.strokeWidth = dick
         feld.set(dick / 2, dick / 2, w - dick / 2, h - dick / 2)
-        canvas.drawRoundRect(feld, radius(), radius(), flaeche)
-        canvas.drawRoundRect(feld, radius(), radius(), rahmen)
+        if (!transparent) {
+            canvas.drawRoundRect(feld, radius(), radius(), flaeche)
+            canvas.drawRoundRect(feld, radius(), radius(), rahmen)
+        }
 
         val z = uhrzeit.format(jetzt)
         val d = tag.format(jetzt)

@@ -123,7 +123,10 @@ class RasterAnsicht(context: Context, private val aktionen: RasterAktionen) : Vi
                         addView(v)
                         ansichten[e.schluessel] = v
                     }
-                    (v as? WidgetRahmen)?.zoom = if (e.istUhr) 100 else e.zoom
+                    (v as? WidgetRahmen)?.let { r ->
+                        r.zoom = if (e.istUhr) 100 else e.zoom
+                        (r.getChildAt(0) as? UhrAnsicht)?.transparent = e.provider == Element.UHR_TRANSPARENT
+                    }
                 }
             }
             elementVon[v] = e

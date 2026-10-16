@@ -75,6 +75,8 @@ sealed class Element {
     companion object {
         /** „Anbieter“ der eingebauten Uhr. */
         const val UHR = "de.oejendorferdamm.dammlauncher/Uhr"
+        /** Dieselbe Uhr ohne Fläche: weiße Schrift mit Schatten direkt auf dem Hintergrund. */
+        const val UHR_TRANSPARENT = "de.oejendorferdamm.dammlauncher/UhrTransparent"
     }
 
     abstract val spalte: Int
@@ -120,7 +122,7 @@ sealed class Element {
         val zoom: Int = 100
     ) : Element() {
         /** Die eingebaute Digitaluhr – kein Android-Widget, braucht keine Freigabe. */
-        val istUhr get() = provider == UHR
+        val istUhr get() = provider == UHR || provider == UHR_TRANSPARENT
         override val schluessel get() = "widget:$kennung"
         override fun verschoben(spalte: Int, zeile: Int) = copy(spalte = spalte, zeile = zeile)
         override fun mitGroesse(breite: Int, hoehe: Int) = copy(breite = breite, hoehe = hoehe)

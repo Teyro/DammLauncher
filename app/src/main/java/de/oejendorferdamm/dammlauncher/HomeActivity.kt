@@ -229,8 +229,8 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
     private fun zeigen() {
         val k = KonfigSpeicher.konfig
         val anbieter = if (sicher) emptySet() else widgets.anbieter().map { it.provider.flattenToString() }.toSet()
-        val (sichtbar, _) = KonfigJson.aufloesen(k, AppKatalog::istDa) { it == Element.UHR || it in anbieter }
-        raster.setze(k, sichtbar) { w -> if (w.istUhr) UhrAnsicht(this) else if (sicher) null else widgets.ansicht(this, w) }
+        val (sichtbar, _) = KonfigJson.aufloesen(k, AppKatalog::istDa) { it == Element.UHR || it == Element.UHR_TRANSPARENT || it in anbieter }
+        raster.setze(k, sichtbar) { w -> if (w.istUhr) UhrAnsicht(this, w.provider == Element.UHR_TRANSPARENT) else if (sicher) null else widgets.ansicht(this, w) }
         alleApps.visibility = if (k.alleAppsKnopf) View.VISIBLE else View.GONE
         hintergrund(k)
         // Widgets ihre Größe mitteilen, sobald sie liegen
@@ -383,6 +383,14 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
                 val f = neuesFenster(if (e.istUhr) "Uhr" else "Widget", 900)
                 f.add(knopf(this, "Größe ändern", haupt = true) { f.schliessen(); raster.beginneGroesse(e) })
                 if (!e.istUhr) f.add(knopf(this, "Inhalt vergrößern …") { f.schliessen(); zoomEinstellen(e) })
+                if (e.istUhr) {
+                    val durchsichtig = e.provider == Element.UHR_TRANSPARENT
+                    f.add(knopf(this, if (durchsichtig) "Mit weißer Fläche" else "Transparent (ohne Fläche)") {
+                        f.schliessen()
+                        val neu = if (durchsichtig) Element.UHR else Element.UHR_TRANSPARENT
+                        KonfigSpeicher.aendere { k -> k.copy(elemente = k.elemente.map { if (it.schluessel == e.schluessel) (it as Element.Widget).copy(provider = neu) else it }) }
+                    })
+                }
                 val id = Geraet.widgetId(e.kennung)
                 if (id != 0 && widgets.info(id)?.configure != null) f.add(knopf(this, "Widget einrichten …") { f.schliessen(); konfigurieren(id, null) })
                 f.add(knopf(this, "Vom Startbildschirm entfernen", gefahr = true) { f.schliessen(); entferne(e) })
@@ -543,7 +551,8 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         if (sicher) { meldung("Im sicheren Start sind Widgets aus."); return }
         if (gesperrt()) { meldung("Der Startbildschirm ist gegen Verändern gesperrt (Einstellungen)."); return }
         val f = neuesFenster("Widget hinzufügen", 1100)
-        f.add(knopf(this, "🕒  Digitaluhr (DammLauncher, 3×2)", haupt = true) { f.schliessen(); uhrAnlegen() }.apply { gravity = Gravity.START or Gravity.CENTER_VERTICAL }, 10)
+        f.add(knopf(this, "🕒  Digitaluhr mit weißer Fläche (DammLauncher, 3×2)", haupt = true) { f.schliessen(); uhrAnlegen(Element.UHR) }.apply { gravity = Gravity.START or Gravity.CENTER_VERTICAL }, 10)
+        f.add(knopf(this, "🕒  Digitaluhr transparent (DammLauncher, 3×2)", haupt = true) { f.schliessen(); uhrAnlegen(Element.UHR_TRANSPARENT) }.apply { gravity = Gravity.START or Gravity.CENTER_VERTICAL }, 10)
         val liste = widgets.anbieter()
         if (liste.isEmpty()) f.add(text(this, "Auf diesem Gerät gibt es keine Widgets.", 26))
         val k = KonfigSpeicher.konfig
@@ -556,7 +565,7 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         }
     }
 
-    private fun uhrAnlegen() {
+    private fun uhrAnlegen(art: String) {
         val k = KonfigSpeicher.konfig
         var b = 3
         var h = 2
@@ -567,7 +576,7 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         }
         if (platz == null) { meldung("Kein freier Platz für die Uhr."); return }
         val kennung = "uhr" + UUID.randomUUID().toString().replace("-", "").take(8)
-        KonfigSpeicher.aendere { it.copy(elemente = it.elemente + Element.Widget(Element.UHR, kennung, platz.first, platz.second, b, h)) }
+        KonfigSpeicher.aendere { it.copy(elemente = it.elemente + Element.Widget(art, kennung, platz.first, platz.second, b, h)) }
     }
 
     /** Wie viele Zellen braucht das Widget mindestens? */
