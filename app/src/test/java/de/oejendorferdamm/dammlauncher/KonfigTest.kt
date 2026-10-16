@@ -16,11 +16,12 @@ class KonfigTest {
     private val voll = Konfig(
         spalten = 8, zeilen = 3, rand = Raender(0, 120, 10, 10), abstand = 4, iconProzent = 70, textGroesse = 30,
         beschriftung = false, alleAppsKnopf = true, schrift = "grundschrift",
+        ausgeblendet = setOf("com.android.vending/com.android.vending.AssetBrowserActivity"),
         gesten = de.oejendorferdamm.dammlauncher.konfig.Gesten(hoch = "einstellungen", runter = "apps", randUnten = "apps", randLinks = "start", randRechts = "aus"),
         elemente = listOf(
             Element.App("org.mozilla.firefox", "org.mozilla.fenix.HomeActivity", 0, 0, titel = "Internet", icon = "0123abcd.png"),
             Element.Widget("com.android.deskclock/com.android.alarmclock.DigitalAppWidgetProvider", "uhr1", 2, 0, 3, 2, zoom = 250),
-            Element.Widget(Element.UHR_TRANSPARENT, "uhr2", 5, 0, 2, 1, uhr = de.oejendorferdamm.dammlauncher.konfig.UhrStil("grundschrift_punkt", "oben", "zahl"))
+            Element.Widget(Element.UHR_TRANSPARENT, "uhr2", 5, 0, 2, 1, uhr = de.oejendorferdamm.dammlauncher.konfig.UhrStil("grundschrift_punkt", "oben", "zahl", sekunden = true))
         ),
         nichtPlatziert = listOf(Element.App("com.android.settings", "com.android.settings.Settings", 0, 0)),
         hintergrund = Hintergrund(0xFF336699.toInt(), bild = true, unsplash = true, thema = "mountains, lake", schluessel = "abcDEF123_-abcDEF123_-xyz"),

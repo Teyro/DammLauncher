@@ -26,6 +26,8 @@ data class Konfig(
     /** Schrift der App-Namen: [Schrift.SYSTEM] oder eine der Grundschriften. */
     val schrift: String = Schrift.SYSTEM,
     val gesten: Gesten = Gesten(),
+    /** In der App-Übersicht ausgeblendet („paket/aktivität“) – z. B. System-Apps, die niemand braucht. */
+    val ausgeblendet: Set<String> = emptySet(),
     /** Neu eingerichtet: oben links die Digitaluhr (3 × 2). */
     val elemente: List<Element> = listOf(Element.Widget(Element.UHR, "uhr", 0, 0, 3, 2)),
     /** Was nach dem Verkleinern des Rasters keinen Platz mehr hatte. */
@@ -76,7 +78,9 @@ data class UhrStil(
     /** [OBEN], [UNTEN] oder [AUS]. */
     val datum: String = UNTEN,
     /** [LANG] „Freitag, 16. Oktober“, [OHNE_WOCHENTAG] „16. Oktober 2026“, [ZAHL] „16.10.2026“, [WOCHENTAG] „Freitag“. */
-    val format: String = LANG
+    val format: String = LANG,
+    /** Uhrzeit mit Sekunden (zeichnet dann jede Sekunde neu). */
+    val sekunden: Boolean = false
 ) {
     companion object {
         const val OBEN = "oben"

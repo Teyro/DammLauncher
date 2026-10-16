@@ -11,6 +11,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import de.oejendorferdamm.dammlauncher.BuildConfig
 import de.oejendorferdamm.dammlauncher.konfig.Geraet
+import de.oejendorferdamm.dammlauncher.apps.AppKatalog
 import de.oejendorferdamm.dammlauncher.konfig.Grenzen
 import de.oejendorferdamm.dammlauncher.konfig.Hintergrund
 import de.oejendorferdamm.dammlauncher.konfig.Gesten
@@ -236,6 +237,18 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
                 )
             }
         }
+
+        abschnitt("Apps")
+        val versteckt = k.ausgeblendet.mapNotNull { sch -> AppKatalog.apps.firstOrNull { AppKatalog.schluessel(it.komponente) == sch } }
+        add(text(c, if (versteckt.isEmpty()) "In der App-Übersicht ist nichts ausgeblendet. Ausblenden: dort lange auf eine App drücken."
+            else "Ausgeblendet (antippen = wieder einblenden):", 22, Farben.TEXT2), 8)
+        versteckt.forEach { a ->
+            knoepfe(knopf(c, "👁  ${a.name}") {
+                aendere { it.copy(ausgeblendet = it.ausgeblendet - AppKatalog.schluessel(a.komponente)) }
+                aufbauen()
+            })
+        }
+        if (Geraet.starts().isNotEmpty()) knoepfe(knopf(c, "„Häufig benutzt“ zurücksetzen") { Geraet.startsVergessen(); a.meldung("Zurückgesetzt.") })
 
         abschnitt("Widgets und Ablage")
         knoepfe(knopf(c, "Widget hinzufügen …") { a.widgetHinzufuegen() })

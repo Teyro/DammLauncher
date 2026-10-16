@@ -207,15 +207,33 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         if (Geraet.veraltetGemeldet || System.currentTimeMillis() - Geraet.letzterUpdateCheck > 24 * 60 * 60_000L) updatePruefenStill()
         else bereitesUpdateInstallieren()
         if (FotoDesTages.faellig()) unsplashLaden(false)
+        haupt.removeCallbacks(wartung)
+        haupt.postDelayed(wartung, WARTUNG_MS)
+    }
+
+    /**
+     * Steht das Board den ganzen Tag auf dem Startbildschirm, gibt es kein onResume – deshalb alle
+     * 15 Minuten: neues Tagesfoto anzeigen bzw. holen und ein bereitliegendes Update installieren.
+     */
+    private val wartung = object : Runnable {
+        override fun run() {
+            if (!vorne) return
+            if (FotoDesTages.faellig()) unsplashLaden(false) else hintergrund(KonfigSpeicher.konfig)
+            if (Geraet.veraltetGemeldet || System.currentTimeMillis() - Geraet.letzterUpdateCheck > 24 * 60 * 60_000L) updatePruefenStill()
+            else bereitesUpdateInstallieren()
+            haupt.postDelayed(this, WARTUNG_MS)
+        }
     }
 
     override fun onPause() {
         vorne = false
+        haupt.removeCallbacks(wartung)
         RandGesten.vorne(false)
         super.onPause()
     }
 
     override fun onDestroy() {
+        haupt.removeCallbacksAndMessages(null)
         KonfigSpeicher.vergiss(konfigBeobachter)
         AppKatalog.vergiss(appBeobachter)
         super.onDestroy()
@@ -477,6 +495,9 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
                 wahl("Unten", u.uhr.datum == UhrStil.UNTEN) { aendere { it.copy(uhr = it.uhr.copy(datum = UhrStil.UNTEN)) } },
                 wahl("Oben", u.uhr.datum == UhrStil.OBEN) { aendere { it.copy(uhr = it.uhr.copy(datum = UhrStil.OBEN)) } },
                 wahl("Ausblenden", u.uhr.datum == UhrStil.AUS) { aendere { it.copy(uhr = it.uhr.copy(datum = UhrStil.AUS)) } })
+            reihe("Uhrzeit",
+                wahl("11:42", !u.uhr.sekunden) { aendere { it.copy(uhr = it.uhr.copy(sekunden = false)) } },
+                wahl("11:42:30 (mit Sekunden)", u.uhr.sekunden) { aendere { it.copy(uhr = it.uhr.copy(sekunden = true)) } })
             if (u.uhr.datum != UhrStil.AUS) reihe("Datumsform",
                 wahl("Freitag, 16. Oktober", u.uhr.format == UhrStil.LANG) { aendere { it.copy(uhr = it.uhr.copy(format = UhrStil.LANG)) } },
                 wahl("16. Oktober 2026", u.uhr.format == UhrStil.OHNE_WOCHENTAG) { aendere { it.copy(uhr = it.uhr.copy(format = UhrStil.OHNE_WOCHENTAG)) } },
@@ -618,6 +639,27 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
             }
         })
         f.add(knopf(this, "App-Info") { f.schliessen(); AppKatalog.zeigeAppInfo(app.komponente) })
+        f.add(knopf(this, "In der Übersicht ausblenden") {
+            f.schliessen()
+            mitErlaubnis {
+                KonfigSpeicher.aendere { it.copy(ausgeblendet = it.ausgeblendet + AppKatalog.schluessel(app.komponente)) }
+                uebersicht?.neuLaden()
+                meldung("„${app.name}“ ist ausgeblendet. Wieder einblenden: Einstellungen → Apps.")
+            }
+        })
+    }
+
+    /** Wie die Einstellungen: mit PIN (falls festgelegt) – sonst direkt. */
+    private fun mitErlaubnis(weiter: () -> Unit) {
+        val pin = KonfigSpeicher.konfig.pin
+        if (pin == null || bossAktiv()) { weiter(); return }
+        frageGeheim("PIN", "PIN eingeben", zahl = true) { eingabe, f ->
+            when (Passwort.pruefe("pin", eingabe, pin)) {
+                true -> { f.schliessen(); weiter() }
+                false -> meldung("Falsche PIN.")
+                null -> meldung("Zu viele Fehlversuche – gesperrt für ${Passwort.gesperrtNoch("pin")} s.")
+            }
+        }
     }
 
     private fun paketeGeaendert(entfernt: String?) {
@@ -1176,6 +1218,7 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
 
     companion object {
         const val EXTRA_GESTE = "geste"
+        private const val WARTUNG_MS = 15 * 60_000L
         /** Wann zuletzt automatisch installiert wurde (hält, solange der Prozess lebt). */
         private var letzteAutoInstallation = 0L
         private const val REQ_BIND = 11

@@ -108,6 +108,24 @@ object Geraet {
         get() = p.getInt("bildHoehe", 1080)
         set(v) = p.edit().putInt("bildHoehe", v.coerceIn(360, 2160)).apply()
 
+    /**
+     * Wie oft welche App gestartet wurde (nur dieses Gerät) – für „Häufig benutzt“. Ältere Starts
+     * zählen weniger: bei jedem Start schrumpfen alle Werte ein wenig.
+     */
+    fun merkeStart(schluessel: String) {
+        val alt = starts()
+        val neu = alt.mapValues { it.value * 0.97f }.filterValues { it > 0.2f }.toMutableMap()
+        neu[schluessel] = (neu[schluessel] ?: 0f) + 1f
+        p.edit().putString("starts", neu.entries.joinToString(";") { "${it.key}=${"%.2f".format(java.util.Locale.US, it.value)}" }).apply()
+    }
+
+    fun startsVergessen() = p.edit().remove("starts").apply()
+
+    fun starts(): Map<String, Float> = (p.getString("starts", "") ?: "").split(';').mapNotNull { e ->
+        val i = e.lastIndexOf('=')
+        if (i <= 0) null else e.substring(0, i) to (e.substring(i + 1).toFloatOrNull() ?: return@mapNotNull null)
+    }.toMap()
+
     /** Einmalige Widget-Freigabe erledigt? */
     var widgetFreigabeGefragt: Boolean
         get() = p.getBoolean("widgetFreigabe", false)

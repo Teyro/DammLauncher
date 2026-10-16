@@ -32,7 +32,15 @@ class UhrAnsicht(context: Context, transparent: Boolean = false, stil: UhrStil =
     private val datum = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
     private val feld = RectF()
     private val masse = Rect()
-    private val uhrzeit = SimpleDateFormat("HH:mm", Locale.GERMAN)
+    private var uhrzeit = SimpleDateFormat("HH:mm", Locale.GERMAN)
+
+    /** Mit Sekunden: genau zum Sekundenwechsel neu zeichnen, solange die Uhr zu sehen ist. */
+    private val sekundenTakt = object : Runnable {
+        override fun run() {
+            invalidate()
+            if (stil.sekunden && isAttachedToWindow) postDelayed(this, 1000L - System.currentTimeMillis() % 1000L + 5L)
+        }
+    }
     private var tag = SimpleDateFormat("EEEE, d. MMMM", Locale.GERMAN)
 
     /** Zuletzt berechnete Schriftgrößen – nur neu rechnen, wenn sich Größe oder Text ändern. */
@@ -71,6 +79,9 @@ class UhrAnsicht(context: Context, transparent: Boolean = false, stil: UhrStil =
         datum.typeface = Schriften.von(context, if (stil.schrift == Schrift.FETT) Schrift.GRUNDSCHRIFT else stil.schrift)
         // gleich breite Ziffern, wo die Schrift sie kennt: nichts springt beim Minutenwechsel
         zeit.fontFeatureSettings = "tnum"
+        uhrzeit = SimpleDateFormat(if (stil.sekunden) "HH:mm:ss" else "HH:mm", Locale.GERMAN)
+        removeCallbacks(sekundenTakt)
+        if (stil.sekunden && isAttachedToWindow) post(sekundenTakt)
         tag = SimpleDateFormat(
             when (stil.format) {
                 UhrStil.OHNE_WOCHENTAG -> "d. MMMM yyyy"
@@ -104,10 +115,12 @@ class UhrAnsicht(context: Context, transparent: Boolean = false, stil: UhrStil =
             addAction(Intent.ACTION_TIME_CHANGED)
             addAction(Intent.ACTION_TIMEZONE_CHANGED)
         })
+        if (stil.sekunden) post(sekundenTakt)
         invalidate()
     }
 
     override fun onDetachedFromWindow() {
+        removeCallbacks(sekundenTakt)
         try { context.unregisterReceiver(takt) } catch (_: Exception) {}
         super.onDetachedFromWindow()
     }
@@ -131,7 +144,7 @@ class UhrAnsicht(context: Context, transparent: Boolean = false, stil: UhrStil =
         val d = tag.format(jetzt)
         // Flach und breit: nur die Uhrzeit
         val mitDatum = stil.datum != UhrStil.AUS && h > w * 0.24f
-        val schluessel = "$width×$height|$mitDatum|${z.length}|$d"
+        val schluessel = "$width×$height|$mitDatum|${gruppen()}|$d"
         if (schluessel != gemessenFuer) {
             gemessenFuer = schluessel
             // „00:00“ als Maß: alle Uhrzeiten gleich groß, auch wenn die Schrift keine gleich breiten Ziffern hat
@@ -158,34 +171,37 @@ class UhrAnsicht(context: Context, transparent: Boolean = false, stil: UhrStil =
     }
 
     /**
-     * Uhrzeit aus drei Teilen setzen: Stunden, Doppelpunkt, Minuten – mit engem, festem Abstand.
+     * Uhrzeit aus Gruppen setzen (Stunden, Minuten, ggf. Sekunden) mit engen, festen Doppelpunkten.
      * Manche Schriften (z. B. die Grundschrift) haben einen sehr breiten Doppelpunkt; so sieht
-     * „11:27“ in jeder Schrift gleich aus. Stunden und Minuten bekommen je die Breite von „00“.
+     * „11:27“ in jeder Schrift gleich aus. Jede Gruppe bekommt die Breite von „00“.
      */
-    private fun zeitTeile(): Triple<Float, Float, Float> {
-        val ziffern = zeit.measureText("00")
-        zeit.getTextBounds(":", 0, 1, masse)
-        val punkt = masse.width().toFloat()
-        val luecke = zeit.textSize * 0.07f
-        return Triple(ziffern, punkt, luecke)
-    }
+    private fun gruppen() = if (stil.sekunden) 3 else 2
 
     private fun zeitBreite(): Float {
-        val (ziffern, punkt, luecke) = zeitTeile()
-        return 2 * ziffern + punkt + 2 * luecke
+        val ziffern = zeit.measureText("00")
+        zeit.getTextBounds(":", 0, 1, masse)
+        val luecke = zeit.textSize * 0.07f
+        val n = gruppen()
+        return n * ziffern + (n - 1) * (masse.width() + 2 * luecke)
     }
 
     private fun zeitMalen(canvas: Canvas, z: String, mitte: Float, grundlinie: Float) {
-        val (ziffern, punkt, luecke) = zeitTeile()
-        val links = mitte - zeitBreite() / 2f
+        val ziffern = zeit.measureText("00")
+        val luecke = zeit.textSize * 0.07f
         zeit.getTextBounds(":", 0, 1, masse)
-        canvas.drawText(z.substring(0, 2), links + ziffern / 2f, grundlinie, zeit)
-        // Doppelpunkt: sichtbarer Teil genau in die Lücke (seine eigene Laufweite zählt nicht)
-        val px = links + ziffern + luecke - masse.left
-        zeit.textAlign = Paint.Align.LEFT
-        canvas.drawText(":", px, grundlinie, zeit)
-        zeit.textAlign = Paint.Align.CENTER
-        canvas.drawText(z.substring(3), links + ziffern + 2 * luecke + punkt + ziffern / 2f, grundlinie, zeit)
+        val punkt = masse.width().toFloat()
+        var x = mitte - zeitBreite() / 2f
+        z.split(':').forEachIndexed { i, teil ->
+            if (i > 0) {
+                // Doppelpunkt: sichtbarer Teil genau in die Lücke (seine eigene Laufweite zählt nicht)
+                zeit.textAlign = Paint.Align.LEFT
+                canvas.drawText(":", x + luecke - masse.left, grundlinie, zeit)
+                zeit.textAlign = Paint.Align.CENTER
+                x += punkt + 2 * luecke
+            }
+            canvas.drawText(teil, x + ziffern / 2f, grundlinie, zeit)
+            x += ziffern
+        }
     }
 
     private fun passendeZeit(b: Float, h: Float): Float {

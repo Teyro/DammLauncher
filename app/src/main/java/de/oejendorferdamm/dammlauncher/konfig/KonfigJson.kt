@@ -33,6 +33,7 @@ object KonfigJson {
         put("animationen", k.animationen)
         put("alleAppsKnopf", k.alleAppsKnopf)
         put("schrift", k.schrift)
+        put("ausgeblendet", JSONArray().apply { k.ausgeblendet.sorted().forEach { put(it) } })
         put("gesten", JSONObject().put("hoch", k.gesten.hoch).put("runter", k.gesten.runter)
             .put("randUnten", k.gesten.randUnten).put("randLinks", k.gesten.randLinks).put("randRechts", k.gesten.randRechts))
         put("elemente", JSONArray().apply { k.elemente.forEach { put(element(it)) } })
@@ -52,7 +53,7 @@ object KonfigJson {
         is Element.Widget -> JSONObject().put("typ", "widget").put("provider", e.provider).put("kennung", e.kennung)
             .put("spalte", e.spalte).put("zeile", e.zeile).put("breite", e.breite).put("hoehe", e.hoehe).apply {
                 if (e.zoom != 100) put("zoom", e.zoom)
-                if (e.istUhr) put("uhr", JSONObject().put("schrift", e.uhr.schrift).put("datum", e.uhr.datum).put("format", e.uhr.format))
+                if (e.istUhr) put("uhr", JSONObject().put("schrift", e.uhr.schrift).put("datum", e.uhr.datum).put("format", e.uhr.format).put("sekunden", e.uhr.sekunden))
             }
     }
 
@@ -128,7 +129,7 @@ object KonfigJson {
                                 val v = u?.optString(n, "").orEmpty()
                                 return if (v.isEmpty()) std else if (v in erlaubt) v else { w.add("$name[$i]: uhr.$n unbekannt"); std }
                             }
-                            val uhr = UhrStil(wahl("schrift", Schrift.ALLE, Schrift.GRUNDSCHRIFT), wahl("datum", UhrStil.DATUM, UhrStil.UNTEN), wahl("format", UhrStil.FORMATE, UhrStil.LANG))
+                            val uhr = UhrStil(wahl("schrift", Schrift.ALLE, Schrift.GRUNDSCHRIFT), wahl("datum", UhrStil.DATUM, UhrStil.UNTEN), wahl("format", UhrStil.FORMATE, UhrStil.LANG), u?.optBoolean("sekunden", false) ?: false)
                             Element.Widget(prov, ken, s, z, e.optInt("breite", 1).coerceIn(1, 10), e.optInt("hoehe", 1).coerceIn(1, 10), zoom.coerceIn(Grenzen.ZOOM), uhr)
                         }
                     }
@@ -171,6 +172,14 @@ object KonfigJson {
             return if (v.isEmpty()) std else if (v in erlaubt) v else { w.add("$n unbekannt"); std }
         }
         val schrift = wahl(o, "schrift", Schrift.ALLE, Schrift.SYSTEM)
+        // 1.4.0: ausgeblendete Apps (fehlt = keine)
+        val ausgeblendet = o.optJSONArray("ausgeblendet")?.let { a ->
+            (0 until a.length()).mapNotNull { i ->
+                val t = a.optString(i)
+                val teile = t.split('/')
+                if (teile.size == 2 && PAKET.matches(teile[0]) && KLASSE.matches(teile[1])) t else { w.add("ausgeblendet[$i] ungültig"); null }
+            }.toSet()
+        } ?: emptySet()
         val g = o.optJSONObject("gesten")
         val sg = Gesten()
         val gesten = Gesten(
@@ -199,6 +208,7 @@ object KonfigJson {
             alleAppsKnopf = schalter("alleAppsKnopf", std.alleAppsKnopf),
             schrift = schrift,
             gesten = gesten,
+            ausgeblendet = ausgeblendet,
             elemente = platziert,
             nichtPlatziert = offen,
             hintergrund = Hintergrund(farbe, h?.optBoolean("bild", false) ?: false, h?.optBoolean("unsplash", false) ?: false, thema, schluessel, quelle),

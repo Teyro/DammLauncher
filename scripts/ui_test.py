@@ -457,11 +457,37 @@ def main():
             print("WARNUNG: Randgeste hat nicht zum Launcher geführt", file=sys.stderr)
     home()
 
+    # Eine App über die Übersicht starten → erscheint unter „Häufig benutzt“
+    tippe("Alle Apps")
+    time.sleep(2)
+    if tippe("Clock", "Uhr"):
+        time.sleep(3)
+    home()
     tippe("Alle Apps")
     time.sleep(2)
     screenshot("19d_uebersicht_dunkel.png")
+    # App ausblenden (ohne PIN direkt)
+    z = knoten("Camera") or knoten("Kamera")
+    if z:
+        lang(*mitte(z))
+        time.sleep(1.5)
+        if tippe("In der Übersicht ausblenden"):
+            time.sleep(2)
+            screenshot("19h_app_ausgeblendet.png")
     adb("shell", "input", "keyevent", "4")
     time.sleep(1)
+    # Uhr mit Sekunden
+    uhr = knoten("Uhr")
+    if uhr:
+        lang(*mitte(uhr))
+        time.sleep(1.5)
+        if tippe("Uhr einstellen …"):
+            time.sleep(1.5)
+            tippe("11:42:30 (mit Sekunden)")
+            time.sleep(1)
+            tippe("Fertig")
+            time.sleep(2)
+            screenshot("19i_uhr_sekunden.png")
 
     # Update-Pflicht: neue Version seit 30 Tagen → Sperre; Server weg → keine Sperre
     steuer("update_alt")

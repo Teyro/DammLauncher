@@ -45,7 +45,14 @@ class RandGesten : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        startForeground(1, hinweis())
+        try {
+            startForeground(1, hinweis())
+        } catch (_: Exception) {
+            // Ab Android 12 darf ein Dienst, den das System im Hintergrund neu startet, nicht in den
+            // Vordergrund – dann beenden; beim nächsten Öffnen des Launchers startet er wieder.
+            stopSelf()
+            return START_NOT_STICKY
+        }
         KonfigSpeicher.init(this)
         Masse.aktualisiere(this)
         aufbauen()

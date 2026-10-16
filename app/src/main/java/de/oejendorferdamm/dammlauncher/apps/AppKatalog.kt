@@ -39,14 +39,15 @@ object AppKatalog {
     private val haupt = Handler(Looper.getMainLooper())
     private val iconFaden = Executors.newSingleThreadExecutor { r -> Thread(r, "Icons").apply { priority = Thread.NORM_PRIORITY - 1 } }
     private val beobachter = ArrayList<(entfernt: String?) -> Unit>()
+    private val wartend = HashMap<String, ArrayList<(Bitmap?) -> Unit>>()
 
     @Volatile
     var apps: List<AppInfo> = emptyList()
         private set
     private var nachKomponente: Map<ComponentName, AppInfo> = emptyMap()
 
-    /** Symbole: Schlüssel = Komponente bzw. Datei + Größe; höchstens 40 MB. */
-    private val cache = object : LruCache<String, Bitmap>(40 * 1024 * 1024) {
+    /** Symbole: Schlüssel = Komponente bzw. Datei + Größe; höchstens 40 MB bzw. ein Achtel des App-Speichers. */
+    private val cache = object : LruCache<String, Bitmap>(minOf(40L * 1024 * 1024, Runtime.getRuntime().maxMemory() / 8).toInt()) {
         override fun sizeOf(key: String, value: Bitmap) = value.byteCount
     }
 
@@ -93,10 +94,19 @@ object AppKatalog {
 
     fun starte(app: ComponentName, quelle: android.graphics.Rect?): Boolean = try {
         la.startMainActivity(app, Process.myUserHandle(), quelle, null)
+        try { de.oejendorferdamm.dammlauncher.konfig.Geraet.merkeStart(schluessel(app)) } catch (_: Exception) {}
         true
     } catch (_: Exception) {
         false
     }
+
+    fun schluessel(app: ComponentName) = "${app.packageName}/${app.className}"
+
+    /** Die am häufigsten gestarteten (sichtbaren) Apps, höchstens [anzahl]. */
+    fun haeufig(anzahl: Int, sichtbar: (AppInfo) -> Boolean): List<AppInfo> =
+        de.oejendorferdamm.dammlauncher.konfig.Geraet.starts().entries.sortedByDescending { it.value }
+            .mapNotNull { (k, _) -> ComponentName.unflattenFromString(k)?.let { nachKomponente[it] } }
+            .filter(sichtbar).take(anzahl)
 
     fun zeigeAppInfo(app: ComponentName) = try {
         la.startAppDetailsActivity(app, Process.myUserHandle(), null, null)
@@ -119,6 +129,11 @@ object AppKatalog {
         val g = groesse.coerceIn(16, 512)
         val schluessel = (eigenes ?: "${app.packageName}/${app.className}") + "@" + g
         cache.get(schluessel)?.let { return it }
+        // Wird dasselbe Symbol schon gezeichnet (z. B. viele gleich große Zellen), nur mitwarten
+        synchronized(wartend) {
+            wartend[schluessel]?.let { it.add(fertig); return null }
+            wartend[schluessel] = arrayListOf(fertig)
+        }
         iconFaden.execute {
             val b = try {
                 if (eigenes != null) ladeDatei(File(KonfigSpeicher.iconOrdner, eigenes), g) else originalIcon(app)?.let { zeichne(it, g) }
@@ -126,7 +141,8 @@ object AppKatalog {
                 null
             }
             if (b != null) cache.put(schluessel, b)
-            haupt.post { fertig(b) }
+            val alle = synchronized(wartend) { wartend.remove(schluessel) }.orEmpty()
+            haupt.post { alle.forEach { it(b) } }
         }
         return null
     }

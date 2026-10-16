@@ -18,6 +18,7 @@ import android.widget.GridView
 import android.widget.LinearLayout
 import de.oejendorferdamm.dammlauncher.apps.AppInfo
 import de.oejendorferdamm.dammlauncher.apps.AppKatalog
+import de.oejendorferdamm.dammlauncher.konfig.KonfigSpeicher
 import java.text.Normalizer
 import kotlin.math.abs
 
@@ -37,7 +38,11 @@ class AppUebersicht(
 ) : FrameLayout(context) {
     private val suche = eingabe(context, "Suchen …")
     private val raster = GridView(context)
-    private var liste: List<AppInfo> = AppKatalog.apps
+    private var liste: List<AppInfo> = emptyList()
+    /** Suchnamen einmal vorbereitet (ohne Akzente, klein) – die Suche filtert dann nur noch. */
+    private var suchNamen: Map<AppInfo, String> = emptyMap()
+    private val haeufigReihe = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
+    private val haeufigBlock = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
     private var y0 = 0f
     private var x0 = 0f
 
@@ -91,7 +96,15 @@ class AppUebersicht(
                 true
             }
         }
+        // „Häufig benutzt“ – nur in der normalen Übersicht, nicht bei der Auswahl eines Symbols
+        if (auswahl == null) {
+            haeufigBlock.addView(text(context, "Häufig benutzt", 22, 0xB3FFFFFF.toInt(), fett = true), lp(oben = 16.vp))
+            haeufigBlock.addView(haeufigReihe, lp(ViewGroup.LayoutParams.MATCH_PARENT, 190.vp, oben = 6.vp))
+            haeufigBlock.addView(View(context).apply { setBackgroundColor(0x26FFFFFF) }, lp(ViewGroup.LayoutParams.MATCH_PARENT, 2.vp, oben = 8.vp))
+            spalte.addView(haeufigBlock, lp(ViewGroup.LayoutParams.MATCH_PARENT))
+        }
         spalte.addView(raster, lp(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f, oben = 20.vp))
+        neuLaden()
         addView(spalte, LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
         suche.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
@@ -102,14 +115,35 @@ class AppUebersicht(
 
     private fun normal(t: String) = Normalizer.normalize(t.lowercase(), Normalizer.Form.NFD).replace(Regex("\\p{M}"), "")
 
+    /** Ausgeblendete Apps erscheinen nur im Auswahlmodus (Symbol einer anderen App übernehmen). */
+    private fun sichtbar(a: AppInfo) = auswahl != null || AppKatalog.schluessel(a.komponente) !in KonfigSpeicher.konfig.ausgeblendet
+
     fun filtern() {
         val f = normal(suche.text.toString().trim())
-        liste = if (f.isEmpty()) AppKatalog.apps else AppKatalog.apps.filter { normal(it.name).contains(f) }
+        val alle = AppKatalog.apps.filter(::sichtbar)
+        liste = if (f.isEmpty()) alle else alle.filter { (suchNamen[it] ?: normal(it.name)).contains(f) }
+        haeufigBlock.visibility = if (f.isEmpty() && haeufigReihe.childCount > 0) View.VISIBLE else View.GONE
         adapter.notifyDataSetChanged()
     }
 
-    /** Paketliste hat sich geändert. */
-    fun neuLaden() = filtern()
+    /** Paketliste (oder Ausblendungen) haben sich geändert. */
+    fun neuLaden() {
+        suchNamen = AppKatalog.apps.associateWith { normal(it.name) }
+        haeufigReihe.removeAllViews()
+        if (auswahl == null) {
+            val n = raster.numColumns.coerceIn(3, 10)
+            AppKatalog.haeufig(n, ::sichtbar).forEach { a ->
+                haeufigReihe.addView(AppZelle(context).apply {
+                    setze(a.komponente, a.name, null, 62, 22.vp.toFloat(), true)
+                    setOnClickListener { v -> starten(a, v) }
+                    setOnLongClickListener { langerDruck(a); true }
+                }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f))
+            }
+            repeat(n - haeufigReihe.childCount) { haeufigReihe.addView(View(context), LinearLayout.LayoutParams(0, 1, 1f)) }
+            if (haeufigReihe.getChildAt(0) !is AppZelle) haeufigReihe.removeAllViews()
+        }
+        filtern()
+    }
 
     fun tastaturWeg() {
         (context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager)?.hideSoftInputFromWindow(suche.windowToken, 0)
