@@ -517,7 +517,13 @@ def main():
         screenshot("23c_widget_liste_neu.png")
         adb("shell", "input", "keyevent", "4")
         time.sleep(1)
-    # Schüler-Ansicht einschalten und wechseln
+    # Schüler-Ansicht einschalten und wechseln (Panel neu öffnen – es steht sonst weiter unten)
+    tippe("Fertig")
+    time.sleep(1.5)
+    lang(w * 85 // 100, h * 80 // 100)
+    time.sleep(2)
+    tippe("▶")
+    time.sleep(1)
     if scrolle_zu("Schüler-Ansicht einschalten", w * 3 // 4):
         time.sleep(1.5)
         scrolle_zu("Jetzt zur Schüler-Ansicht", w * 3 // 4, antippen=False)
