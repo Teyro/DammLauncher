@@ -510,6 +510,8 @@ def main():
     # Neues Widget-Menü mit den eingebauten Kacheln
     lang(w * 85 // 100, h * 80 // 100)
     time.sleep(2)
+    tippe("▶")  # Panel nach rechts – dort wird gescrollt
+    time.sleep(1)
     if scrolle_zu("Widget hinzufügen …", w * 3 // 4):
         time.sleep(2)
         screenshot("23c_widget_liste_neu.png")

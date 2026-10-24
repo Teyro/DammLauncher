@@ -25,6 +25,22 @@ auf dem Startbildschirm unten rechts.
   notfalls kleiner; der Rest kommt in die Ablage „nicht platziert“ und kehrt zurück, sobald Platz ist.
 - **Widgets** aller Apps; mehrere Zellen groß, Größe per Griffen änderbar. Ein abstürzendes Widget
   reißt den Launcher nicht mit.
+- **Eingebaute Kacheln** (kein Android-Widget, keine Freigabe nötig): Digitaluhr,
+  **„Noch 12 min bis zur Pause“** (Pausenzeiten in den Einstellungen → Schulzeiten),
+  **„Heute fehlen 2“** – nur die Zahl für die Klasse des Boards, die Kinder raten, wer fehlt (siehe
+  unten) – und **QR-Code** mit einem Link oder dem Gäste-WLAN (eigener QR-Erzeuger, ohne Bibliothek).
+- **Ordner**: eine App auf einen Ordner ziehen legt sie hinein; antippen öffnet ihn groß. Neuer
+  Ordner über langen Druck auf eine App → „In einen Ordner legen …“ oder Widgets → „Leerer Ordner“.
+- **Schüler-Ansicht**: Einzelne Apps, Widgets oder Ordner lassen sich für Kinder ausblenden
+  (langer Druck → „In der Schüler-Ansicht ausblenden“), die App-Übersicht auf Wunsch auch. Die
+  Lehrer-Ansicht öffnet ein langer Druck auf eine freie Fläche mit der PIN; sie kehrt nach einer
+  einstellbaren Zeit ohne Berührung (Standard 20 min) von selbst zurück.
+- **Hinweis-Band** oben auf allen Boards, z. B. „Morgen Wandertag“, mit Ablaufdatum (geht mit der
+  Vorlage an alle Geräte).
+- **Feierabend-Sperre**: ab einer Uhrzeit (Standard 17–7 Uhr) und auf Wunsch am Wochenende zeigt
+  das Board nur eine Uhr; „Entsperren“ fragt die PIN und gibt bis zum Ende dieses Feierabends frei.
+- **Bildschirmschoner**: nach 5–60 Minuten ohne Berührung dunkel und gedimmt, mit Foto des Tages und
+  einer Uhr, die jede Minute ein Stück wandert (kein Einbrennen). Antippen weckt.
 - **Hintergrund**: Bild (einmalig auf Bildschirmgröße verkleinert gespeichert) oder Farbe.
 - **App-Übersicht**: nach oben wischen oder großer Knopf „Alle Apps“; alphabetisch, mit Suche.
   Schließen: nach unten wischen, Zurück oder Knopf.
@@ -73,7 +89,23 @@ anhaken; danach geht alles ohne Rückfragen. Widgets, die beim Anlegen eine Einr
 lassen sich über langen Druck → „Widget einrichten“ nachträglich einrichten.
 
 Gerätespezifisch und vom Abgleich nie überschrieben: Gerätename, Zugangsdaten, Widget-Ids,
-Ein/Aus des automatischen Abgleichs.
+Ein/Aus des automatischen Abgleichs, Klasse des Boards, offene Lehrer-Ansicht.
+
+### „Heute fehlen …“ (Abwesenheiten, nur Zahlen)
+
+Das Board meldet sich nicht selbst bei IServ an. Stattdessen legt das iPhone-Widget
+**IServ-Abwesenheiten** (ab 0.13, Einstellungen → DammLauncher-Boards) eine kleine Datei
+`abwesend.json` in denselben Ordner wie die Vorlage – **nur die Anzahl je Klasse**, keine Namen,
+kein Grund:
+
+```json
+{"format": 1, "stand": 1792134000000, "datum": "2026-10-24",
+ "klassen": {"5a": {"fehlen": 2, "stunden": 1}, "6b": {"fehlen": 0}}}
+```
+
+Jedes Board liest sie mit seinem Lesezugang alle paar Minuten (nur, wenn eine Kachel „Heute fehlen …“
+liegt) und zeigt die Zahl für **seine** Klasse (Einstellungen → Abwesenheiten → Klasse wählen; die
+Klasse gehört zum Gerät, nicht zur Vorlage). Ist die Meldung nicht von heute, zeigt die Kachel „–“.
 
 ## Updates und Update-Pflicht
 

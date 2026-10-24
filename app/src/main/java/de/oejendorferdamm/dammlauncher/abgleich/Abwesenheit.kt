@@ -53,7 +53,7 @@ object Abwesenheit {
         val n = k?.optInt("fehlen", -1) ?: ks.optInt(name, -1)
         if (n < 0) return Anzeige(titel, "–", "Meldung unlesbar")
         val stunden = k?.optInt("stunden", 0) ?: 0
-        val stand = o.optLong("stand", 0L).takeIf { it > 0 }?.let { " · " + SimpleDateFormat("HH:mm", Locale.GERMAN).format(Date(it)) } ?: ""
+        val stand = o.optLong("stand", 0L).takeIf { it > 0 }?.let { " · Stand " + SimpleDateFormat("H.mm", Locale.GERMAN).format(Date(it)) } ?: ""
         return when (n) {
             0 -> Anzeige(titel + stand, "Alle da!", "heute fehlt niemand")
             else -> Anzeige(titel + stand, "$n", (if (n == 1) "fehlt heute" else "fehlen heute") + if (stunden > 0) " ($stunden nur stundenweise)" else "")
