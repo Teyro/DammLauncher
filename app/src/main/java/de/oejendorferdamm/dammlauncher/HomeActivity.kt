@@ -35,6 +35,18 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import de.oejendorferdamm.dammlauncher.abgleich.Abgleich
+import de.oejendorferdamm.dammlauncher.abgleich.Abwesenheit
+import de.oejendorferdamm.dammlauncher.konfig.Feierabend
+import de.oejendorferdamm.dammlauncher.konfig.Hinweis
+import de.oejendorferdamm.dammlauncher.konfig.Ordner
+import de.oejendorferdamm.dammlauncher.konfig.Zeiten
+import de.oejendorferdamm.dammlauncher.konfig.Zeitraum
+import de.oejendorferdamm.dammlauncher.qr.QrCode
+import de.oejendorferdamm.dammlauncher.ui.AppZelle
+import de.oejendorferdamm.dammlauncher.ui.InfoKachel
+import de.oejendorferdamm.dammlauncher.ui.QrAnsicht
+import android.view.MotionEvent
+import java.util.Calendar
 import de.oejendorferdamm.dammlauncher.apps.AppInfo
 import de.oejendorferdamm.dammlauncher.apps.AppKatalog
 import de.oejendorferdamm.dammlauncher.apps.EigeneSymbole
@@ -95,6 +107,14 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
     private val fenster = ArrayList<GrossFenster>()
     private var sperre: View? = null
     private var meldungAnsicht: TextView? = null
+    private lateinit var hinweisBand: TextView
+    private lateinit var lehrerKnopf: TextView
+    /** Feierabend-Sperre (über allem außer Update-Sperre, Fenstern und Meldungen). */
+    private var ruhe: View? = null
+    private var schoner: View? = null
+    private var letzteBeruehrung = System.currentTimeMillis()
+    /** Nach dem Wecken aus dem Bildschirmschoner: Rest dieser Berührung verschlucken. */
+    private var schlucken = false
 
     /** Sicherer Start nach mehreren Abstürzen: Sicherung laden, keine Widgets. */
     private var sicher = false
@@ -153,6 +173,19 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
             setOnClickListener { fotoSeiteOeffnen() }
         }
         wurzel.addView(fotoHinweis, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM or Gravity.END).apply { bottomMargin = 10.vp; rightMargin = 12.vp })
+        // Hinweis-Band für alle Boards (aus der Vorlage), oben in der Mitte
+        hinweisBand = text(this, "", 30, 0xFF1F2328.toInt(), fett = true).apply {
+            background = runde(0xF2FDE68A.toInt(), 30f.vp, 2.vp, 0xFFF59E0B.toInt())
+            setPadding(40.vp, 16.vp, 40.vp, 16.vp)
+            gravity = Gravity.CENTER
+            maxLines = 2
+            ellipsize = android.text.TextUtils.TruncateAt.END
+            maxWidth = (resources.displayMetrics.widthPixels * 0.8f).toInt()
+            visibility = View.GONE
+        }
+        wurzel.addView(hinweisBand, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply { topMargin = 14.vp })
+        lehrerKnopf = glasKnopf(this, "Lehrer-Ansicht  ✕") { zurSchuelerAnsicht() }.apply { groesse(22); setPadding(30.vp, 12.vp, 30.vp, 12.vp); visibility = View.GONE }
+        wurzel.addView(lehrerKnopf, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP or Gravity.END).apply { topMargin = 14.vp; rightMargin = 14.vp })
         setContentView(wurzel)
 
         KonfigSpeicher.beobachte(konfigBeobachter)
@@ -209,6 +242,50 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         if (FotoDesTages.faellig()) unsplashLaden(false)
         haupt.removeCallbacks(wartung)
         haupt.postDelayed(wartung, WARTUNG_MS)
+        haupt.removeCallbacks(takt)
+        takt.run()
+    }
+
+    /**
+     * Alle 30 Sekunden (nur solange der Startbildschirm vorne ist, kostet fast nichts): Feierabend,
+     * Bildschirmschoner, Rückkehr zur Schüler-Ansicht, Hinweis-Band und Abwesenheits-Zahl.
+     */
+    private val takt = object : Runnable {
+        override fun run() {
+            if (!vorne) return
+            zeitenPruefen()
+            haupt.postDelayed(this, 30_000)
+        }
+    }
+
+    private fun zeitenPruefen() {
+        val k = KonfigSpeicher.konfig
+        val jetzt = Calendar.getInstance()
+        val ruhig = System.currentTimeMillis() - letzteBeruehrung
+        if (Zeiten.feierabend(k.feierabend, jetzt) && System.currentTimeMillis() >= Geraet.feierabendFreiBis) zeigeRuhe() else ruheWeg()
+        if (k.schueler.an && Geraet.lehrerAnsicht && ruhig > k.schueler.zurueck * 60_000L) zurSchuelerAnsicht()
+        if (k.schoner > 0 && schoner == null && sperre == null && !laedt && ruhig > k.schoner * 60_000L) zeigeSchoner()
+        hinweisZeigen(k)
+        if (k.elemente.any { it is Element.Widget && it.provider == Element.ABWESEND } && System.currentTimeMillis() - Geraet.abwesendGeladen > 5 * 60_000L) {
+            Geraet.abwesendGeladen = System.currentTimeMillis() // auch bei Fehler nicht gleich wieder
+            arbeit.execute { if (Abwesenheit.laden(this)) haupt.post { kachelnNeu() } }
+        }
+    }
+
+    /** Eingebaute Kacheln neu zeichnen (z. B. neue Abwesenheits-Meldung). */
+    private fun kachelnNeu() = raster.widgetRahmen().values.forEach { r -> (r as? WidgetRahmen)?.getChildAt(0)?.invalidate() }
+
+    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        letzteBeruehrung = System.currentTimeMillis()
+        if (ev.actionMasked == MotionEvent.ACTION_DOWN && schoner != null) {
+            schonerWeg()
+            schlucken = true
+        }
+        if (schlucken) {
+            if (ev.actionMasked == MotionEvent.ACTION_UP || ev.actionMasked == MotionEvent.ACTION_CANCEL) schlucken = false
+            return true
+        }
+        return super.dispatchTouchEvent(ev)
     }
 
     /**
@@ -228,6 +305,8 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
     override fun onPause() {
         vorne = false
         haupt.removeCallbacks(wartung)
+        haupt.removeCallbacks(takt)
+        schonerWeg()
         RandGesten.vorne(false)
         super.onPause()
     }
@@ -255,6 +334,7 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         when {
             sperre != null -> Unit // gesperrt: nur das Update hilft
             fenster.isNotEmpty() -> fenster.last().schliessen()
+            ruhe != null -> Unit // Feierabend: nur „Entsperren“ hilft
             uebersicht != null -> uebersichtZu()
             panel != null -> panelZu()
             else -> raster.abbrechen() // ein Launcher beendet sich nicht
@@ -266,15 +346,26 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
     private fun zeigen() {
         val k = KonfigSpeicher.konfig
         val anbieter = if (sicher) emptySet() else widgets.anbieterNamen()
-        val (sichtbar, _) = KonfigJson.aufloesen(k, AppKatalog::istDa) { it == Element.UHR || it == Element.UHR_TRANSPARENT || it in anbieter }
+        val (sichtbar, _) = KonfigJson.aufloesen(k, AppKatalog::istDa) { it in Element.EINGEBAUT || it in anbieter }
         // Was fehlt (App nicht installiert), erscheint als Platzhalter – im sicheren Start fehlen Widgets absichtlich
         val da = sichtbar.map { it.schluessel }.toSet()
-        val fehlt = k.elemente.filter { it.schluessel !in da && !(sicher && it is Element.Widget) }.map { it.schluessel }.toSet()
-        val elemente = k.elemente.filter { it.schluessel in da || it.schluessel in fehlt }
+        // Schüler-Ansicht: was nur für Lehrkräfte ist, bleibt weg
+        val schueler = schuelerAnsicht()
+        val alle = k.elemente.filter { !schueler || it.schluessel !in k.schueler.nurLehrer }
+        val fehlt = alle.filter { it.schluessel !in da && !(sicher && it is Element.Widget) }.map { it.schluessel }.toSet()
+        val elemente = alle.filter { it.schluessel in da || it.schluessel in fehlt }
         raster.setze(k, elemente, fehlt) { w ->
-            if (w.istUhr) UhrAnsicht(this, w.provider == Element.UHR_TRANSPARENT, w.uhr) else if (sicher) null else widgets.ansicht(this, w)
+            when (w.provider) {
+                Element.UHR, Element.UHR_TRANSPARENT -> UhrAnsicht(this, w.provider == Element.UHR_TRANSPARENT, w.uhr)
+                Element.PAUSE -> InfoKachel(this) { Zeiten.pause(KonfigSpeicher.konfig.pausen, Calendar.getInstance()) }
+                Element.ABWESEND -> InfoKachel(this) { Abwesenheit.anzeige(Geraet.klasse) }
+                Element.QR -> QrAnsicht(this).apply { text = w.text }
+                else -> if (sicher) null else widgets.ansicht(this, w)
+            }
         }
-        alleApps.visibility = if (k.alleAppsKnopf) View.VISIBLE else View.GONE
+        alleApps.visibility = if (k.alleAppsKnopf && !(schueler && k.schueler.ohneAlleApps)) View.VISIBLE else View.GONE
+        lehrerKnopf.visibility = if (k.schueler.an && !schueler) View.VISIBLE else View.GONE
+        hinweisZeigen(k)
         hintergrund(k)
         // Widgets ihre Größe mitteilen, sobald sie liegen
         raster.post {
@@ -379,6 +470,8 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
     }
 
     override fun langerDruckLeer() {
+        // Schüler-Ansicht: langer Druck + PIN öffnet die Lehrer-Ansicht (Einstellungen danach wie gewohnt)
+        if (schuelerAnsicht()) { mitErlaubnis { zurLehrerAnsicht() }; return }
         val pin = KonfigSpeicher.konfig.pin
         if (pin == null || bossAktiv()) oeffnePanel() else frageGeheim("Einstellungen", "PIN eingeben", zahl = true) { eingabe, f ->
             when (Passwort.pruefe("pin", eingabe, pin)) {
@@ -405,6 +498,7 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         val paket = when (e) {
             is Element.App -> e.paket
             is Element.Widget -> e.provider.substringBefore('/')
+            is Ordner -> return
         }
         val name = AppNamen.raten(paket)
         val f = neuesFenster("$name fehlt", 900)
@@ -422,7 +516,7 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         )
     }
 
-    override fun gesperrt() = KonfigSpeicher.konfig.bearbeitenGesperrt
+    override fun gesperrt() = KonfigSpeicher.konfig.bearbeitenGesperrt || schuelerAnsicht()
 
     override fun verschiebe(e: Element, spalte: Int, zeile: Int) = KonfigSpeicher.aendere { k ->
         k.copy(elemente = k.elemente.map { if (it.schluessel == e.schluessel) it.verschoben(spalte, zeile) else it })
@@ -444,23 +538,47 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
 
     /** Langer Druck und loslassen ohne Bewegung: großes Menü. */
     override fun menue(e: Element) {
+        if (schuelerAnsicht()) return
         when (e) {
             is Element.App -> {
                 val name = e.titel ?: AppKatalog.finde(e.paket, e.aktivitaet)?.name ?: e.paket
                 val f = neuesFenster(name, 900)
-                f.add(text(this, "Zum Verschieben: lange drücken und auf eine freie Zelle ziehen.", 24, Farben.TEXT2))
+                f.add(text(this, "Zum Verschieben: lange drücken und auf eine freie Zelle ziehen – auf einen Ordner gezogen, landet die App darin.", 24, Farben.TEXT2))
                 f.add(knopf(this, "Name und Symbol ändern …", haupt = true) { f.schliessen(); bearbeiten(e) })
+                f.add(knopf(this, "In einen Ordner legen …") { f.schliessen(); ordnerWaehlen(e) })
                 f.add(knopf(this, "App-Info") { f.schliessen(); AppKatalog.zeigeAppInfo(ComponentName(e.paket, e.aktivitaet)) })
+                schuelerKnopf(f, e)
                 f.add(knopf(this, "Vom Startbildschirm entfernen", gefahr = true) { f.schliessen(); entferne(e) })
             }
             is Element.Widget -> {
-                val f = neuesFenster(if (e.istUhr) "Uhr" else "Widget", 900)
+                val f = neuesFenster(when (e.provider) {
+                    Element.UHR, Element.UHR_TRANSPARENT -> "Uhr"
+                    Element.PAUSE -> "Pausen-Countdown"
+                    Element.ABWESEND -> "Heute fehlen …"
+                    Element.QR -> "QR-Code"
+                    else -> "Widget"
+                }, 900)
                 f.add(knopf(this, "Größe ändern", haupt = true) { f.schliessen(); raster.beginneGroesse(e) })
-                if (!e.istUhr) f.add(knopf(this, "Inhalt vergrößern …") { f.schliessen(); zoomEinstellen(e) })
-                if (e.istUhr) f.add(knopf(this, "Uhr einstellen …") { f.schliessen(); uhrEinstellen(e) })
+                when (e.provider) {
+                    Element.UHR, Element.UHR_TRANSPARENT -> f.add(knopf(this, "Uhr einstellen …") { f.schliessen(); uhrEinstellen(e) })
+                    Element.PAUSE -> f.add(knopf(this, "Pausenzeiten …") { f.schliessen(); pausenEinstellen() })
+                    Element.ABWESEND -> f.add(knopf(this, "Klasse dieses Boards …") { f.schliessen(); klasseEinstellen() })
+                    Element.QR -> f.add(knopf(this, "QR-Code ändern …") { f.schliessen(); qrEinrichten(e) })
+                    else -> f.add(knopf(this, "Inhalt vergrößern …") { f.schliessen(); zoomEinstellen(e) })
+                }
                 val id = Geraet.widgetId(e.kennung)
-                if (id != 0 && widgets.info(id)?.configure != null) f.add(knopf(this, "Widget einrichten …") { f.schliessen(); konfigurieren(id, null) })
+                if (!e.eingebaut && id != 0 && widgets.info(id)?.configure != null) f.add(knopf(this, "Widget einrichten …") { f.schliessen(); konfigurieren(id, null) })
+                schuelerKnopf(f, e)
                 f.add(knopf(this, "Vom Startbildschirm entfernen", gefahr = true) { f.schliessen(); entferne(e) })
+            }
+            is Ordner -> {
+                val f = neuesFenster("Ordner „${e.name}“", 900)
+                f.add(knopf(this, "Öffnen", haupt = true) { f.schliessen(); oeffneOrdner(e, raster) })
+                f.add(knopf(this, "Umbenennen …") { f.schliessen(); ordnerUmbenennen(e) })
+                f.add(knopf(this, "App hinzufügen …") { f.schliessen(); ordnerAppWaehlen(e) })
+                schuelerKnopf(f, e)
+                f.add(knopf(this, "Ordner auflösen (Apps auf den Startbildschirm)") { f.schliessen(); ordnerAufloesen(e) })
+                f.add(knopf(this, "Ordner mit allen Apps entfernen", gefahr = true) { f.schliessen(); entferne(e) })
             }
         }
     }
@@ -600,7 +718,8 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
     // ------------------------------------------------------------ App-Übersicht
 
     private fun oeffneUebersicht() {
-        if (uebersicht != null || sperre != null) return
+        if (uebersicht != null || sperre != null || ruhe != null) return
+        if (schuelerAnsicht() && KonfigSpeicher.konfig.schueler.ohneAlleApps) return
         raster.abbrechen()
         val u = AppUebersicht(this,
             starten = { app, v -> uebersichtZu(); val r = Rect(); v.getGlobalVisibleRect(r); if (!AppKatalog.starte(app.komponente, r)) meldung("Die App lässt sich nicht starten.") },
@@ -668,9 +787,11 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
             fun bleibt(e: Element) = when (e) {
                 is Element.App -> e.paket != entfernt
                 is Element.Widget -> !e.provider.startsWith("$entfernt/")
+                is Ordner -> true
             }
+            fun ohne(e: Element) = if (e is Ordner) e.copy(apps = e.apps.filter { it.paket != entfernt }) else e
             k.elemente.filterNot(::bleibt).filterIsInstance<Element.Widget>().forEach { w -> widgets.loesche(Geraet.widgetId(w.kennung)); Geraet.setzeWidgetId(w.kennung, 0) }
-            k.copy(elemente = k.elemente.filter(::bleibt), nichtPlatziert = k.nichtPlatziert.filter(::bleibt))
+            k.copy(elemente = k.elemente.filter(::bleibt).map(::ohne), nichtPlatziert = k.nichtPlatziert.filter(::bleibt).map(::ohne))
         }
         uebersicht?.neuLaden()
         zeigen()
@@ -684,6 +805,10 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         val f = neuesFenster("Widget hinzufügen", 1100)
         f.add(knopf(this, "🕒  Digitaluhr mit weißer Fläche (DammLauncher, 3×2)", haupt = true) { f.schliessen(); uhrAnlegen(Element.UHR) }.apply { gravity = Gravity.START or Gravity.CENTER_VERTICAL }, 10)
         f.add(knopf(this, "🕒  Digitaluhr transparent (DammLauncher, 3×2)", haupt = true) { f.schliessen(); uhrAnlegen(Element.UHR_TRANSPARENT) }.apply { gravity = Gravity.START or Gravity.CENTER_VERTICAL }, 10)
+        f.add(knopf(this, "⏰  Noch … bis zur Pause (DammLauncher, 2×1)", haupt = true) { f.schliessen(); eingebautAnlegen(Element.PAUSE, 2, 1) }.apply { gravity = Gravity.START or Gravity.CENTER_VERTICAL }, 10)
+        f.add(knopf(this, "🧒  Heute fehlen … – nur die Zahl (DammLauncher, 2×2)", haupt = true) { f.schliessen(); eingebautAnlegen(Element.ABWESEND, 2, 2) }.apply { gravity = Gravity.START or Gravity.CENTER_VERTICAL }, 10)
+        f.add(knopf(this, "🔳  QR-Code: Link oder Gäste-WLAN (DammLauncher, 2×2)", haupt = true) { f.schliessen(); qrEinrichten(null) }.apply { gravity = Gravity.START or Gravity.CENTER_VERTICAL }, 10)
+        f.add(knopf(this, "📁  Leerer Ordner (1×1)", haupt = true) { f.schliessen(); ordnerAnlegen(null) }.apply { gravity = Gravity.START or Gravity.CENTER_VERTICAL }, 10)
         val liste = widgets.anbieter()
         if (liste.isEmpty()) f.add(text(this, "Auf diesem Gerät gibt es keine Widgets.", 26))
         val k = KonfigSpeicher.konfig
@@ -696,18 +821,24 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         }
     }
 
-    private fun uhrAnlegen(art: String) {
+    private fun uhrAnlegen(art: String) = eingebautAnlegen(art, 3, 2)
+
+    /** Eingebaute Kachel anlegen – passt sie nicht, wird sie kleiner. Gibt die Kennung zurück (null = kein Platz). */
+    private fun eingebautAnlegen(art: String, breite: Int, hoehe: Int, text: String = ""): String? {
         val k = KonfigSpeicher.konfig
-        var b = 3
-        var h = 2
+        var b = breite
+        var h = hoehe
         var platz = Belegung.ersteFreie(k.elemente, b, h, k.spalten, k.zeilen)
         while (platz == null && (b > 1 || h > 1)) {
             if (b >= h && b > 1) b-- else h--
             platz = Belegung.ersteFreie(k.elemente, b, h, k.spalten, k.zeilen)
         }
-        if (platz == null) { meldung("Kein freier Platz für die Uhr."); return }
-        val kennung = "uhr" + UUID.randomUUID().toString().replace("-", "").take(8)
-        KonfigSpeicher.aendere { it.copy(elemente = it.elemente + Element.Widget(art, kennung, platz.first, platz.second, b, h)) }
+        if (platz == null) { meldung("Kein freier Platz – Raster vergrößern oder etwas entfernen."); return null }
+        val kennung = (if (art == Element.UHR || art == Element.UHR_TRANSPARENT) "uhr" else "k") + UUID.randomUUID().toString().replace("-", "").take(8)
+        KonfigSpeicher.aendere { it.copy(elemente = it.elemente + Element.Widget(art, kennung, platz.first, platz.second, b, h, text = text)) }
+        if (art == Element.PAUSE && k.pausen.isEmpty()) pausenEinstellen()
+        if (art == Element.ABWESEND && Geraet.klasse.isBlank()) klasseEinstellen()
+        return kennung
     }
 
     /** Wie viele Zellen braucht das Widget mindestens? */
@@ -1057,6 +1188,453 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
                 meldung(t, lang = true)
             }
         }
+    }
+
+    // ------------------------------------------------------------ Schüler- und Lehrer-Ansicht
+
+    /** Läuft gerade die Schüler-Ansicht (eingeschaltet und nicht mit der PIN geöffnet)? */
+    private fun schuelerAnsicht() = KonfigSpeicher.konfig.schueler.an && !Geraet.lehrerAnsicht
+
+    private fun zurLehrerAnsicht() {
+        Geraet.lehrerAnsicht = true
+        letzteBeruehrung = System.currentTimeMillis()
+        zeigen()
+        meldung("Lehrer-Ansicht. Zurück: Knopf oben rechts – oder von selbst nach ${KonfigSpeicher.konfig.schueler.zurueck} min ohne Berührung.", lang = true)
+    }
+
+    override fun zurSchuelerAnsicht() {
+        if (!Geraet.lehrerAnsicht) return
+        Geraet.lehrerAnsicht = false
+        raster.abbrechen()
+        fenster.toList().forEach { it.schliessen() }
+        uebersichtZu()
+        panelZu()
+        zeigen()
+    }
+
+    /** Im Menü eines Elements: in der Schüler-Ansicht zeigen oder nicht. */
+    private fun schuelerKnopf(f: GrossFenster, e: Element) {
+        val sa = KonfigSpeicher.konfig.schueler
+        if (!sa.an) return
+        val nur = e.schluessel in sa.nurLehrer
+        f.add(knopf(this, if (nur) "👁  In der Schüler-Ansicht wieder zeigen" else "🙈  In der Schüler-Ansicht ausblenden") {
+            f.schliessen()
+            KonfigSpeicher.aendere { k -> k.copy(schueler = k.schueler.copy(nurLehrer = if (nur) k.schueler.nurLehrer - e.schluessel else k.schueler.nurLehrer + e.schluessel)) }
+            meldung(if (nur) "Ist jetzt auch in der Schüler-Ansicht zu sehen." else "Nur noch in der Lehrer-Ansicht zu sehen.")
+        })
+    }
+
+    // ------------------------------------------------------------ Hinweis-Band
+
+    private fun hinweisZeigen(k: Konfig) {
+        val h = k.hinweis
+        val an = Zeiten.hinweisAktiv(h, Calendar.getInstance())
+        val t = if (an && h != null) "📢  ${h.text}" else ""
+        if (an == (hinweisBand.visibility == View.VISIBLE) && hinweisBand.text.toString() == t) return
+        hinweisBand.text = t
+        hinweisBand.visibility = if (an) View.VISIBLE else View.GONE
+        // Das Raster rückt unter das Band, damit nichts verdeckt wird
+        val lp = raster.layoutParams as FrameLayout.LayoutParams
+        if (!an) { lp.topMargin = 0; raster.layoutParams = lp }
+        else hinweisBand.post { lp.topMargin = hinweisBand.height + 20.vp; raster.layoutParams = lp }
+    }
+
+    override fun hinweisEinstellen() {
+        val k = KonfigSpeicher.konfig
+        val f = neuesFenster("Hinweis-Band", 1150)
+        f.add(text(this, "Erscheint oben auf dem Startbildschirm, z. B. „Morgen Wandertag – Regenjacke mitbringen!“. " +
+            "Auf alle Boards kommt er mit „Als Vorlage hochladen“ (Boss-Modus).", 22, Farben.TEXT2))
+        val feld = eingabe(this, "Text (bis ${Hinweis.MAX} Zeichen)", k.hinweis?.text ?: "")
+        f.add(feld)
+        var tage = 1
+        val reihe = LinearLayout(this)
+        fun dauer() {
+            reihe.removeAllViews()
+            listOf(1 to "Nur heute", 3 to "3 Tage", 7 to "1 Woche", 14 to "2 Wochen").forEach { (n, t) ->
+                reihe.addView(knopf(this, t, haupt = tage == n) { tage = n; dauer() }, lp(rechts = 12.vp))
+            }
+        }
+        dauer()
+        f.add(text(this, "Wie lange?" + (k.hinweis?.let { " (bisher bis ${it.bis.split('-').reversed().joinToString(".")})" } ?: ""), 22, Farben.TEXT2), 18)
+        f.add(reihe, 6)
+        f.knoepfe(
+            knopf(this, "Entfernen", gefahr = k.hinweis != null) { f.schliessen(); KonfigSpeicher.aendere { it.copy(hinweis = null) } }.apply { isEnabled = k.hinweis != null },
+            knopf(this, "Abbrechen") { f.schliessen() },
+            knopf(this, "Anzeigen", haupt = true) {
+                val t = feld.text.toString().trim().replace(Regex("\\s+"), " ")
+                if (t.isEmpty()) { meldung("Bitte einen Text eingeben."); return@knopf }
+                f.schliessen()
+                KonfigSpeicher.aendere { it.copy(hinweis = Hinweis(t.take(Hinweis.MAX), Zeiten.hinweisBis(tage, Calendar.getInstance()))) }
+                panel?.aufbauen()
+            }
+        )
+    }
+
+    // ------------------------------------------------------------ Feierabend-Sperre
+
+    private fun wann(ms: Long): String {
+        val e = Calendar.getInstance().apply { timeInMillis = ms }
+        val uhr = Zeitraum.uhrzeit(e.get(Calendar.HOUR_OF_DAY) * 60 + e.get(Calendar.MINUTE))
+        val heute = Calendar.getInstance()
+        val morgen = (heute.clone() as Calendar).apply { add(Calendar.DAY_OF_MONTH, 1) }
+        return when (Zeiten.tag(e)) {
+            Zeiten.tag(heute) -> "heute um $uhr"
+            Zeiten.tag(morgen) -> "morgen um $uhr"
+            else -> java.text.SimpleDateFormat("EEEE", java.util.Locale.GERMAN).format(e.time) + " um " + uhr
+        }
+    }
+
+    /** Abends: nur Uhr und „Entsperren“ (PIN) – Apps und Einstellungen sind nicht erreichbar. */
+    private fun zeigeRuhe() {
+        if (ruhe != null || sperre != null) return
+        raster.abbrechen()
+        fenster.toList().forEach { it.schliessen() }
+        uebersichtZu()
+        panelZu()
+        if (Geraet.lehrerAnsicht) { Geraet.lehrerAnsicht = false; zeigen() }
+        val ende = Zeiten.feierabendEnde(KonfigSpeicher.konfig.feierabend, Calendar.getInstance())
+        val ebene = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setBackgroundColor(0xF20B1220.toInt())
+            isClickable = true
+            addView(UhrAnsicht(context, transparent = true, stil = UhrStil()), lp(1000.vp, 440.vp))
+            addView(text(context, "Feierabend 🌙", 52, Color.WHITE, fett = true).apply { gravity = Gravity.CENTER }, lp(oben = 20.vp))
+            addView(text(context, "Das Board ist bis ${wann(ende)} gesperrt.", 30, 0xDDFFFFFF.toInt()).apply { gravity = Gravity.CENTER }, lp(oben = 14.vp))
+            addView(knopf(context, "Entsperren", haupt = true) { ruheEntsperren(ende) }.apply { minWidth = 360.vp }, lp(oben = 50.vp))
+        }
+        ruhe = ebene
+        wurzel.addView(ebene, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        meldungAnsicht?.bringToFront()
+    }
+
+    private fun ruheWeg() {
+        ruhe?.let { wurzel.removeView(it) }
+        ruhe = null
+    }
+
+    /** Mit der PIN (falls festgelegt) bis zum Ende dieses Feierabends freigeben. */
+    private fun ruheEntsperren(ende: Long) {
+        val frei = {
+            Geraet.feierabendFreiBis = ende
+            ruheWeg()
+            meldung("Entsperrt bis ${wann(ende)}.")
+        }
+        val pin = KonfigSpeicher.konfig.pin
+        if (pin == null) { frei(); return }
+        frageGeheim("Entsperren", "PIN eingeben", zahl = true) { eingabe, f ->
+            when (Passwort.pruefe("pin", eingabe, pin)) {
+                true -> { f.schliessen(); frei() }
+                false -> meldung("Falsche PIN.")
+                null -> meldung("Zu viele Fehlversuche – gesperrt für ${Passwort.gesperrtNoch("pin")} s.")
+            }
+        }
+    }
+
+    override fun feierabendEinstellen() {
+        val fa = KonfigSpeicher.konfig.feierabend
+        val f = neuesFenster("Feierabend-Sperre", 1150)
+        f.add(text(this, "Abends und am Wochenende zeigt das Board nur eine Uhr. „Entsperren“ fragt die PIN – danach bleibt es bis zum Ende dieses Feierabends offen.", 22, Farben.TEXT2))
+        if (KonfigSpeicher.konfig.pin == null) f.add(text(this, "Noch keine PIN festgelegt (Einstellungen → Bedienung): dann reicht ein Tipp auf „Entsperren“.", 22, Farben.ROT), 10)
+        var an = fa.an
+        var wochenende = fa.wochenende
+        f.add(de.oejendorferdamm.dammlauncher.ui.schalter(this, "Feierabend-Sperre an", an) { an = it })
+        val ab = eingabe(this, "Sperren ab, z. B. 17:00", Zeitraum.uhrzeit(fa.ab))
+        val bis = eingabe(this, "Wieder frei ab, z. B. 07:00", Zeitraum.uhrzeit(fa.bis))
+        f.add(text(this, "Sperren ab:", 22, Farben.TEXT2), 16); f.add(ab, 4)
+        f.add(text(this, "Wieder frei ab:", 22, Farben.TEXT2), 12); f.add(bis, 4)
+        f.add(de.oejendorferdamm.dammlauncher.ui.schalter(this, "Samstag und Sonntag ganz gesperrt", wochenende) { wochenende = it }, 16)
+        f.knoepfe(knopf(this, "Abbrechen") { f.schliessen() }, knopf(this, "Speichern", haupt = true) {
+            val a = Zeitraum.minuten(ab.text.toString())
+            val b = Zeitraum.minuten(bis.text.toString())
+            if (a == null || b == null) { meldung("Bitte Uhrzeiten wie 17:00 und 07:00 eingeben."); return@knopf }
+            f.schliessen()
+            val neu = Feierabend(an, a, b, wochenende)
+            KonfigSpeicher.aendere { it.copy(feierabend = neu) }
+            // Wer gerade abends einrichtet, wird nicht sofort ausgesperrt: gilt ab dem nächsten Feierabend
+            val jetzt = Calendar.getInstance()
+            if (Zeiten.feierabend(neu, jetzt)) {
+                Geraet.feierabendFreiBis = Zeiten.feierabendEnde(neu, jetzt)
+                meldung("Gespeichert – gilt ab dem nächsten Feierabend.")
+            } else Geraet.feierabendFreiBis = 0
+            panel?.aufbauen()
+        })
+    }
+
+    // ------------------------------------------------------------ Bildschirmschoner
+
+    /** Dunkel, gedimmt, Foto des Tages und eine Uhr, die jede Minute ein Stück wandert (kein Einbrennen). */
+    private fun zeigeSchoner() {
+        if (schoner != null || !vorne) return
+        raster.abbrechen()
+        val ebene = FrameLayout(this).apply {
+            setBackgroundColor(Color.BLACK)
+            elevation = 95f.vp
+            contentDescription = "Bildschirmschoner"
+        }
+        val foto = FotoDesTages.datei().takeIf { KonfigSpeicher.konfig.hintergrund.unsplash && it.exists() }
+            ?: KonfigSpeicher.hintergrundDatei.takeIf { KonfigSpeicher.konfig.hintergrund.bild && it.exists() }
+        if (foto != null) {
+            val bild = ImageView(this).apply { scaleType = ImageView.ScaleType.CENTER_CROP; alpha = 0.55f }
+            ebene.addView(bild, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+            arbeit.execute {
+                val b = try { BitmapFactory.decodeFile(foto.absolutePath, BitmapFactory.Options().apply { inSampleSize = 2 }) } catch (_: Throwable) { null }
+                haupt.post { if (schoner === ebene) bild.setImageBitmap(b) }
+            }
+        }
+        val uhr = UhrAnsicht(this, transparent = true, stil = UhrStil())
+        val m = resources.displayMetrics
+        val ub = minOf(760.vp, m.widthPixels * 7 / 10)
+        val uh = ub * 9 / 19
+        val lpu = FrameLayout.LayoutParams(ub, uh, Gravity.TOP or Gravity.START)
+        ebene.addView(uhr, lpu)
+        val wandern = object : Runnable {
+            override fun run() {
+                lpu.leftMargin = (Math.random() * (m.widthPixels - ub).coerceAtLeast(1)).toInt()
+                lpu.topMargin = (Math.random() * (m.heightPixels - uh).coerceAtLeast(1)).toInt()
+                uhr.layoutParams = lpu
+                if (schoner === ebene) ebene.postDelayed(this, 60_000)
+            }
+        }
+        schoner = ebene
+        wandern.run()
+        wurzel.addView(ebene, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        window.attributes = window.attributes.apply { screenBrightness = 0.05f }
+    }
+
+    private fun schonerWeg() {
+        val s = schoner ?: return
+        schoner = null
+        wurzel.removeView(s)
+        window.attributes = window.attributes.apply { screenBrightness = android.view.WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE }
+        letzteBeruehrung = System.currentTimeMillis()
+    }
+
+    // ------------------------------------------------------------ Ordner
+
+    private fun ordnerAktuell(kennung: String) = KonfigSpeicher.konfig.elemente.firstOrNull { it is Ordner && it.kennung == kennung } as? Ordner
+
+    private fun appName(a: Element.App) = a.titel ?: AppKatalog.finde(a.paket, a.aktivitaet)?.name ?: AppNamen.raten(a.paket)
+
+    override fun oeffneOrdner(o: Ordner, v: View) {
+        val aktuell = ordnerAktuell(o.kennung) ?: return
+        val k = KonfigSpeicher.konfig
+        val f = neuesFenster(aktuell.name, 1400)
+        val apps = aktuell.apps.filter { AppKatalog.istDa(it.paket, it.aktivitaet) }
+        if (apps.isEmpty()) f.add(text(this, "Der Ordner ist leer. Apps hineinlegen: eine App auf den Ordner ziehen – oder „App hinzufügen“.", 24, Farben.TEXT2))
+        val schrift = Schriften.von(this, k.schrift)
+        apps.chunked(5).forEach { reihe ->
+            f.add(LinearLayout(this).apply {
+                reihe.forEach { a ->
+                    addView(AppZelle(context).apply {
+                        dunkel = true
+                        setze(ComponentName(a.paket, a.aktivitaet), appName(a), a.icon, 70, 22f.vp, true, schrift)
+                        setOnClickListener { zelle ->
+                            f.schliessen()
+                            val r = Rect(); zelle.getGlobalVisibleRect(r)
+                            if (!AppKatalog.starte(ComponentName(a.paket, a.aktivitaet), r)) meldung("Die App lässt sich nicht starten.")
+                        }
+                        setOnLongClickListener { if (!gesperrt()) { f.schliessen(); ordnerAppMenue(aktuell, a) }; true }
+                    }, lp(240.vp, 230.vp))
+                }
+            }, 6)
+        }
+        if (!gesperrt()) f.knoepfe(
+            knopf(this, "Umbenennen …") { f.schliessen(); ordnerUmbenennen(aktuell) },
+            knopf(this, "App hinzufügen …") { f.schliessen(); ordnerAppWaehlen(aktuell) }
+        )
+    }
+
+    override fun inOrdner(app: Element.App, o: Ordner) {
+        val vorher = ordnerAktuell(o.kennung) ?: return
+        if (vorher.apps.size >= Ordner.MAX_APPS) { meldung("Der Ordner ist voll (höchstens ${Ordner.MAX_APPS} Apps)."); return }
+        KonfigSpeicher.aendere { k ->
+            k.copy(elemente = k.elemente.filter { it.schluessel != app.schluessel }.map {
+                if (it is Ordner && it.kennung == o.kennung && it.apps.none { a -> a.schluessel == app.schluessel }) it.copy(apps = it.apps + app.verschoben(0, 0) as Element.App) else it
+            })
+        }
+        meldung("„${appName(app)}“ liegt jetzt im Ordner „${vorher.name}“.")
+    }
+
+    private fun ordnerWaehlen(app: Element.App) {
+        val ordner = KonfigSpeicher.konfig.elemente.filterIsInstance<Ordner>()
+        if (ordner.isEmpty()) { ordnerAnlegen(app); return }
+        val f = neuesFenster("In welchen Ordner?", 900)
+        ordner.forEach { o -> f.add(knopf(this, "📁  ${o.name}") { f.schliessen(); inOrdner(app, o) }) }
+        f.add(knopf(this, "Neuer Ordner …", haupt = true) { f.schliessen(); ordnerAnlegen(app) })
+    }
+
+    /** Neuer Ordner – mit [app] darin an deren Stelle, sonst leer in der ersten freien Zelle. */
+    private fun ordnerAnlegen(app: Element.App?) {
+        if (gesperrt()) { meldung("Der Startbildschirm ist gegen Verändern gesperrt (Einstellungen)."); return }
+        val k = KonfigSpeicher.konfig
+        val platz = if (app != null) app.spalte to app.zeile else Belegung.ersteFreie(k.elemente, 1, 1, k.spalten, k.zeilen)
+        if (platz == null) { meldung("Kein freier Platz – Raster vergrößern oder etwas entfernen."); return }
+        val neu = Ordner(UUID.randomUUID().toString().replace("-", "").take(12), "Ordner", listOfNotNull(app?.verschoben(0, 0) as Element.App?), platz.first, platz.second)
+        KonfigSpeicher.aendere { it.copy(elemente = it.elemente.filter { e -> e.schluessel != app?.schluessel } + neu) }
+        ordnerUmbenennen(neu)
+    }
+
+    private fun ordnerUmbenennen(o: Ordner) {
+        val f = neuesFenster("Name des Ordners", 900)
+        val feld = eingabe(this, "z. B. Mathe, Lesen, Spiele", if (o.name == "Ordner") "" else o.name)
+        f.add(feld)
+        f.knoepfe(knopf(this, "Abbrechen") { f.schliessen() }, knopf(this, "Speichern", haupt = true) {
+            val n = feld.text.toString().trim().take(40).ifEmpty { "Ordner" }
+            f.schliessen()
+            KonfigSpeicher.aendere { k -> k.copy(elemente = k.elemente.map { if (it is Ordner && it.kennung == o.kennung) it.copy(name = n) else it }) }
+        })
+        feld.requestFocus()
+    }
+
+    private fun ordnerAppWaehlen(o: Ordner) {
+        lateinit var auswahl: AppUebersicht
+        auswahl = AppUebersicht(this, { _, _ -> }, {}, { wurzel.removeView(auswahl) }, titel = "In „${o.name}“ legen …", auswahl = { app ->
+            wurzel.removeView(auswahl)
+            inOrdner(Element.App(app.paket, app.aktivitaet, 0, 0), o)
+            ordnerAktuell(o.kennung)?.let { oeffneOrdner(it, raster) }
+        })
+        wurzel.addView(auswahl, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+    }
+
+    private fun ordnerAppMenue(o: Ordner, a: Element.App) {
+        val f = neuesFenster(appName(a), 900)
+        f.add(knopf(this, "Auf den Startbildschirm legen", haupt = true) {
+            f.schliessen()
+            val k = KonfigSpeicher.konfig
+            if (k.elemente.any { it.schluessel == a.schluessel }) { ausOrdner(o, a); return@knopf }
+            val platz = Belegung.ersteFreie(k.elemente, 1, 1, k.spalten, k.zeilen) ?: run { meldung("Kein freier Platz auf dem Startbildschirm."); return@knopf }
+            KonfigSpeicher.aendere { kk ->
+                kk.copy(elemente = kk.elemente.map { if (it is Ordner && it.kennung == o.kennung) it.copy(apps = it.apps.filter { x -> x.schluessel != a.schluessel }) else it } + a.verschoben(platz.first, platz.second))
+            }
+        })
+        f.add(knopf(this, "Aus dem Ordner entfernen", gefahr = true) { f.schliessen(); ausOrdner(o, a) })
+    }
+
+    private fun ausOrdner(o: Ordner, a: Element.App) = KonfigSpeicher.aendere { k ->
+        k.copy(elemente = k.elemente.map { if (it is Ordner && it.kennung == o.kennung) it.copy(apps = it.apps.filter { x -> x.schluessel != a.schluessel }) else it })
+    }
+
+    /** Ordner weg, seine Apps in freie Zellen (der Platz des Ordners zuerst) – was nicht passt, in die Ablage. */
+    private fun ordnerAufloesen(o: Ordner) {
+        KonfigSpeicher.aendere { k ->
+            val liste = k.elemente.filter { it.schluessel != o.schluessel }.toMutableList()
+            val ablage = k.nichtPlatziert.toMutableList()
+            for (a in o.apps) {
+                if (liste.any { it.schluessel == a.schluessel } || ablage.any { it.schluessel == a.schluessel }) continue
+                val platz = if (liste.none { it.spalte == o.spalte && it.zeile == o.zeile }) o.spalte to o.zeile else Belegung.ersteFreie(liste, 1, 1, k.spalten, k.zeilen)
+                if (platz == null) ablage.add(a) else liste.add(a.verschoben(platz.first, platz.second))
+            }
+            k.copy(elemente = liste, nichtPlatziert = ablage)
+        }
+        if (KonfigSpeicher.konfig.nichtPlatziert.isNotEmpty()) meldung("Nicht alle Apps hatten Platz – sie liegen in der Ablage (Einstellungen → Widgets und Ablage).", lang = true)
+    }
+
+    // ------------------------------------------------------------ Pausen, Klasse, QR-Code
+
+    override fun pausenEinstellen() {
+        val f = neuesFenster("Pausenzeiten", 1100)
+        f.add(text(this, "Für die Kachel „Noch … bis zur Pause“. Auf alle Boards kommen sie mit „Als Vorlage hochladen“ (Boss-Modus).", 22, Farben.TEXT2))
+        val liste = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        f.add(liste)
+        fun aufbauen() {
+            liste.removeAllViews()
+            val p = KonfigSpeicher.konfig.pausen
+            if (p.isEmpty()) liste.addView(text(this, "Noch keine Pausen eingetragen.", 24, Farben.TEXT2))
+            p.forEach { z ->
+                liste.addView(LinearLayout(this).apply {
+                    gravity = Gravity.CENTER_VERTICAL
+                    addView(text(context, "${Zeitraum.uhrzeit(z.von)} – ${Zeitraum.uhrzeit(z.bis)}", 30, fett = true), lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+                    addView(knopf(context, "Entfernen", gefahr = true) { KonfigSpeicher.aendere { it.copy(pausen = it.pausen - z) }; aufbauen() })
+                }, lp(ViewGroup.LayoutParams.MATCH_PARENT, oben = 10.vp))
+            }
+        }
+        aufbauen()
+        val von = eingabe(this, "Beginn, z. B. 09:35")
+        val bis = eingabe(this, "Ende, z. B. 09:55")
+        f.add(text(this, "Neue Pause:", 22, Farben.TEXT2), 22)
+        f.add(von, 6)
+        f.add(bis, 8)
+        f.knoepfe(knopf(this, "Fertig") { f.schliessen() }, knopf(this, "Hinzufügen", haupt = true) {
+            val z = Zeitraum.aus("${von.text}-${bis.text}")
+            if (z == null) { meldung("Bitte Uhrzeiten wie 09:35 und 09:55 eingeben (Ende nach Beginn)."); return@knopf }
+            KonfigSpeicher.aendere { it.copy(pausen = (it.pausen + z).distinct().sortedBy { p -> p.von }.take(20)) }
+            von.setText(""); bis.setText("")
+            aufbauen()
+            panel?.aufbauen()
+        })
+    }
+
+    override fun klasseEinstellen() {
+        val f = neuesFenster("Klasse dieses Boards", 1100)
+        f.add(text(this, "Die Kachel „Heute fehlen …“ zeigt nur die ZAHL der fehlenden Kinder dieser Klasse – keine Namen. " +
+            "Die Zahlen legt das iPhone-Widget „IServ-Abwesenheiten“ als abwesend.json in den Vorlagen-Ordner.", 22, Farben.TEXT2))
+        val bekannt = Abwesenheit.klassen()
+        if (bekannt.isNotEmpty()) {
+            f.add(text(this, "Klassen aus der letzten Meldung:", 22, Farben.TEXT2), 16)
+            f.add(android.widget.HorizontalScrollView(this).apply {
+                isHorizontalScrollBarEnabled = false
+                addView(LinearLayout(context).apply {
+                    bekannt.forEach { kl -> addView(knopf(context, kl, haupt = kl.equals(Geraet.klasse, true)) { Geraet.klasse = kl; f.schliessen(); kachelnNeu(); panel?.aufbauen() }, lp(rechts = 12.vp)) }
+                })
+            }, 6)
+        }
+        val feld = eingabe(this, "Klasse, z. B. 5a", Geraet.klasse)
+        f.add(feld, 16)
+        val g = Geraet.abwesendGeladen
+        f.add(text(this, when {
+            Geraet.server.isBlank() -> "Noch kein Server eingetragen (Boss-Modus → Zentrale Verteilung)."
+            g == 0L -> "Noch nichts gelesen."
+            Geraet.abwesendDaten.isEmpty() -> "Zuletzt gesucht ${wann(g)} – im Ordner liegt noch keine Meldung."
+            else -> "Zuletzt gelesen ${wann(g)}."
+        }, 21, Farben.TEXT2), 10)
+        f.knoepfe(
+            knopf(this, "Jetzt laden") {
+                meldung("Lädt …")
+                arbeit.execute {
+                    Abwesenheit.laden(this)
+                    haupt.post { kachelnNeu(); meldung(if (Geraet.abwesendDaten.isEmpty()) "Keine Meldung gefunden." else "Meldung gelesen.") }
+                }
+            },
+            knopf(this, "Speichern", haupt = true) { Geraet.klasse = feld.text.toString(); f.schliessen(); kachelnNeu(); panel?.aufbauen() }
+        )
+    }
+
+    /** QR-Code anlegen ([w] = null) oder ändern: Link oder WLAN-Zugang. */
+    private fun qrEinrichten(w: Element.Widget?, wlanWahl: Boolean? = null) {
+        val alt = w?.text.orEmpty()
+        val wlan = wlanWahl ?: (QrCode.wlanName(alt) != null)
+        val f = neuesFenster(if (w == null) "QR-Code anlegen" else "QR-Code ändern", 1100)
+        f.add(LinearLayout(this).apply {
+            addView(knopf(context, "🔗  Link", haupt = !wlan) { if (wlan) { f.schliessen(); qrEinrichten(w, false) } }, lp(rechts = 12.vp))
+            addView(knopf(context, "📶  Gäste-WLAN", haupt = wlan) { if (!wlan) { f.schliessen(); qrEinrichten(w, true) } })
+        })
+        val felder = if (!wlan) {
+            f.add(text(this, "Kinder und Gäste scannen den Code mit der Kamera und landen auf dieser Seite.", 22, Farben.TEXT2), 16)
+            listOf(eingabe(this, "Adresse, z. B. https://schule.de/elternbrief", if (QrCode.wlanName(alt) == null) alt else ""))
+        } else {
+            f.add(text(this, "Der Zugang steht lesbar in der Einrichtung (und in der Vorlage) – nur für ein Gäste-WLAN verwenden.", 22, Farben.ROT), 16)
+            listOf(eingabe(this, "WLAN-Name", QrCode.wlanFeld(alt, "S") ?: ""), eingabe(this, "Passwort (leer = offenes WLAN)", QrCode.wlanFeld(alt, "P") ?: ""))
+        }
+        felder.forEach { f.add(it, 10) }
+        f.knoepfe(knopf(this, "Abbrechen") { f.schliessen() }, knopf(this, "Speichern", haupt = true) {
+            val inhalt = if (!wlan) {
+                val t = felder[0].text.toString().trim()
+                if (t.contains("://") || t.isEmpty()) t else "https://$t"
+            } else {
+                val ssid = felder[0].text.toString()
+                if (ssid.isBlank()) "" else QrCode.wlan(ssid, felder[1].text.toString())
+            }
+            when {
+                inhalt.isEmpty() -> meldung(if (wlan) "Bitte den WLAN-Namen eingeben." else "Bitte eine Adresse eingeben.")
+                inhalt.length > Grenzen.QR_TEXT || QrCode.aus(inhalt) == null -> meldung("Das ist zu lang für einen QR-Code.")
+                else -> {
+                    f.schliessen()
+                    if (w == null) eingebautAnlegen(Element.QR, 2, 2, inhalt)
+                    else KonfigSpeicher.aendere { k -> k.copy(elemente = k.elemente.map { if (it.schluessel == w.schluessel) (it as Element.Widget).copy(text = inhalt) else it }) }
+                }
+            }
+        })
     }
 
     // ------------------------------------------------------------ Hintergrund-Prüfungen beim Start

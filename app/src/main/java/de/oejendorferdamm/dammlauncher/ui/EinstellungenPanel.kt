@@ -19,6 +19,9 @@ import de.oejendorferdamm.dammlauncher.konfig.Schrift
 import de.oejendorferdamm.dammlauncher.konfig.Konfig
 import de.oejendorferdamm.dammlauncher.konfig.KonfigSpeicher
 import de.oejendorferdamm.dammlauncher.raster.Belegung
+import de.oejendorferdamm.dammlauncher.abgleich.Abwesenheit
+import de.oejendorferdamm.dammlauncher.konfig.Zeitraum
+import de.oejendorferdamm.dammlauncher.konfig.Zeiten
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -43,6 +46,11 @@ interface PanelAktionen {
     fun updateText(): String
     fun meldung(text: String)
     fun panelZu()
+    fun pausenEinstellen()
+    fun hinweisEinstellen()
+    fun feierabendEinstellen()
+    fun klasseEinstellen()
+    fun zurSchuelerAnsicht()
 }
 
 /**
@@ -171,6 +179,46 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
             knopf(c, if (k.pin == null) "PIN für Einstellungen festlegen …" else "PIN ändern …") { a.pinFestlegen() },
             knopf(c, "PIN entfernen", gefahr = k.pin != null) { aendere { it.copy(pin = null) }; aufbauen() }.apply { isEnabled = k.pin != null }
         )
+
+        abschnitt("Schüler-Ansicht")
+        val sa = k.schueler
+        add(schalter(c, "Schüler-Ansicht einschalten", sa.an) { an ->
+            // Wer gerade einrichtet, bleibt in der Lehrer-Ansicht
+            Geraet.lehrerAnsicht = true
+            aendere { it.copy(schueler = it.schueler.copy(an = an)) }
+            aufbauen()
+        })
+        add(text(c, "Kinder sehen nur, was für sie gedacht ist. Lehrer-Ansicht: lange auf eine freie Fläche drücken und die PIN eingeben.", 21, Farben.TEXT2), 6)
+        if (sa.an) {
+            add(text(c, "Ausblenden: in der Lehrer-Ansicht lange auf eine App, ein Widget oder einen Ordner drücken → „In der Schüler-Ansicht ausblenden“. " +
+                "Ausgeblendet: ${sa.nurLehrer.size}.", 21, Farben.TEXT2), 6)
+            if (k.pin == null) add(text(c, "Noch keine PIN festgelegt – dann kann jeder in die Lehrer-Ansicht wechseln.", 22, Farben.ROT), 8)
+            add(schalter(c, "Keine App-Übersicht in der Schüler-Ansicht", sa.ohneAlleApps) { an -> aendere { it.copy(schueler = it.schueler.copy(ohneAlleApps = an)) } })
+            add(regler(c, "Zurück zur Schüler-Ansicht nach … ohne Berührung", 5..120, sa.zurueck.coerceIn(5, 120), 5, " min") { n -> aendere { it.copy(schueler = it.schueler.copy(zurueck = n)) } })
+            knoepfe(knopf(c, "Jetzt zur Schüler-Ansicht", haupt = true) { a.zurSchuelerAnsicht() })
+        }
+
+        abschnitt("Schulzeiten")
+        add(text(c, "Pausen: " + (if (k.pausen.isEmpty()) "noch keine" else k.pausen.joinToString(", ") { "${Zeitraum.uhrzeit(it.von)}–${Zeitraum.uhrzeit(it.bis)}" }), 24, Farben.TEXT2))
+        knoepfe(knopf(c, "Pausenzeiten …") { a.pausenEinstellen() })
+        val fa = k.feierabend
+        add(text(c, "Feierabend-Sperre: " + (if (!fa.an) "aus" else "${Zeitraum.uhrzeit(fa.ab)} bis ${Zeitraum.uhrzeit(fa.bis)}" + if (fa.wochenende) ", Wochenende gesperrt" else ""), 24, Farben.TEXT2), 18)
+        knoepfe(knopf(c, "Feierabend-Sperre …") { a.feierabendEinstellen() })
+        auswahl("Bildschirmschoner (dunkel, Uhr und Foto) nach", listOf("0" to "Aus", "5" to "5 min", "10" to "10 min", "15" to "15 min", "30" to "30 min", "60" to "1 Stunde"), k.schoner.toString()) { v ->
+            aendere { it.copy(schoner = v.toInt()) }
+        }
+
+        abschnitt("Hinweis-Band")
+        val hw = k.hinweis
+        add(text(c, if (hw == null) "Kein Hinweis." else "„${hw.text}“ – bis ${hw.bis.split('-').reversed().joinToString(".")}" +
+            (if (!Zeiten.hinweisAktiv(hw, java.util.Calendar.getInstance())) " (abgelaufen)" else ""), 24, Farben.TEXT2))
+        knoepfe(knopf(c, if (hw == null) "Hinweis schreiben …" else "Hinweis ändern …") { a.hinweisEinstellen() })
+
+        abschnitt("Abwesenheiten")
+        add(text(c, "Klasse dieses Boards: " + Geraet.klasse.ifBlank { "noch keine" } +
+            "\nDie Kachel „Heute fehlen …“ zeigt nur die Zahl – die Kinder raten, wer fehlt.", 24, Farben.TEXT2))
+        if (Geraet.klasse.isNotBlank()) add(text(c, "Jetzt: " + Abwesenheit.anzeige(Geraet.klasse).let { "${it.gross} ${it.unten}" }, 22, Farben.TEXT2), 6)
+        knoepfe(knopf(c, "Klasse wählen …") { a.klasseEinstellen() })
 
         abschnitt("Hintergrund")
         knoepfe(

@@ -489,6 +489,75 @@ def main():
             time.sleep(2)
             screenshot("19i_uhr_sekunden.png")
 
+    # 1.5.0: Pausen-Countdown, „Heute fehlen …“ (Zahl aus abwesend.json), QR-Code, Ordner, Hinweis-Band
+    adb("shell", "am", "start", "-n", f"{PAKET}/.TestEinrichtungActivity", "--ez", "neu15", "true", "--es", "klasse", "5a")
+    time.sleep(3)
+    home()
+    time.sleep(5)
+    screenshot("22_kacheln_ordner_hinweis.png")
+    if tippe("Ordner Mathe", teil=True):
+        time.sleep(2)
+        screenshot("23_ordner_offen.png")
+        adb("shell", "input", "keyevent", "4")
+        time.sleep(1)
+    z = knoten("Ordner Mathe", teil=True)
+    if z:
+        lang(*mitte(z))
+        time.sleep(1.5)
+        screenshot("23b_ordner_menue.png")
+        adb("shell", "input", "keyevent", "4")
+        time.sleep(1)
+    # Neues Widget-Menü mit den eingebauten Kacheln
+    lang(w * 85 // 100, h * 80 // 100)
+    time.sleep(2)
+    if scrolle_zu("Widget hinzufügen …", w * 3 // 4):
+        time.sleep(2)
+        screenshot("23c_widget_liste_neu.png")
+        adb("shell", "input", "keyevent", "4")
+        time.sleep(1)
+    # Schüler-Ansicht einschalten und wechseln
+    if scrolle_zu("Schüler-Ansicht einschalten", w * 3 // 4):
+        time.sleep(1.5)
+        scrolle_zu("Jetzt zur Schüler-Ansicht", w * 3 // 4, antippen=False)
+        screenshot("24_schueler_einstellungen.png")
+        # Ordner nur für Lehrkräfte – erst zur Schüler-Ansicht, wenn markiert
+        tippe("Fertig")
+        time.sleep(1.5)
+        z = knoten("Ordner Mathe", teil=True)
+        if z:
+            lang(*mitte(z))
+            time.sleep(1.5)
+            tippe("🙈  In der Schüler-Ansicht ausblenden")
+            time.sleep(1.5)
+        screenshot("25_lehrer_ansicht.png")
+        tippe("Lehrer-Ansicht  ✕")
+        time.sleep(2)
+        screenshot("26_schueler_ansicht.png")
+        lang(w * 85 // 100, h * 80 // 100)  # ohne PIN: gleich zurück zur Lehrer-Ansicht
+        time.sleep(2)
+        screenshot("27_zurueck_lehrer.png")
+    else:
+        tippe("Fertig")
+        time.sleep(1)
+    # Feierabend-Sperre: ab jetzt gesperrt, „Entsperren“ (ohne PIN) gibt frei
+    adb("shell", "am", "start", "-n", f"{PAKET}/.TestEinrichtungActivity", "--ez", "feierabend", "true")
+    time.sleep(3)
+    home()
+    time.sleep(3)
+    screenshot("28_feierabend.png")
+    if tippe("Entsperren"):
+        time.sleep(2)
+        screenshot("29_entsperrt.png")
+    # Bildschirmschoner nach 1 Minute
+    adb("shell", "am", "start", "-n", f"{PAKET}/.TestEinrichtungActivity", "--ei", "schoner", "1")
+    time.sleep(3)
+    home()
+    time.sleep(100)
+    screenshot("30_bildschirmschoner.png")
+    tap(w // 2, h // 2)
+    time.sleep(2)
+    screenshot("31_geweckt.png")
+
     # Update-Pflicht: neue Version seit 30 Tagen → Sperre; Server weg → keine Sperre
     steuer("update_alt")
     adb("shell", "am", "start", "-a", "android.settings.SETTINGS")

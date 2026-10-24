@@ -39,8 +39,66 @@ data class Konfig(
     val pin: PasswortHash? = null,
     /** Master-Passwort für den Boss-Modus (Hash), null = noch nicht festgelegt. */
     val boss: PasswortHash? = null,
+    /** Pausen des Tages (Minuten seit Mitternacht) – für die Pausen-Kachel. */
+    val pausen: List<Zeitraum> = emptyList(),
+    /** Hinweis-Band oben auf allen Boards, null = keiner. */
+    val hinweis: Hinweis? = null,
+    /** Abends und am Wochenende gesperrt (Entsperren mit der PIN). */
+    val feierabend: Feierabend = Feierabend(),
+    /** Bildschirmschoner nach so vielen Minuten ohne Berührung (0 = aus). */
+    val schoner: Int = 0,
+    val schueler: SchuelerAnsicht = SchuelerAnsicht(),
     /** Wann diese Einrichtung zuletzt geändert wurde (ms seit 1970) – dient auch als Vorlagen-Version. */
     val stand: Long = 0L
+)
+
+/** Uhrzeiten als Minuten seit Mitternacht, [von] bis ausschließlich [bis]. */
+data class Zeitraum(val von: Int, val bis: Int) {
+    override fun toString() = "${uhrzeit(von)}-${uhrzeit(bis)}"
+
+    companion object {
+        fun uhrzeit(min: Int) = "%02d:%02d".format(min / 60, min % 60)
+
+        /** „9:35“, „09.35“ oder „0935“ → Minuten; null, wenn es keine Uhrzeit ist. */
+        fun minuten(t: String): Int? {
+            val m = Regex("^\\s*(\\d{1,2})[:.]?(\\d{2})\\s*$").find(t) ?: return null
+            val h = m.groupValues[1].toInt()
+            val mi = m.groupValues[2].toInt()
+            return if (h in 0..23 && mi in 0..59) h * 60 + mi else null
+        }
+
+        /** „09:35-09:55“ (auch mit – oder „bis“) → Zeitraum; null bei Unsinn oder Ende vor Beginn. */
+        fun aus(t: String): Zeitraum? {
+            val teile = t.split(Regex("\\s*(-|–|bis)\\s*"))
+            if (teile.size != 2) return null
+            val a = minuten(teile[0]) ?: return null
+            val b = minuten(teile[1]) ?: return null
+            return if (b > a) Zeitraum(a, b) else null
+        }
+    }
+}
+
+/** Hinweis-Band: [text] wird bis einschließlich [bis] (yyyy-MM-dd) gezeigt. */
+data class Hinweis(val text: String, val bis: String) {
+    companion object {
+        val DATUM = Regex("^\\d{4}-\\d{2}-\\d{2}$")
+        const val MAX = 200
+    }
+}
+
+/** Feierabend-Sperre von [ab] bis [bis] (Minuten, über Mitternacht) und auf Wunsch das ganze Wochenende. */
+data class Feierabend(val an: Boolean = false, val ab: Int = 17 * 60, val bis: Int = 7 * 60, val wochenende: Boolean = true)
+
+/**
+ * Schüler-Ansicht: zeigt nur, was nicht als [nurLehrer] markiert ist (Schlüssel der Elemente), und
+ * auf Wunsch keine App-Übersicht. Die Lehrer-Ansicht öffnet sich mit der PIN und kehrt nach
+ * [zurueck] Minuten ohne Berührung von selbst zurück.
+ */
+data class SchuelerAnsicht(
+    val an: Boolean = false,
+    val nurLehrer: Set<String> = emptySet(),
+    val ohneAlleApps: Boolean = true,
+    val zurueck: Int = 20
 )
 
 data class Raender(val oben: Int, val unten: Int, val links: Int, val rechts: Int) {
@@ -139,6 +197,13 @@ sealed class Element {
         const val UHR = "de.oejendorferdamm.dammlauncher/Uhr"
         /** Dieselbe Uhr ohne Fläche: weiße Schrift mit Schatten direkt auf dem Hintergrund. */
         const val UHR_TRANSPARENT = "de.oejendorferdamm.dammlauncher/UhrTransparent"
+        /** „Noch 12 min bis zur Pause“ (Zeiten aus [Konfig.pausen]). */
+        const val PAUSE = "de.oejendorferdamm.dammlauncher/Pause"
+        /** „Heute fehlen 2“ – nur die Zahl für die Klasse dieses Boards. */
+        const val ABWESEND = "de.oejendorferdamm.dammlauncher/Abwesend"
+        /** QR-Code mit Link oder WLAN-Zugang ([Widget.text]). */
+        const val QR = "de.oejendorferdamm.dammlauncher/QrCode"
+        val EINGEBAUT = setOf(UHR, UHR_TRANSPARENT, PAUSE, ABWESEND, QR)
     }
 
     abstract val spalte: Int
@@ -183,13 +248,39 @@ sealed class Element {
         /** Inhalt vergrößern (Prozent): viele Widgets haben feste Größen und wirken auf großen Boards winzig. */
         val zoom: Int = 100,
         /** Nur für die eingebaute Uhr: Schrift und Datum. */
-        val uhr: UhrStil = UhrStil()
+        val uhr: UhrStil = UhrStil(),
+        /** Nur für den QR-Code: sein Inhalt. */
+        val text: String = ""
     ) : Element() {
         /** Die eingebaute Digitaluhr – kein Android-Widget, braucht keine Freigabe. */
         val istUhr get() = provider == UHR || provider == UHR_TRANSPARENT
+        /** Uhr, Pause, Abwesend, QR: von DammLauncher selbst gezeichnet. */
+        val eingebaut get() = provider in EINGEBAUT
         override val schluessel get() = "widget:$kennung"
         override fun verschoben(spalte: Int, zeile: Int) = copy(spalte = spalte, zeile = zeile)
         override fun mitGroesse(breite: Int, hoehe: Int) = copy(breite = breite, hoehe = hoehe)
+    }
+}
+
+/**
+ * Ordner (1 × 1) mit mehreren Apps – antippen öffnet ihn groß. Die Apps darin behalten eigene Namen
+ * und Symbole; ihre Zellen-Angaben sind ohne Bedeutung.
+ */
+data class Ordner(
+    val kennung: String,
+    val name: String,
+    val apps: List<Element.App>,
+    override val spalte: Int,
+    override val zeile: Int
+) : Element() {
+    override val breite get() = 1
+    override val hoehe get() = 1
+    override val schluessel get() = "ordner:$kennung"
+    override fun verschoben(spalte: Int, zeile: Int) = copy(spalte = spalte, zeile = zeile)
+    override fun mitGroesse(breite: Int, hoehe: Int) = this
+
+    companion object {
+        const val MAX_APPS = 24
     }
 }
 
@@ -201,4 +292,7 @@ object Grenzen {
     val ICON = 20..100
     val TEXT = 10..60
     val ZOOM = 50..400
+    val SCHONER = 0..120
+    val ZURUECK = 1..240
+    const val QR_TEXT = 600
 }

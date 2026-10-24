@@ -18,6 +18,7 @@ import android.widget.TextView
 import de.oejendorferdamm.dammlauncher.apps.AppKatalog
 import de.oejendorferdamm.dammlauncher.konfig.Element
 import de.oejendorferdamm.dammlauncher.konfig.Konfig
+import de.oejendorferdamm.dammlauncher.konfig.Ordner
 import de.oejendorferdamm.dammlauncher.raster.Belegung
 import de.oejendorferdamm.dammlauncher.raster.RasterRechner
 import kotlin.math.abs
@@ -37,6 +38,9 @@ interface RasterAktionen {
     /** Platzhalter angetippt: App bzw. Widget-App ist auf diesem Gerät nicht installiert. */
     fun fehlt(e: Element)
     fun nachUnten()
+    fun oeffneOrdner(o: Ordner, v: View)
+    /** App auf einen Ordner gezogen. */
+    fun inOrdner(app: Element.App, o: Ordner)
 }
 
 /**
@@ -134,6 +138,16 @@ class RasterAnsicht(context: Context, private val aktionen: RasterAktionen) : Vi
                     zelle.setze(android.content.ComponentName(e.paket, e.aktivitaet), e.titel ?: info?.name ?: e.paket, e.icon, k.iconProzent, textPx, k.beschriftung, schrift)
                     v = zelle
                 }
+                is Ordner -> {
+                    val zelle = (v as? OrdnerZelle) ?: OrdnerZelle(context).also { neu ->
+                        neu.setOnClickListener { (elementVon[neu] as? Ordner)?.let { aktionen.oeffneOrdner(it, neu) } }
+                        neu.setOnLongClickListener { elementVon[neu]?.let { beginneZiehen(it, neu) }; true }
+                        addView(neu)
+                        ansichten[e.schluessel] = neu
+                    }
+                    zelle.setze(e, k.iconProzent, textPx, k.beschriftung, schrift)
+                    v = zelle
+                }
                 is Element.Widget -> {
                     if (v == null) {
                         val inhalt = widgetAnsicht(e)
@@ -152,11 +166,13 @@ class RasterAnsicht(context: Context, private val aktionen: RasterAktionen) : Vi
                         ansichten[e.schluessel] = v
                     }
                     (v as? WidgetRahmen)?.let { r ->
-                        r.zoom = if (e.istUhr) 100 else e.zoom
+                        r.zoom = if (e.eingebaut) 100 else e.zoom
                         (r.getChildAt(0) as? UhrAnsicht)?.let { u ->
                             u.transparent = e.provider == Element.UHR_TRANSPARENT
                             u.stil = e.uhr
                         }
+                        (r.getChildAt(0) as? QrAnsicht)?.text = e.text
+                        (r.getChildAt(0) as? InfoKachel)?.invalidate()
                     }
                 }
             }
@@ -227,7 +243,7 @@ class RasterAnsicht(context: Context, private val aktionen: RasterAktionen) : Vi
             zz.ziel?.let { (s, z) ->
                 val frei = Belegung.frei(konfig.elemente, s, z, zz.e.breite, zz.e.hoehe, konfig.spalten, konfig.zeilen, zz.e.schluessel)
                 val f = r().feld(s, z, zz.e.breite, zz.e.hoehe)
-                malen.color = if (frei) 0x5532C864 else 0x55E04040
+                malen.color = if (ordnerBei(zz.e, s, z) != null) 0x772563EB else if (frei) 0x5532C864 else 0x55E04040
                 canvas.drawRoundRect(f.links, f.oben, f.rechts, f.unten, 16f.vp, 16f.vp, malen)
             }
         }
@@ -301,9 +317,11 @@ class RasterAnsicht(context: Context, private val aktionen: RasterAktionen) : Vi
         zz.v.elevation = 0f
         invalidate()
         if (abbrechen) return
+        val ordner = zz.ziel?.let { (s, z) -> ordnerBei(zz.e, s, z) }
         when {
             !zz.bewegt -> aktionen.menue(zz.e)
             zz.ueberEntfernen -> aktionen.entferne(zz.e)
+            ordner != null -> aktionen.inOrdner(zz.e as Element.App, ordner)
             else -> zz.ziel?.let { (s, z) ->
                 if ((s != zz.e.spalte || z != zz.e.zeile) &&
                     Belegung.frei(konfig.elemente, s, z, zz.e.breite, zz.e.hoehe, konfig.spalten, konfig.zeilen, zz.e.schluessel)
@@ -312,6 +330,10 @@ class RasterAnsicht(context: Context, private val aktionen: RasterAktionen) : Vi
         }
         requestLayout()
     }
+
+    /** Liegt in der Zielzelle ein Ordner, in den die gezogene App hinein kann? */
+    private fun ordnerBei(e: Element, s: Int, z: Int): Ordner? =
+        if (e !is Element.App) null else konfig.elemente.firstOrNull { it is Ordner && it.spalte == s && it.zeile == z } as? Ordner
 
     // ------------------------------------------------------------ Größe ändern
 
@@ -369,7 +391,7 @@ class RasterAnsicht(context: Context, private val aktionen: RasterAktionen) : Vi
                 downX = ev.x; downY = ev.y
                 nachObenErledigt = false
                 // Über der eingebauten Uhr darf gewischt werden, über fremden Widgets nicht (die scrollen evtl. selbst)
-                startInWidget = elementVon.any { (v, e) -> v is WidgetRahmen && !(e as Element.Widget).istUhr && ev.x >= v.left && ev.x < v.right && ev.y >= v.top && ev.y < v.bottom }
+                startInWidget = elementVon.any { (v, e) -> v is WidgetRahmen && !(e as Element.Widget).eingebaut && ev.x >= v.left && ev.x < v.right && ev.y >= v.top && ev.y < v.bottom }
             }
             MotionEvent.ACTION_MOVE -> if (istNachOben(ev) || istNachUnten(ev)) return true
         }
@@ -549,6 +571,7 @@ class PlatzhalterAnsicht(context: Context, private var e: Element) : View(contex
     private fun name(): String = when (val x = e) {
         is Element.App -> x.titel ?: AppNamen.raten(x.paket)
         is Element.Widget -> AppNamen.raten(x.provider.substringBefore('/')) + "-Widget"
+        is Ordner -> x.name
     }
 
     override fun onDraw(canvas: Canvas) {

@@ -60,7 +60,11 @@ android {
     }
     kotlinOptions { jvmTarget = "17" }
     buildFeatures { buildConfig = true }
-    testOptions { unitTests.isReturnDefaultValues = true }
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+        // QR-Muster für die Gegenprobe mit einem fremden Decoder ausgeben (siehe QrCodeTest)
+        unitTests.all { t -> System.getenv("QR_AUSGABE")?.let { t.systemProperty("qrAusgabe", it) } }
+    }
     packaging { resources.excludes += listOf("META-INF/*.version", "kotlin/**", "DebugProbesKt.bin") }
 }
 

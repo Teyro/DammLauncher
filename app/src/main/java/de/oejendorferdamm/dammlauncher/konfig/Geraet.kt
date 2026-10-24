@@ -126,6 +126,27 @@ object Geraet {
         if (i <= 0) null else e.substring(0, i) to (e.substring(i + 1).toFloatOrNull() ?: return@mapNotNull null)
     }.toMap()
 
+    // ---- Abwesenheiten: Klasse dieses Boards und die zuletzt gelesene Meldung (nur Zahlen)
+    var klasse: String
+        get() = p.getString("klasse", "") ?: ""
+        set(v) = p.edit().putString("klasse", v.trim().take(20)).apply()
+    var abwesendDaten: String
+        get() = p.getString("abwesend", "") ?: ""
+        set(v) = p.edit().putString("abwesend", v.take(64 * 1024)).apply()
+    var abwesendGeladen: Long
+        get() = p.getLong("abwesendGeladen", 0)
+        set(v) = p.edit().putLong("abwesendGeladen", v).apply()
+
+    /** Lehrer-Ansicht offen (sonst Schüler-Ansicht, wenn diese eingeschaltet ist). */
+    var lehrerAnsicht: Boolean
+        get() = p.getBoolean("lehrer", false)
+        set(v) = p.edit().putBoolean("lehrer", v).apply()
+
+    /** Feierabend-Sperre mit der PIN aufgehoben bis (ms). */
+    var feierabendFreiBis: Long
+        get() = p.getLong("feierabendFrei", 0)
+        set(v) = p.edit().putLong("feierabendFrei", v).apply()
+
     /** Einmalige Widget-Freigabe erledigt? */
     var widgetFreigabeGefragt: Boolean
         get() = p.getBoolean("widgetFreigabe", false)

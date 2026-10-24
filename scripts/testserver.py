@@ -110,6 +110,12 @@ class H(BaseHTTPRequestHandler):
             return self.antwort(401, kopf={"WWW-Authenticate": 'Basic realm="test"'})
         if p in DATEIEN:
             return self.antwort(200, DATEIEN[p])
+        if p.endswith("/abwesend.json"):
+            # Meldung des iPhone-Widgets „IServ-Abwesenheiten“: nur Zahlen je Klasse, Datum von heute
+            heute = datetime.date.today().isoformat()
+            stand = int(datetime.datetime.now().timestamp() * 1000)
+            m = {"format": 1, "stand": stand, "datum": heute, "klassen": {"5a": {"fehlen": 2, "stunden": 1}, "6b": {"fehlen": 0}}}
+            return self.antwort(200, json.dumps(m).encode(), "application/json")
         self.antwort(404)
 
     def unsplash(self, p):

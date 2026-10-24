@@ -43,6 +43,13 @@ object KonfigJson {
         put("bearbeitenGesperrt", k.bearbeitenGesperrt)
         put("pin", k.pin?.let { hash(it) } ?: JSONObject.NULL)
         put("boss", k.boss?.let { hash(it) } ?: JSONObject.NULL)
+        put("pausen", JSONArray().apply { k.pausen.forEach { put(it.toString()) } })
+        k.hinweis?.let { put("hinweis", JSONObject().put("text", it.text).put("bis", it.bis)) }
+        put("feierabend", JSONObject().put("an", k.feierabend.an).put("ab", Zeitraum.uhrzeit(k.feierabend.ab))
+            .put("bis", Zeitraum.uhrzeit(k.feierabend.bis)).put("wochenende", k.feierabend.wochenende))
+        put("schoner", k.schoner)
+        put("schueler", JSONObject().put("an", k.schueler.an).put("nurLehrer", JSONArray().apply { k.schueler.nurLehrer.sorted().forEach { put(it) } })
+            .put("ohneAlleApps", k.schueler.ohneAlleApps).put("zurueck", k.schueler.zurueck))
     }.toString(2)
 
     private fun hash(h: PasswortHash) = JSONObject().put("hash", h.hash).put("salt", h.salt).put("runden", h.runden)
@@ -54,7 +61,10 @@ object KonfigJson {
             .put("spalte", e.spalte).put("zeile", e.zeile).put("breite", e.breite).put("hoehe", e.hoehe).apply {
                 if (e.zoom != 100) put("zoom", e.zoom)
                 if (e.istUhr) put("uhr", JSONObject().put("schrift", e.uhr.schrift).put("datum", e.uhr.datum).put("format", e.uhr.format).put("sekunden", e.uhr.sekunden))
+                if (e.provider == Element.QR) put("text", e.text)
             }
+        is Ordner -> JSONObject().put("typ", "ordner").put("kennung", e.kennung).put("name", e.name).put("spalte", e.spalte).put("zeile", e.zeile)
+            .put("apps", JSONArray().apply { e.apps.forEach { put(element(it)) } })
     }
 
     private val PAKET = Regex("^[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z0-9_]+)+$")
@@ -64,7 +74,16 @@ object KonfigJson {
     val ICON_DATEI = Regex("^[a-f0-9]{8,64}\\.png$")
 
     /** Alle eigenen Symbol-Dateien, die eine Konfiguration braucht (für Export und Vorlage). */
-    fun icons(k: Konfig): Set<String> = (k.elemente + k.nichtPlatziert).mapNotNull { (it as? Element.App)?.icon }.toSet()
+    fun icons(k: Konfig): Set<String> = (k.elemente + k.nichtPlatziert).flatMap { e ->
+        when (e) {
+            is Element.App -> listOf(e.icon)
+            is Ordner -> e.apps.map { it.icon }
+            else -> emptyList()
+        }
+    }.filterNotNull().toSet()
+
+    /** Schlüssel eines Elements (für die Schüler-Ansicht). */
+    private val SCHLUESSEL = Regex("^(app|widget|ordner):[A-Za-z0-9_.$/-]{1,300}$")
 
     /** Liest; wirft [KonfigFehler] nur, wenn es gar keine DammLauncher-Konfiguration ist. */
     fun lese(text: String): Ergebnis {
@@ -107,13 +126,26 @@ object KonfigJson {
                 val e = a.optJSONObject(i) ?: run { w.add("$name[$i] ist kein Eintrag"); return@mapNotNull null }
                 val s = e.optInt("spalte", -1)
                 val z = e.optInt("zeile", -1)
+                fun app(e: JSONObject, wo: String, s: Int, z: Int): Element.App? {
+                    val p = e.optString("paket")
+                    val akt = e.optString("aktivitaet")
+                    val titel = if (e.has("titel")) e.optString("titel").trim().take(60).ifEmpty { null } else null
+                    val icon = if (e.has("icon")) e.optString("icon").takeIf { ICON_DATEI.matches(it) } ?: run { w.add("$wo: ungültiges Symbol"); null } else null
+                    return if (!PAKET.matches(p) || !KLASSE.matches(akt)) { w.add("$wo: ungültige App"); null } else Element.App(p, akt, s, z, titel, icon)
+                }
                 when (e.optString("typ")) {
-                    "app" -> {
-                        val p = e.optString("paket")
-                        val akt = e.optString("aktivitaet")
-                        val titel = if (e.has("titel")) e.optString("titel").trim().take(60).ifEmpty { null } else null
-                        val icon = if (e.has("icon")) e.optString("icon").takeIf { ICON_DATEI.matches(it) } ?: run { w.add("$name[$i]: ungültiges Symbol"); null } else null
-                        if (!PAKET.matches(p) || !KLASSE.matches(akt)) { w.add("$name[$i]: ungültige App"); null } else Element.App(p, akt, s, z, titel, icon)
+                    "app" -> app(e, "$name[$i]", s, z)
+                    "ordner" -> {
+                        val ken = e.optString("kennung")
+                        val titel = e.optString("name").trim().take(40)
+                        val liste = e.optJSONArray("apps")
+                        if (!KENNUNG.matches(ken) || liste == null) { w.add("$name[$i]: ungültiger Ordner"); null } else {
+                            val apps = (0 until liste.length()).mapNotNull { j ->
+                                liste.optJSONObject(j)?.let { app(it, "$name[$i].apps[$j]", 0, 0) } ?: run { w.add("$name[$i].apps[$j] ungültig"); null }
+                            }.distinctBy { it.schluessel }
+                            if (apps.size > Ordner.MAX_APPS) w.add("$name[$i]: zu viele Apps im Ordner")
+                            Ordner(ken, titel.ifEmpty { "Ordner" }, apps.take(Ordner.MAX_APPS), s, z)
+                        }
                     }
                     "widget" -> {
                         val prov = e.optString("provider")
@@ -130,7 +162,8 @@ object KonfigJson {
                                 return if (v.isEmpty()) std else if (v in erlaubt) v else { w.add("$name[$i]: uhr.$n unbekannt"); std }
                             }
                             val uhr = UhrStil(wahl("schrift", Schrift.ALLE, Schrift.GRUNDSCHRIFT), wahl("datum", UhrStil.DATUM, UhrStil.UNTEN), wahl("format", UhrStil.FORMATE, UhrStil.LANG), u?.optBoolean("sekunden", false) ?: false)
-                            Element.Widget(prov, ken, s, z, e.optInt("breite", 1).coerceIn(1, 10), e.optInt("hoehe", 1).coerceIn(1, 10), zoom.coerceIn(Grenzen.ZOOM), uhr)
+                            val text = if (prov == Element.QR) e.optString("text", "").also { if (it.length > Grenzen.QR_TEXT) w.add("$name[$i]: QR-Text zu lang") }.take(Grenzen.QR_TEXT) else ""
+                            Element.Widget(prov, ken, s, z, e.optInt("breite", 1).coerceIn(1, 10), e.optInt("hoehe", 1).coerceIn(1, 10), zoom.coerceIn(Grenzen.ZOOM), uhr, text)
                         }
                     }
                     else -> { w.add("$name[$i]: unbekannter Typ"); null }
@@ -196,6 +229,33 @@ object KonfigJson {
         val pin = passwort("pin")
         val boss = passwort("boss")
 
+        // 1.5.0: Pausen, Hinweis-Band, Feierabend, Bildschirmschoner, Schüler-Ansicht – fehlt etwas, gilt der Standard
+        val pausen = o.optJSONArray("pausen")?.let { a ->
+            (0 until a.length()).mapNotNull { i -> Zeitraum.aus(a.optString(i)) ?: run { w.add("pausen[$i] ungültig"); null } }
+        }.orEmpty().distinct().sortedBy { it.von }.take(20)
+        val hinweis = o.optJSONObject("hinweis")?.let { hw ->
+            val t = hw.optString("text").trim().take(Hinweis.MAX)
+            val bis = hw.optString("bis")
+            if (t.isEmpty() || !Hinweis.DATUM.matches(bis)) { w.add("hinweis ungültig"); null } else Hinweis(t, bis)
+        }
+        val fa = o.optJSONObject("feierabend")
+        val sf = Feierabend()
+        fun uhr(n: String, std: Int): Int {
+            val t = fa?.optString(n, "").orEmpty()
+            return if (t.isEmpty()) std else Zeitraum.minuten(t) ?: run { w.add("feierabend.$n ungültig"); std }
+        }
+        val feierabend = Feierabend(fa?.optBoolean("an", false) ?: false, uhr("ab", sf.ab), uhr("bis", sf.bis), fa?.optBoolean("wochenende", true) ?: true)
+        val schoner = if (o.has("schoner")) zahl(o, "schoner", Grenzen.SCHONER, 0) else 0
+        val sa = o.optJSONObject("schueler")
+        val schueler = if (sa == null) SchuelerAnsicht() else SchuelerAnsicht(
+            sa.optBoolean("an", false),
+            sa.optJSONArray("nurLehrer")?.let { a ->
+                (0 until a.length()).mapNotNull { i -> a.optString(i).takeIf { SCHLUESSEL.matches(it) } ?: run { w.add("schueler.nurLehrer[$i] ungültig"); null } }.toSet()
+            }.orEmpty(),
+            sa.optBoolean("ohneAlleApps", true),
+            if (sa.has("zurueck")) zahl(sa, "zurueck", Grenzen.ZURUECK, 20) else 20
+        )
+
         val k = Konfig(
             spalten = spalten,
             zeilen = zeilen,
@@ -215,6 +275,11 @@ object KonfigJson {
             bearbeitenGesperrt = schalter("bearbeitenGesperrt", false),
             pin = pin,
             boss = boss,
+            pausen = pausen,
+            hinweis = hinweis,
+            feierabend = feierabend,
+            schoner = schoner,
+            schueler = schueler,
             stand = o.optLong("stand", 0L)
         )
         return Ergebnis(k, w)
@@ -239,11 +304,13 @@ object KonfigJson {
             val da = when (e) {
                 is Element.App -> appDa(e.paket, e.aktivitaet)
                 is Element.Widget -> providerDa(e.provider)
+                is Ordner -> true
             }
             if (!da) protokoll.add(
                 when (e) {
                     is Element.App -> "App fehlt: ${e.paket}"
                     is Element.Widget -> "Widget fehlt: ${e.provider}"
+                    is Ordner -> ""
                 }
             )
             da
