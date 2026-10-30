@@ -70,7 +70,7 @@ class WidgetVerwaltung(context: Context) {
      * Ids entfernter Widgets löschen. Gibt die Widgets zurück, die noch eine Freigabe brauchen.
      */
     fun abgleichen(k: Konfig): List<Element.Widget> {
-        val gewollt = (k.elemente + k.nichtPlatziert).filterIsInstance<Element.Widget>()
+        val gewollt = de.oejendorferdamm.dammlauncher.konfig.KonfigJson.alleElemente(k).filterIsInstance<Element.Widget>()
         val kennungen = gewollt.map { it.kennung }.toSet()
         // Verwaiste Ids: entfernte Widgets und Ids, die zu keiner Kennung mehr gehören
         Geraet.alleWidgetKennungen().forEach { (kennung, id) ->

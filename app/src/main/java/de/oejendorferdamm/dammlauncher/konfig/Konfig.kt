@@ -48,9 +48,84 @@ data class Konfig(
     /** Bildschirmschoner nach so vielen Minuten ohne Berührung (0 = aus). */
     val schoner: Int = 0,
     val schueler: SchuelerAnsicht = SchuelerAnsicht(),
+    /** [Aussehen.KLASSISCH] oder [Aussehen.CLEVERTOUCH] (Optik der neuen Clevertouch-Boards, ohne Animationen). */
+    val aussehen: String = Aussehen.KLASSISCH,
+    /** Form aller App-Symbole: [SymbolForm.ORIGINAL], [SymbolForm.RUND] oder [SymbolForm.KREIS]. */
+    val symbolForm: String = SymbolForm.ORIGINAL,
+    /** Leiste unten mit Lieblings-Apps (im Clevertouch-Aussehen). */
+    val dock: List<Element.App> = emptyList(),
+    val seitenleiste: Seitenleiste = Seitenleiste(),
+    /** Unterrichtsstunden des Tages (1. Stunde, 2. Stunde …) – für die Stundenplan-Kachel. */
+    val stunden: List<Zeitraum> = emptyList(),
+    /** Zeitgesteuerte Nachrichten an alle Boards (z. B. „Probealarm um 10:15“). */
+    val nachrichten: List<Nachricht> = emptyList(),
+    val aufraeumen: Aufraeumen = Aufraeumen(),
+    /** Name des aktiven Profils – seine Elemente stehen in [elemente]. */
+    val profil: String = Profil.STANDARD,
+    /** Die übrigen Profile (Startbildschirme je Klasse oder Fach) mit ihren Elementen. */
+    val profile: List<Profil> = emptyList(),
+    /** Beim Stundenwechsel das Profil wählen, das so heißt wie das Fach laut Stundenplan. */
+    val profilNachFach: Boolean = false,
+    /**
+     * Status-Zugang für die Tafel-Übersicht, der mit der Vorlage an alle Boards geht (null = keiner).
+     * Steht lesbar in der Vorlage – nur einen Zugang verwenden, der ausschließlich in den Ordner
+     * „status“ schreiben darf.
+     */
+    val statusZugang: Zugang? = null,
     /** Wann diese Einrichtung zuletzt geändert wurde (ms seit 1970) – dient auch als Vorlagen-Version. */
     val stand: Long = 0L
 )
+
+object Aussehen {
+    const val KLASSISCH = "klassisch"
+    const val CLEVERTOUCH = "clevertouch"
+    val ALLE = setOf(KLASSISCH, CLEVERTOUCH)
+}
+
+object SymbolForm {
+    const val ORIGINAL = "original"
+    const val RUND = "rund"
+    const val KREIS = "kreis"
+    val ALLE = setOf(ORIGINAL, RUND, KREIS)
+}
+
+/**
+ * Seitenleiste wie bei Clevertouch: ein schmaler Griff am Rand – auch über anderen Apps – öffnet
+ * Startbildschirm, Zurück, Whiteboard, Timer, Abdecken und bis zu [MAX_APPS] eigene Apps.
+ */
+data class Seitenleiste(val an: Boolean = false, val seite: String = RECHTS, val apps: List<Element.App> = emptyList()) {
+    companion object {
+        const val LINKS = "links"
+        const val RECHTS = "rechts"
+        const val MAX_APPS = 6
+    }
+}
+
+/** Nachricht an alle Boards: am [tag] (yyyy-MM-dd) von [von] bis [bis] (Minuten) oben eingeblendet. */
+data class Nachricht(val text: String, val tag: String, val von: Int, val bis: Int) {
+    companion object {
+        const val MAX = 200
+        const val ANZAHL = 20
+    }
+}
+
+/**
+ * „Aufräumen“: Apps im Hintergrund schließen und die Lautstärke zurücksetzen – auf Knopfdruck, zu
+ * Beginn jeder Pause ([pausen], nur wenn der Startbildschirm vorne ist) und zum [feierabend].
+ * [lautstaerke] in Prozent, -1 = nicht ändern.
+ */
+data class Aufraeumen(val pausen: Boolean = false, val feierabend: Boolean = true, val lautstaerke: Int = 40)
+
+data class Zugang(val benutzer: String, val passwort: String)
+
+/** Ein gespeicherter Startbildschirm (z. B. „Mathe“ oder „5a“). */
+data class Profil(val name: String, val elemente: List<Element>) {
+    companion object {
+        const val STANDARD = "Standard"
+        const val MAX = 12
+        val NAME = Regex("^[\\p{L}0-9 ._-]{1,30}$")
+    }
+}
 
 /** Uhrzeiten als Minuten seit Mitternacht, [von] bis ausschließlich [bis]. */
 data class Zeitraum(val von: Int, val bis: Int) {
@@ -203,7 +278,19 @@ sealed class Element {
         const val ABWESEND = "de.oejendorferdamm.dammlauncher/Abwesend"
         /** QR-Code mit Link oder WLAN-Zugang ([Widget.text]). */
         const val QR = "de.oejendorferdamm.dammlauncher/QrCode"
-        val EINGEBAUT = setOf(UHR, UHR_TRANSPARENT, PAUSE, ABWESEND, QR)
+        /** „3. Stunde · Mathe · bis 10:15“ (Zeiten aus [Konfig.stunden], Fächer aus dem Stundenplan). */
+        const val STUNDE = "de.oejendorferdamm.dammlauncher/Stunde"
+        /** Großer Lautstärke-Regler. */
+        const val LAUTSTAERKE = "de.oejendorferdamm.dammlauncher/Lautstaerke"
+        /** Zufallsname bzw. Zufallszahl ([Widget.text] = Bereich, z. B. „1-28“). */
+        const val ZUFALL = "de.oejendorferdamm.dammlauncher/Zufall"
+        /** Bildschirm teilen: startet die Freigabe-App ([Widget.text] = „paket/aktivität“) mit großem Hinweis. */
+        const val FREIGABE = "de.oejendorferdamm.dammlauncher/Freigabe"
+        /** Schnelleinstellungen: Lautstärke, Helligkeit, WLAN, Abdecken, Aufräumen. */
+        const val SCHNELL = "de.oejendorferdamm.dammlauncher/Schnell"
+        val EINGEBAUT = setOf(UHR, UHR_TRANSPARENT, PAUSE, ABWESEND, QR, STUNDE, LAUTSTAERKE, ZUFALL, FREIGABE, SCHNELL)
+        /** Eingebaute Kacheln, die [Widget.text] benutzen. */
+        val MIT_TEXT = setOf(QR, ZUFALL, FREIGABE)
     }
 
     abstract val spalte: Int
@@ -249,7 +336,7 @@ sealed class Element {
         val zoom: Int = 100,
         /** Nur für die eingebaute Uhr: Schrift und Datum. */
         val uhr: UhrStil = UhrStil(),
-        /** Nur für den QR-Code: sein Inhalt. */
+        /** QR-Code: sein Inhalt; Zufall: Zahlenbereich; Freigabe: „paket/aktivität“ der Freigabe-App. */
         val text: String = ""
     ) : Element() {
         /** Die eingebaute Digitaluhr – kein Android-Widget, braucht keine Freigabe. */
@@ -295,4 +382,6 @@ object Grenzen {
     val SCHONER = 0..120
     val ZURUECK = 1..240
     const val QR_TEXT = 600
+    const val DOCK = 10
+    val LAUTSTAERKE = -1..100
 }

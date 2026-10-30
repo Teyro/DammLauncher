@@ -22,6 +22,9 @@ import de.oejendorferdamm.dammlauncher.raster.Belegung
 import de.oejendorferdamm.dammlauncher.abgleich.Abwesenheit
 import de.oejendorferdamm.dammlauncher.konfig.Zeitraum
 import de.oejendorferdamm.dammlauncher.konfig.Zeiten
+import de.oejendorferdamm.dammlauncher.konfig.Aussehen
+import de.oejendorferdamm.dammlauncher.konfig.Seitenleiste
+import de.oejendorferdamm.dammlauncher.konfig.SymbolForm
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -51,6 +54,17 @@ interface PanelAktionen {
     fun feierabendEinstellen()
     fun klasseEinstellen()
     fun zurSchuelerAnsicht()
+    fun stundenZeiten()
+    fun stundenplanBoard()
+    fun nachrichten()
+    fun profileOeffnen()
+    fun seitenleisteApp()
+    fun hilfeAn(): Boolean
+    fun hilfeErlauben()
+    fun statusZugangEinstellen()
+    fun tafelnZeigen()
+    fun aufraeumenJetzt()
+    fun schnellOeffnen()
 }
 
 /**
@@ -129,6 +143,21 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
         aktuelleKarte = null
         val k = KonfigSpeicher.konfig
 
+        abschnitt("Aussehen")
+        val ct = k.aussehen == Aussehen.CLEVERTOUCH
+        add(schalter(c, "Clevertouch-Aussehen (wie die neuen Boards)", ct) { an ->
+            aendere {
+                // Einschalten: einheitliche runde Symbole und keine Animationen – so wirkt es wie Android 15, bleibt aber schnell
+                if (an) it.copy(aussehen = Aussehen.CLEVERTOUCH, animationen = false, symbolForm = if (it.symbolForm == SymbolForm.ORIGINAL) SymbolForm.RUND else it.symbolForm)
+                else it.copy(aussehen = Aussehen.KLASSISCH)
+            }
+            aufbauen()
+        })
+        add(text(c, "Oben Uhr, Suchleiste und Schnelleinstellungen, unten ein Dock mit Lieblings-Apps, Farben passend zum Hintergrund, " +
+            "Milchglas – ohne Animationen, damit es auch auf älteren Boards flüssig bleibt. Apps kommen ins Dock über langes Drücken → „Ins Dock legen“.", 21, Farben.TEXT2), 6)
+        auswahl("Form der App-Symbole", listOf(SymbolForm.ORIGINAL to "Original", SymbolForm.RUND to "Abgerundet", SymbolForm.KREIS to "Kreis"), k.symbolForm) { v -> aendere { it.copy(symbolForm = v) } }
+        if (ct) add(text(c, "Im Dock: " + (if (k.dock.isEmpty()) "noch keine Apps" else k.dock.joinToString(", ") { d -> d.titel ?: AppKatalog.finde(d.paket, d.aktivitaet)?.name ?: d.paket }), 22, Farben.TEXT2), 10)
+
         abschnitt("Raster")
         add(regler(c, "Spalten", Grenzen.RASTER, k.spalten) { n -> aendereRaster(n, null) })
         add(regler(c, "Zeilen", Grenzen.RASTER, k.zeilen) { n -> aendereRaster(null, n) })
@@ -180,6 +209,36 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
             knopf(c, "PIN entfernen", gefahr = k.pin != null) { aendere { it.copy(pin = null) }; aufbauen() }.apply { isEnabled = k.pin != null }
         )
 
+        abschnitt("Seitenleiste")
+        val sl = k.seitenleiste
+        add(schalter(c, "Seitenleiste am Bildschirmrand (auch über anderen Apps)", sl.an) { an -> aendere { it.copy(seitenleiste = it.seitenleiste.copy(an = an)) }; aufbauen() })
+        add(text(c, "Ein schmaler Griff am Rand öffnet: Startbildschirm, Alle Apps, Whiteboard (DammBoard), Timer (DammZeit), Abdecken und eigene Apps.", 21, Farben.TEXT2), 6)
+        if (sl.an) {
+            auswahl("Seite", listOf(Seitenleiste.RECHTS to "Rechts", Seitenleiste.LINKS to "Links"), sl.seite) { v -> aendere { it.copy(seitenleiste = it.seitenleiste.copy(seite = v)) } }
+            if (!a.gestenErlaubt()) {
+                add(text(c, "Dafür braucht DammLauncher einmal die Erlaubnis „Über anderen Apps einblenden“.", 22, Farben.ROT), 12)
+                knoepfe(knopf(c, "Erlaubnis erteilen …", haupt = true) { a.gestenErlauben() })
+            }
+            add(text(c, if (a.hilfeAn()) "„Zurück“ und „Übersicht“ sind eingeschaltet." else
+                "„Zurück“ und „Übersicht“ brauchen einmal die Bedienungshilfe „DammLauncher-Seitenleiste“ (liest keine Inhalte).", 21, if (a.hilfeAn()) Farben.TEXT2 else Farben.TEXT), 12)
+            if (!a.hilfeAn()) knoepfe(knopf(c, "Bedienungshilfe einschalten …") { a.hilfeErlauben() })
+            add(text(c, "Eigene Apps (antippen = entfernen):", 22, Farben.TEXT2), 14)
+            sl.apps.forEach { app ->
+                knoepfe(knopf(c, "✕  " + (app.titel ?: AppKatalog.finde(app.paket, app.aktivitaet)?.name ?: app.paket)) {
+                    aendere { it.copy(seitenleiste = it.seitenleiste.copy(apps = it.seitenleiste.apps.filter { x -> x.schluessel != app.schluessel })) }
+                    aufbauen()
+                })
+            }
+            if (sl.apps.size < Seitenleiste.MAX_APPS) knoepfe(knopf(c, "App hinzufügen …") { a.seitenleisteApp() })
+        }
+
+        abschnitt("Stundenplan und Profile")
+        add(text(c, "Stunden: " + (if (k.stunden.isEmpty()) "noch keine" else "${k.stunden.size} (${Zeitraum.uhrzeit(k.stunden.first().von)}–${Zeitraum.uhrzeit(k.stunden.last().bis)})") +
+            "\nStundenplan dieses Boards: " + (if (Geraet.stundenplan.isBlank()) "keiner (sonst stundenplan.json im Vorlagen-Ordner)" else "eingetragen") +
+            "\nProfile: " + listOf(k.profil).plus(k.profile.map { it.name }).joinToString(", ") + " – aktiv: ${k.profil}" +
+            (if (k.profilNachFach) "\nWechselt beim Stundenwechsel zum Profil des Fachs." else ""), 24, Farben.TEXT2))
+        knoepfe(knopf(c, "Stundenzeiten …") { a.stundenZeiten() }, knopf(c, "Stundenplan …") { a.stundenplanBoard() }, knopf(c, "Profile …") { a.profileOeffnen() })
+
         abschnitt("Schüler-Ansicht")
         val sa = k.schueler
         add(schalter(c, "Schüler-Ansicht einschalten", sa.an) { an ->
@@ -213,6 +272,19 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
         add(text(c, if (hw == null) "Kein Hinweis." else "„${hw.text}“ – bis ${hw.bis.split('-').reversed().joinToString(".")}" +
             (if (!Zeiten.hinweisAktiv(hw, java.util.Calendar.getInstance())) " (abgelaufen)" else ""), 24, Farben.TEXT2))
         knoepfe(knopf(c, if (hw == null) "Hinweis schreiben …" else "Hinweis ändern …") { a.hinweisEinstellen() })
+        val heute = Zeiten.tag(java.util.Calendar.getInstance())
+        val geplant = k.nachrichten.count { it.tag >= heute }
+        add(text(c, "Zeitgesteuerte Nachrichten (z. B. „Probealarm um 10:15“): " + (if (geplant == 0) "keine geplant" else "$geplant geplant"), 24, Farben.TEXT2), 18)
+        knoepfe(knopf(c, "Nachrichten …") { a.nachrichten() })
+
+        abschnitt("Aufräumen")
+        add(text(c, "Schließt Apps im Hintergrund und setzt die Lautstärke zurück – damit die nächste Klasse ein ordentliches Board vorfindet.", 21, Farben.TEXT2))
+        add(schalter(c, "Zu Beginn jeder Pause (nur wenn der Startbildschirm vorne ist)", k.aufraeumen.pausen) { an -> aendere { it.copy(aufraeumen = it.aufraeumen.copy(pausen = an)) } })
+        add(schalter(c, "Zum Feierabend (mit der Feierabend-Sperre)", k.aufraeumen.feierabend) { an -> aendere { it.copy(aufraeumen = it.aufraeumen.copy(feierabend = an)) } })
+        auswahl("Lautstärke danach", listOf("-1" to "Nicht ändern", "20" to "20 %", "30" to "30 %", "40" to "40 %", "50" to "50 %", "60" to "60 %"), k.aufraeumen.lautstaerke.toString()) { v ->
+            aendere { it.copy(aufraeumen = it.aufraeumen.copy(lautstaerke = v.toInt())) }
+        }
+        knoepfe(knopf(c, "Jetzt aufräumen") { a.aufraeumenJetzt() }, knopf(c, "Schnelleinstellungen …") { a.schnellOeffnen() })
 
         abschnitt("Abwesenheiten")
         add(text(c, "Klasse dieses Boards: " + Geraet.klasse.ifBlank { "noch keine" } +
@@ -339,6 +411,8 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
                 passwort.setText("")
             })
             add(schalter(c, "Automatisch täglich abgleichen", Geraet.abgleichAn) { an -> Geraet.abgleichAn = an })
+            add(text(c, "Tafel-Übersicht – Bericht dieses Boards: " + (if (!de.oejendorferdamm.dammlauncher.abgleich.Status.hatZugang()) "kein Status-Zugang" else Geraet.statusMeldung.ifBlank { "noch nicht gesendet" }), 22, Farben.TEXT2), 16)
+            knoepfe(knopf(c, "Status-Zugang …") { a.statusZugangEinstellen() }, knopf(c, "Tafel-Übersicht …", haupt = true) { a.tafelnZeigen() })
             knoepfe(knopf(c, "Als Vorlage für alle Geräte hochladen", haupt = true) { a.hochladen() })
             knoepfe(knopf(c, "Boss-Modus beenden", gefahr = true) { a.bossAbmelden() })
         } else {

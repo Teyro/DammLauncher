@@ -44,8 +44,11 @@ abstract class KartenAnsicht(context: Context) : View(context) {
         val dick = maxOf(2f, minOf(width, height) * 0.025f)
         rahmen.strokeWidth = dick
         feld.set(dick / 2, dick / 2, width - dick / 2, height - dick / 2)
+        // Clevertouch: getönte Fläche ohne Rahmen und ohne Schatten (spart auch Rechenzeit)
+        flaeche.color = if (Thema.clevertouch) Thema.karte else Color.WHITE
+        elevation = if (Thema.clevertouch) 0f else 10f.vp
         canvas.drawRoundRect(feld, radius(), radius(), flaeche)
-        canvas.drawRoundRect(feld, radius(), radius(), rahmen)
+        if (!Thema.clevertouch) canvas.drawRoundRect(feld, radius(), radius(), rahmen)
     }
 }
 
@@ -216,7 +219,7 @@ class OrdnerZelle(context: Context) : View(context) {
         val apps = sichtbar()
         if (width == 0 || apps.isEmpty()) return
         val klein = (groesse() / spalten(apps.size) * 0.78f).toInt().coerceAtLeast(8)
-        val schluessel = apps.joinToString { it.schluessel + it.icon } + "@$klein"
+        val schluessel = apps.joinToString { it.schluessel + it.icon } + "@$klein#${AppKatalog.form}"
         if (schluessel == geladenFuer) return
         geladenFuer = schluessel
         bilder.clear()

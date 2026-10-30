@@ -95,7 +95,7 @@ class UhrAnsicht(context: Context, transparent: Boolean = false, stil: UhrStil =
     }
 
     private fun farben() {
-        elevation = if (transparent) 0f else 10f.vp
+        elevation = if (transparent || Thema.clevertouch) 0f else 10f.vp
         zeit.color = if (transparent) 0xFFFFFFFF.toInt() else 0xFF111827.toInt()
         datum.color = if (transparent) 0xF2FFFFFF.toInt() else 0xFF4B5563.toInt()
         if (transparent) {
@@ -135,8 +135,10 @@ class UhrAnsicht(context: Context, transparent: Boolean = false, stil: UhrStil =
             val dick = maxOf(2f, minOf(w, h) * 0.025f)
             rahmen.strokeWidth = dick
             feld.set(dick / 2, dick / 2, w - dick / 2, h - dick / 2)
+            // Clevertouch: getönte Fläche ohne dunklen Rahmen, wie die Kacheln bei Android 15
+            flaeche.color = if (Thema.clevertouch) Thema.karte else 0xFFFFFFFF.toInt()
             canvas.drawRoundRect(feld, radius(), radius(), flaeche)
-            canvas.drawRoundRect(feld, radius(), radius(), rahmen)
+            if (!Thema.clevertouch) canvas.drawRoundRect(feld, radius(), radius(), rahmen)
         }
 
         val jetzt = Date()

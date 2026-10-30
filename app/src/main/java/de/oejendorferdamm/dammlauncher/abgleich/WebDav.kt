@@ -147,4 +147,39 @@ class WebDav(basis: String, benutzer: String, passwort: String) {
             c.disconnect()
         }
     }
+
+    /** Dateinamen in einem Ordner (PROPFIND, Tiefe 1); fehlt der Ordner, eine leere Liste. */
+    fun liste(pfad: String): List<String> {
+        val c = oeffne(pfad.trimEnd('/') + "/", "PROPFIND")
+        try {
+            c.setRequestProperty("Depth", "1")
+            val code = pruefeCode(c)
+            if (code == 404) return emptyList()
+            if (code != 207 && code !in 200..299) throw IOException("Ordner lässt sich nicht lesen (HTTP $code).")
+            val text = c.inputStream.use { ein ->
+                val aus = ByteArrayOutputStream()
+                val puffer = ByteArray(16 * 1024)
+                while (true) {
+                    val n = ein.read(puffer)
+                    if (n < 0) break
+                    aus.write(puffer, 0, n)
+                    if (aus.size() > 2 * 1024 * 1024) throw IOException("Antwort zu groß.")
+                }
+                aus.toString("UTF-8")
+            }
+            return namenAus(text)
+        } finally {
+            c.disconnect()
+        }
+    }
+
+    companion object {
+        /** Dateinamen aus einer PROPFIND-Antwort (Ordner selbst und Unterordner nicht). */
+        fun namenAus(xml: String): List<String> = Regex("<(?:[A-Za-z0-9]+:)?href>([^<]+)</(?:[A-Za-z0-9]+:)?href>", RegexOption.IGNORE_CASE)
+            .findAll(xml).map { it.groupValues[1].trim() }
+            .filter { !it.endsWith("/") }
+            .map { java.net.URLDecoder.decode(it.substringAfterLast('/').replace("+", "%2B"), "UTF-8") }
+            .filter { it.isNotEmpty() }
+            .distinct().toList()
+    }
 }

@@ -56,14 +56,16 @@ fun knopf(c: Context, beschriftung: String, haupt: Boolean = false, gefahr: Bool
     groesse(26)
     gravity = Gravity.CENTER
     typeface = Typeface.DEFAULT_BOLD
+    // Im Clevertouch-Aussehen nimmt der Hauptknopf die Farbe des Hintergrunds an
+    val akzent = if (Thema.clevertouch) Thema.akzent else Farben.AKZENT
     val grund = when {
         gefahr -> Farben.ROT
-        haupt -> Farben.AKZENT
+        haupt -> akzent
         else -> Color.WHITE
     }
     val gedrueckt = when {
         gefahr -> 0xFFB91C1C.toInt()
-        haupt -> Farben.AKZENT_DUNKEL
+        haupt -> if (Thema.clevertouch) dunkler(akzent) else Farben.AKZENT_DUNKEL
         else -> 0xFFE5E7EB.toInt()
     }
     background = StateListDrawable().apply {
@@ -80,6 +82,14 @@ fun knopf(c: Context, beschriftung: String, haupt: Boolean = false, gefahr: Bool
     setPadding(26.vp, 10.vp, 26.vp, 10.vp)
     isClickable = true
     setOnClickListener { klick() }
+}
+
+/** Dieselbe Farbe, 20 % dunkler (gedrückter Knopf). */
+fun dunkler(farbe: Int): Int {
+    val hsv = FloatArray(3)
+    Color.colorToHSV(farbe, hsv)
+    hsv[2] *= 0.8f
+    return Color.HSVToColor(Color.alpha(farbe), hsv)
 }
 
 /** Halbdurchsichtige Pille für den Startbildschirm (liest sich auf jedem Hintergrund). */
@@ -134,11 +144,11 @@ fun regler(c: Context, name: String, bereich: IntRange, wert: Int, schritt: Int 
         minimumHeight = 70.vp
         setPadding(36.vp, 0, 36.vp, 0)
         // dicker Daumen, gut zu greifen
-        thumb = runde(Farben.AKZENT, 30f.vp).apply { setSize(60.vp, 60.vp) }
+        thumb = runde(if (Thema.clevertouch) Thema.akzent else Farben.AKZENT, 30f.vp).apply { setSize(60.vp, 60.vp) }
         progressDrawable = android.graphics.drawable.LayerDrawable(
             arrayOf(
                 runde(0xFFD5DCE4.toInt(), 8f.vp),
-                android.graphics.drawable.ClipDrawable(runde(Farben.AKZENT, 8f.vp), Gravity.START, android.graphics.drawable.ClipDrawable.HORIZONTAL)
+                android.graphics.drawable.ClipDrawable(runde(if (Thema.clevertouch) Thema.akzent else Farben.AKZENT, 8f.vp), Gravity.START, android.graphics.drawable.ClipDrawable.HORIZONTAL)
             )
         ).apply {
             setId(0, android.R.id.background); setId(1, android.R.id.progress)
@@ -260,10 +270,13 @@ class GrossFenster(private val wurzel: FrameLayout, titel: String, breite: Int =
             topMargin = 30.vp; bottomMargin = 30.vp
         })
         wurzel.addView(decke, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
-        decke.alpha = 0f
-        decke.animate().alpha(1f).setDuration(120).start()
-        kasten.scaleX = 0.96f; kasten.scaleY = 0.96f
-        kasten.animate().scaleX(1f).scaleY(1f).setDuration(160).start()
+        // Einblenden nur mit eingeschalteten Animationen – ältere Boards ruckeln sonst
+        if (de.oejendorferdamm.dammlauncher.konfig.KonfigSpeicher.konfig.animationen) {
+            decke.alpha = 0f
+            decke.animate().alpha(1f).setDuration(120).start()
+            kasten.scaleX = 0.96f; kasten.scaleY = 0.96f
+            kasten.animate().scaleX(1f).scaleY(1f).setDuration(160).start()
+        }
     }
 
     fun add(v: View, oben: Int = 14) {

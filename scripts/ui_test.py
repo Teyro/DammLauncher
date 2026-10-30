@@ -220,6 +220,49 @@ def main():
             time.sleep(1.5)
             screenshot("00e_uhr_eingestellt.png")
 
+    # 1.6.0: Clevertouch-Aussehen mit allen neuen Kacheln, Dock, Seitenleiste und Nachricht
+    adb("shell", "appops", "set", PAKET, "SYSTEM_ALERT_WINDOW", "allow")
+    adb("shell", "am", "start", "-n", f"{PAKET}/.TestEinrichtungActivity", "--ez", "neu16", "true")
+    time.sleep(3)
+    home()
+    time.sleep(4)
+    screenshot("40_clevertouch.png")
+    if tippe("Apps durchsuchen"):
+        time.sleep(2)
+        screenshot("41_clevertouch_suche.png")
+        tastatur_zu()
+        adb("shell", "input", "keyevent", "4")
+        time.sleep(1.5)
+    if tippe("Zufall – antippen", teil=True):
+        time.sleep(1)
+        screenshot("42_zufall.png")
+    if tippe("Schnelleinstellungen"):
+        time.sleep(1.5)
+        screenshot("43_schnelleinstellungen.png")
+        tippe("Fertig")
+        time.sleep(1)
+    # Seitenleiste: Griff am rechten Rand (Überlagerung – nicht im Oberflächenbaum)
+    tap(w - 8, h // 2)
+    time.sleep(2)
+    screenshot("44_seitenleiste.png")
+    tap(w // 4, h // 2)  # außerhalb tippen schließt
+    time.sleep(1)
+    if tippe("Schnelleinstellungen"):
+        time.sleep(1.5)
+        tippe("▬  Abdecken")
+        time.sleep(2.5)
+        screenshot("45_abdecken.png")
+        f = w / 1920
+        tap(int(w - 80 * f), int(80 * f))  # ✕
+        time.sleep(1.5)
+        screenshot("46_abdecken_zu.png")
+    # Dock: Einstellungen aus dem Dock starten, zurück
+    lang(w // 2, h * 3 // 5)
+    time.sleep(1.5)
+    screenshot("47_clevertouch_einstellungen.png")
+    adb("shell", "input", "keyevent", "4")
+    time.sleep(1)
+
     # Für die folgenden Schritte: schlichte Einrichtung (6 × 4, Knopf „Alle Apps“)
     adb("shell", "am", "start", "-n", f"{PAKET}/.TestEinrichtungActivity", "--ez", "leer", "true")
     time.sleep(3)

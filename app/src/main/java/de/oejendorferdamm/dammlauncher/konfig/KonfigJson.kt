@@ -50,6 +50,23 @@ object KonfigJson {
         put("schoner", k.schoner)
         put("schueler", JSONObject().put("an", k.schueler.an).put("nurLehrer", JSONArray().apply { k.schueler.nurLehrer.sorted().forEach { put(it) } })
             .put("ohneAlleApps", k.schueler.ohneAlleApps).put("zurueck", k.schueler.zurueck))
+        // 1.6.0
+        put("aussehen", k.aussehen)
+        put("symbolForm", k.symbolForm)
+        put("dock", JSONArray().apply { k.dock.forEach { put(element(it)) } })
+        put("seitenleiste", JSONObject().put("an", k.seitenleiste.an).put("seite", k.seitenleiste.seite)
+            .put("apps", JSONArray().apply { k.seitenleiste.apps.forEach { put(element(it)) } }))
+        put("stunden", JSONArray().apply { k.stunden.forEach { put(it.toString()) } })
+        put("nachrichten", JSONArray().apply {
+            k.nachrichten.forEach { n -> put(JSONObject().put("text", n.text).put("tag", n.tag).put("von", Zeitraum.uhrzeit(n.von)).put("bis", Zeitraum.uhrzeit(n.bis))) }
+        })
+        put("aufraeumen", JSONObject().put("pausen", k.aufraeumen.pausen).put("feierabend", k.aufraeumen.feierabend).put("lautstaerke", k.aufraeumen.lautstaerke))
+        put("profil", k.profil)
+        put("profile", JSONArray().apply {
+            k.profile.forEach { p -> put(JSONObject().put("name", p.name).put("elemente", JSONArray().apply { p.elemente.forEach { put(element(it)) } })) }
+        })
+        put("profilNachFach", k.profilNachFach)
+        k.statusZugang?.let { put("statusZugang", JSONObject().put("benutzer", it.benutzer).put("passwort", it.passwort)) }
     }.toString(2)
 
     private fun hash(h: PasswortHash) = JSONObject().put("hash", h.hash).put("salt", h.salt).put("runden", h.runden)
@@ -61,7 +78,7 @@ object KonfigJson {
             .put("spalte", e.spalte).put("zeile", e.zeile).put("breite", e.breite).put("hoehe", e.hoehe).apply {
                 if (e.zoom != 100) put("zoom", e.zoom)
                 if (e.istUhr) put("uhr", JSONObject().put("schrift", e.uhr.schrift).put("datum", e.uhr.datum).put("format", e.uhr.format).put("sekunden", e.uhr.sekunden))
-                if (e.provider == Element.QR) put("text", e.text)
+                if (e.provider in Element.MIT_TEXT) put("text", e.text)
             }
         is Ordner -> JSONObject().put("typ", "ordner").put("kennung", e.kennung).put("name", e.name).put("spalte", e.spalte).put("zeile", e.zeile)
             .put("apps", JSONArray().apply { e.apps.forEach { put(element(it)) } })
@@ -74,13 +91,16 @@ object KonfigJson {
     val ICON_DATEI = Regex("^[a-f0-9]{8,64}\\.png$")
 
     /** Alle eigenen Symbol-Dateien, die eine Konfiguration braucht (für Export und Vorlage). */
-    fun icons(k: Konfig): Set<String> = (k.elemente + k.nichtPlatziert).flatMap { e ->
+    fun icons(k: Konfig): Set<String> = (alleElemente(k) + k.dock + k.seitenleiste.apps).flatMap { e ->
         when (e) {
             is Element.App -> listOf(e.icon)
             is Ordner -> e.apps.map { it.icon }
             else -> emptyList()
         }
     }.filterNotNull().toSet()
+
+    /** Elemente aller Profile (das aktive und die gespeicherten) samt Ablage – z. B. damit keine Widgets verloren gehen. */
+    fun alleElemente(k: Konfig): List<Element> = k.elemente + k.nichtPlatziert + k.profile.flatMap { it.elemente }
 
     /** Schlüssel eines Elements (für die Schüler-Ansicht). */
     private val SCHLUESSEL = Regex("^(app|widget|ordner):[A-Za-z0-9_.$/-]{1,300}$")
@@ -120,8 +140,7 @@ object KonfigJson {
             w.add("rand fehlt"); std.rand
         } else Raender(zahl(r, "oben", Grenzen.RAND, 40), zahl(r, "unten", Grenzen.RAND, 40), zahl(r, "links", Grenzen.RAND, 40), zahl(r, "rechts", Grenzen.RAND, 40))
 
-        fun elemente(name: String): List<Element> {
-            val a = o.optJSONArray(name) ?: run { if (o.has(name)) w.add("$name ist keine Liste"); return emptyList() }
+        fun elementeAus(a: JSONArray, name: String): List<Element> {
             return (0 until a.length()).mapNotNull { i ->
                 val e = a.optJSONObject(i) ?: run { w.add("$name[$i] ist kein Eintrag"); return@mapNotNull null }
                 val s = e.optInt("spalte", -1)
@@ -162,13 +181,26 @@ object KonfigJson {
                                 return if (v.isEmpty()) std else if (v in erlaubt) v else { w.add("$name[$i]: uhr.$n unbekannt"); std }
                             }
                             val uhr = UhrStil(wahl("schrift", Schrift.ALLE, Schrift.GRUNDSCHRIFT), wahl("datum", UhrStil.DATUM, UhrStil.UNTEN), wahl("format", UhrStil.FORMATE, UhrStil.LANG), u?.optBoolean("sekunden", false) ?: false)
-                            val text = if (prov == Element.QR) e.optString("text", "").also { if (it.length > Grenzen.QR_TEXT) w.add("$name[$i]: QR-Text zu lang") }.take(Grenzen.QR_TEXT) else ""
+                            val text = if (prov in Element.MIT_TEXT) e.optString("text", "").also { if (it.length > Grenzen.QR_TEXT) w.add("$name[$i]: Text zu lang") }.take(Grenzen.QR_TEXT) else ""
                             Element.Widget(prov, ken, s, z, e.optInt("breite", 1).coerceIn(1, 10), e.optInt("hoehe", 1).coerceIn(1, 10), zoom.coerceIn(Grenzen.ZOOM), uhr, text)
                         }
                     }
                     else -> { w.add("$name[$i]: unbekannter Typ"); null }
                 }
             }
+        }
+        fun elemente(name: String): List<Element> {
+            val a = o.optJSONArray(name) ?: run { if (o.has(name)) w.add("$name ist keine Liste"); return emptyList() }
+            return elementeAus(a, name)
+        }
+        /** Nur Apps (Dock, Seitenleiste), ohne Doppelte. */
+        fun appsAus(a: JSONArray?, name: String, max: Int): List<Element.App> {
+            if (a == null) return emptyList()
+            val liste = elementeAus(a, name)
+            if (liste.any { it !is Element.App }) w.add("$name: nur Apps erlaubt")
+            val apps = liste.filterIsInstance<Element.App>().distinctBy { it.schluessel }.map { it.verschoben(0, 0) as Element.App }
+            if (apps.size > max) w.add("$name: zu viele Apps")
+            return apps.take(max)
         }
 
         // Beim Lesen nur reparieren (Überlappung, außerhalb), nichts eigenmächtig neu einsortieren
@@ -256,6 +288,53 @@ object KonfigJson {
             if (sa.has("zurueck")) zahl(sa, "zurueck", Grenzen.ZURUECK, 20) else 20
         )
 
+        // 1.6.0: Clevertouch-Aussehen, Dock, Seitenleiste, Stunden, Nachrichten, Aufräumen, Profile – fehlt etwas, gilt der Standard
+        val aussehen = wahl(o, "aussehen", Aussehen.ALLE, Aussehen.KLASSISCH)
+        val symbolForm = wahl(o, "symbolForm", SymbolForm.ALLE, SymbolForm.ORIGINAL)
+        val dock = appsAus(o.optJSONArray("dock"), "dock", Grenzen.DOCK)
+        val sl = o.optJSONObject("seitenleiste")
+        val seitenleiste = if (sl == null) Seitenleiste() else Seitenleiste(
+            sl.optBoolean("an", false),
+            wahl(sl, "seite", setOf(Seitenleiste.LINKS, Seitenleiste.RECHTS), Seitenleiste.RECHTS),
+            appsAus(sl.optJSONArray("apps"), "seitenleiste.apps", Seitenleiste.MAX_APPS)
+        )
+        val stunden = o.optJSONArray("stunden")?.let { a ->
+            (0 until a.length()).mapNotNull { i -> Zeitraum.aus(a.optString(i)) ?: run { w.add("stunden[$i] ungültig"); null } }
+        }.orEmpty().distinct().sortedBy { it.von }.take(16)
+        val nachrichten = o.optJSONArray("nachrichten")?.let { a ->
+            (0 until a.length()).mapNotNull { i ->
+                val n = a.optJSONObject(i)
+                val t = n?.optString("text")?.trim()?.take(Nachricht.MAX).orEmpty()
+                val tag = n?.optString("tag").orEmpty()
+                val von = n?.optString("von")?.let { Zeitraum.minuten(it) }
+                val bis = n?.optString("bis")?.let { Zeitraum.minuten(it) }
+                if (t.isEmpty() || !Hinweis.DATUM.matches(tag) || von == null || bis == null || bis <= von) { w.add("nachrichten[$i] ungültig"); null } else Nachricht(t, tag, von, bis)
+            }
+        }.orEmpty().take(Nachricht.ANZAHL)
+        val au = o.optJSONObject("aufraeumen")
+        val aufraeumen = if (au == null) Aufraeumen() else Aufraeumen(
+            au.optBoolean("pausen", false), au.optBoolean("feierabend", true),
+            if (au.has("lautstaerke")) zahl(au, "lautstaerke", Grenzen.LAUTSTAERKE, 40) else 40
+        )
+        val profilName = o.optString("profil", "").trim().let { p ->
+            if (p.isEmpty()) Profil.STANDARD else if (Profil.NAME.matches(p)) p else { w.add("profil ungültig"); Profil.STANDARD }
+        }
+        val schonDa = (platziert + offen).map { it.schluessel }.toMutableSet()
+        val profile = o.optJSONArray("profile")?.let { a ->
+            val namen = mutableSetOf(profilName.lowercase())
+            (0 until a.length()).mapNotNull { i ->
+                val p = a.optJSONObject(i)
+                val n = p?.optString("name")?.trim().orEmpty()
+                val liste = p?.optJSONArray("elemente")
+                if (!Profil.NAME.matches(n) || liste == null || !namen.add(n.lowercase())) { w.add("profile[$i] ungültig"); return@mapNotNull null }
+                val roh2 = elementeAus(liste, "profile[$i].elemente")
+                // Widget-Kennungen dürfen nur einmal vorkommen (sie gehören zu je einer Widget-Id)
+                val eindeutig = roh2.filter { it !is Element.Widget || it.eingebaut || schonDa.add(it.schluessel) }
+                if (eindeutig.size < roh2.size) w.add("profile[$i]: doppelte Widgets entfernt")
+                Profil(n, Belegung.anpassen(eindeutig, emptyList(), spalten, zeilen).first)
+            }
+        }.orEmpty().take(Profil.MAX)
+
         val k = Konfig(
             spalten = spalten,
             zeilen = zeilen,
@@ -280,6 +359,21 @@ object KonfigJson {
             feierabend = feierabend,
             schoner = schoner,
             schueler = schueler,
+            aussehen = aussehen,
+            symbolForm = symbolForm,
+            dock = dock,
+            seitenleiste = seitenleiste,
+            stunden = stunden,
+            nachrichten = nachrichten,
+            aufraeumen = aufraeumen,
+            profil = profilName,
+            profile = profile,
+            profilNachFach = o.optBoolean("profilNachFach", false),
+            statusZugang = o.optJSONObject("statusZugang")?.let { z ->
+                val b = z.optString("benutzer").trim()
+                val p = z.optString("passwort")
+                if (b.isEmpty() || p.isEmpty() || b.length > 100 || p.length > 200) { w.add("statusZugang ungültig"); null } else Zugang(b, p)
+            },
             stand = o.optLong("stand", 0L)
         )
         return Ergebnis(k, w)

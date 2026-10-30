@@ -62,4 +62,44 @@ object Zeiten {
         c.add(Calendar.DAY_OF_MONTH, (tage - 1).coerceAtLeast(0))
         return tag(c)
     }
+
+    /** Index der Stunde, die gerade läuft (0 = 1. Stunde), sonst null. */
+    fun stundeJetzt(stunden: List<Zeitraum>, jetzt: Calendar): Int? {
+        if (wochenende(jetzt)) return null
+        val m = minuten(jetzt)
+        return stunden.indexOfFirst { m >= it.von && m < it.bis }.takeIf { it >= 0 }
+    }
+
+    /** Fach der Stunde [i] am Wochentag von [jetzt] laut [plan] (Mo = 0 … Fr = 4), sonst "". */
+    fun fach(plan: List<List<String>>, jetzt: Calendar, i: Int): String {
+        val tag = (jetzt.get(Calendar.DAY_OF_WEEK) + 5) % 7 // Montag = 0
+        return plan.getOrNull(tag)?.getOrNull(i)?.trim().orEmpty()
+    }
+
+    /** Was die Stundenplan-Kachel zeigt: laufende bzw. nächste Stunde mit Fach. */
+    fun stunde(stunden: List<Zeitraum>, plan: List<List<String>>, jetzt: Calendar): Anzeige {
+        if (stunden.isEmpty()) return Anzeige("Stundenplan", "–", "Stundenzeiten eintragen")
+        if (wochenende(jetzt)) return Anzeige("Heute", "Wochenende", "Keine Schule")
+        val m = minuten(jetzt)
+        stundeJetzt(stunden, jetzt)?.let { i ->
+            return Anzeige("${i + 1}. Stunde", fach(plan, jetzt, i).ifEmpty { "Unterricht" }, "bis ${Zeitraum.uhrzeit(stunden[i].bis)} · noch ${dauer(stunden[i].bis - m)}")
+        }
+        val n = stunden.indexOfFirst { it.von > m }
+        if (n < 0) return Anzeige("Heute", "Schluss", "Bis morgen!")
+        val f = fach(plan, jetzt, n)
+        return Anzeige("Gleich: ${n + 1}. Stunde", f.ifEmpty { "um ${Zeitraum.uhrzeit(stunden[n].von)}" }, if (f.isEmpty()) "in ${dauer(stunden[n].von - m)}" else "um ${Zeitraum.uhrzeit(stunden[n].von)}")
+    }
+
+    /** Nachricht, die gerade gezeigt werden soll (die zuerst beginnende), sonst null. */
+    fun nachricht(liste: List<Nachricht>, jetzt: Calendar): Nachricht? {
+        val t = tag(jetzt)
+        val m = minuten(jetzt)
+        return liste.filter { it.tag == t && m >= it.von && m < it.bis }.minByOrNull { it.von }
+    }
+
+    /** Beginnt in dieser Minute eine Pause? (für „Aufräumen in den Pausen“) */
+    fun pausenBeginn(pausen: List<Zeitraum>, jetzt: Calendar) = !wochenende(jetzt) && pausen.any { it.von == minuten(jetzt) }
+
+    /** Stundenplan als Text („Mathe, Deutsch, Sport“ je Wochentag) → Liste je Tag. */
+    fun planAus(zeilen: List<String>): List<List<String>> = zeilen.take(5).map { z -> z.split(',', ';').map { it.trim().take(30) }.dropLastWhile { it.isEmpty() }.take(16) }
 }

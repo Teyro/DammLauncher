@@ -52,6 +52,8 @@ class TagesJob : JobService() {
             Geraet.init(context)
             if (FotoDesTages.faellig()) FotoDesTages.laden(context)
             if (Geraet.autoUpdate && System.currentTimeMillis() - Geraet.letzterUpdateCheck > 20 * 60 * 60_000L) updateVorladen(context)
+            // Tafel-Übersicht: Bericht dieses Boards (nur mit Status-Zugang)
+            if (de.oejendorferdamm.dammlauncher.abgleich.Status.faellig()) de.oejendorferdamm.dammlauncher.abgleich.Status.senden(context)
         }
 
         @Synchronized

@@ -172,7 +172,7 @@ class RasterAnsicht(context: Context, private val aktionen: RasterAktionen) : Vi
                             u.stil = e.uhr
                         }
                         (r.getChildAt(0) as? QrAnsicht)?.text = e.text
-                        (r.getChildAt(0) as? InfoKachel)?.invalidate()
+                        (r.getChildAt(0) as? KartenAnsicht)?.invalidate()
                     }
                 }
             }

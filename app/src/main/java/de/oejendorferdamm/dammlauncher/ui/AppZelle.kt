@@ -83,7 +83,7 @@ class AppZelle(context: Context) : View(context) {
         val app = komponente ?: return
         if (width == 0) return
         val g = iconGroesse()
-        val schluessel = "$app|$eigenesIcon|$g"
+        val schluessel = "$app|$eigenesIcon|$g|${AppKatalog.form}"
         if (geladenFuer == schluessel) return
         geladenFuer = schluessel
         val sofort = AppKatalog.icon(app, eigenesIcon, g) { b ->

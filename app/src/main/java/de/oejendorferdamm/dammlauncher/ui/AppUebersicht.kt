@@ -63,8 +63,14 @@ class AppUebersicht(
     }
 
     init {
-        // Dunkles Glas über dem Startbildschirm
-        setBackgroundColor(0xF0111827.toInt())
+        // Dunkles Glas über dem Startbildschirm – im Clevertouch-Aussehen das weichgezeichnete Hintergrundbild
+        val glas = Thema.glas
+        if (Thema.clevertouch && glas != null) {
+            background = android.graphics.drawable.LayerDrawable(arrayOf(
+                android.graphics.drawable.BitmapDrawable(resources, glas).apply { isFilterBitmap = true },
+                android.graphics.drawable.ColorDrawable(0xB30B1220.toInt())
+            ))
+        } else setBackgroundColor(0xF0111827.toInt())
         suche.apply {
             setTextColor(android.graphics.Color.WHITE)
             setHintTextColor(0x99FFFFFF.toInt())
@@ -143,6 +149,12 @@ class AppUebersicht(
             if (haeufigReihe.getChildAt(0) !is AppZelle) haeufigReihe.removeAllViews()
         }
         filtern()
+    }
+
+    /** Suchfeld fokussieren und Tastatur zeigen (Suchleiste der Kopfzeile). */
+    fun sucheOeffnen() {
+        suche.requestFocus()
+        suche.post { (context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager)?.showSoftInput(suche, InputMethodManager.SHOW_IMPLICIT) }
     }
 
     fun tastaturWeg() {

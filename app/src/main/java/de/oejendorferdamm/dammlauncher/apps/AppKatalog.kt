@@ -17,6 +17,7 @@ import android.os.Process
 import android.os.UserHandle
 import android.util.LruCache
 import de.oejendorferdamm.dammlauncher.konfig.KonfigSpeicher
+import de.oejendorferdamm.dammlauncher.konfig.SymbolForm
 import java.io.File
 import java.text.Collator
 import java.util.Locale
@@ -93,7 +94,9 @@ object AppKatalog {
     fun istDa(paket: String, aktivitaet: String) = finde(paket, aktivitaet) != null
 
     fun starte(app: ComponentName, quelle: android.graphics.Rect?): Boolean = try {
-        la.startMainActivity(app, Process.myUserHandle(), quelle, null)
+        // Ohne Animationen startet die App sofort (kein Aufzoomen – spart auf älteren Boards spürbar Zeit)
+        val optionen = if (KonfigSpeicher.konfig.animationen) null else android.app.ActivityOptions.makeCustomAnimation(kontext, 0, 0).toBundle()
+        la.startMainActivity(app, Process.myUserHandle(), quelle, optionen)
         try { de.oejendorferdamm.dammlauncher.konfig.Geraet.merkeStart(schluessel(app)) } catch (_: Exception) {}
         true
     } catch (_: Exception) {
@@ -125,9 +128,22 @@ object AppKatalog {
      * Symbol in [groesse] px liefern. Steht es im Zwischenspeicher, sofort; sonst wird es im
      * Hintergrund gezeichnet und [fertig] auf dem Haupt-Faden aufgerufen. [eigenes] = eigene Symboldatei.
      */
+    /**
+     * Form der Symbole ([SymbolForm]) – wird beim Zeichnen angewandt. Geändert: Zwischenspeicher
+     * leeren, die Zellen laden dann neu (ihr Schlüssel enthält die Form).
+     */
+    @Volatile
+    var form: String = SymbolForm.ORIGINAL
+        set(v) {
+            if (field == v) return
+            field = v
+            cache.evictAll()
+        }
+
     fun icon(app: ComponentName, eigenes: String?, groesse: Int, fertig: (Bitmap?) -> Unit): Bitmap? {
         val g = groesse.coerceIn(16, 512)
-        val schluessel = (eigenes ?: "${app.packageName}/${app.className}") + "@" + g
+        val f = form
+        val schluessel = (eigenes ?: "${app.packageName}/${app.className}") + "@" + g + if (eigenes == null) "#$f" else ""
         cache.get(schluessel)?.let { return it }
         // Wird dasselbe Symbol schon gezeichnet (z. B. viele gleich große Zellen), nur mitwarten
         synchronized(wartend) {
@@ -136,7 +152,7 @@ object AppKatalog {
         }
         iconFaden.execute {
             val b = try {
-                if (eigenes != null) ladeDatei(File(KonfigSpeicher.iconOrdner, eigenes), g) else originalIcon(app)?.let { zeichne(it, g) }
+                if (eigenes != null) ladeDatei(File(KonfigSpeicher.iconOrdner, eigenes), g) else originalIcon(app)?.let { zeichne(it, g, f) }
             } catch (_: Throwable) {
                 null
             }
@@ -147,10 +163,32 @@ object AppKatalog {
         return null
     }
 
-    fun zeichne(d: Drawable, g: Int): Bitmap {
+    fun zeichne(d: Drawable, g: Int, form: String = SymbolForm.ORIGINAL): Bitmap {
         val b = Bitmap.createBitmap(g, g, Bitmap.Config.ARGB_8888)
-        d.setBounds(0, 0, g, g)
-        d.draw(Canvas(b))
+        val c = Canvas(b)
+        if (form == SymbolForm.ORIGINAL) {
+            d.setBounds(0, 0, g, g)
+            d.draw(c)
+            return b
+        }
+        // Einheitliche Form wie bei Android 15: Kreis oder abgerundetes Quadrat
+        val pfad = android.graphics.Path().apply {
+            val f = android.graphics.RectF(0f, 0f, g.toFloat(), g.toFloat())
+            if (form == SymbolForm.KREIS) addOval(f, android.graphics.Path.Direction.CW) else addRoundRect(f, g * 0.3f, g * 0.3f, android.graphics.Path.Direction.CW)
+        }
+        c.clipPath(pfad)
+        if (d is android.graphics.drawable.AdaptiveIconDrawable) {
+            // Ebenen sind 108 Einheiten groß, sichtbar sind 72: also ein Viertel über den Rand hinaus
+            val rand = g / 4
+            d.background?.let { it.setBounds(-rand, -rand, g + rand, g + rand); it.draw(c) }
+            d.foreground?.let { it.setBounds(-rand, -rand, g + rand, g + rand); it.draw(c) }
+        } else {
+            // Altes Symbol: auf eine helle Fläche, etwas kleiner
+            c.drawColor(0xFFF5F7FA.toInt())
+            val innen = (g * 0.16f).toInt()
+            d.setBounds(innen, innen, g - innen, g - innen)
+            d.draw(c)
+        }
         return b
     }
 

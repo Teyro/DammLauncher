@@ -152,6 +152,56 @@ object Geraet {
         get() = p.getBoolean("widgetFreigabe", false)
         set(v) = p.edit().putBoolean("widgetFreigabe", v).apply()
 
+    // ---- Stundenplan dieses Boards (Fächer je Wochentag, Mo–Fr, eine Zeile je Tag) und aus dem Vorlagen-Ordner
+    var stundenplan: String
+        get() = p.getString("stundenplan", "") ?: ""
+        set(v) = p.edit().putString("stundenplan", v.take(4000)).apply()
+    var stundenplanServer: String
+        get() = p.getString("stundenplanServer", "") ?: ""
+        set(v) = p.edit().putString("stundenplanServer", v.take(256 * 1024)).apply()
+    var stundenplanGeladen: Long
+        get() = p.getLong("stundenplanGeladen", 0)
+        set(v) = p.edit().putLong("stundenplanGeladen", v).apply()
+
+    // ---- Zufallsname: Namen bleiben NUR auf diesem Board (nie in der Vorlage), schon gezogene merken
+    fun namen(klasse: String): String = p.getString("namen_" + klasse.lowercase(), "") ?: ""
+    fun setzeNamen(klasse: String, text: String) = p.edit().putString("namen_" + klasse.lowercase(), text.take(4000)).apply()
+    fun gezogen(kennung: String): Set<String> = (p.getString("gezogen_$kennung", "") ?: "").split('\n').filter { it.isNotEmpty() }.toSet()
+    fun setzeGezogen(kennung: String, s: Set<String>) = p.edit().putString("gezogen_$kennung", s.joinToString("\n")).apply()
+
+    // ---- Tafel-Übersicht: Status-Zugang (nur Schreibrecht auf den Status-Ordner, verschlüsselt) und letzter Bericht
+    var statusZugangVerschluesselt: String
+        get() = p.getString("statusZugang", "") ?: ""
+        set(v) = p.edit().putString("statusZugang", v).apply()
+    var letzterStatus: Long
+        get() = p.getLong("letzterStatus", 0)
+        set(v) = p.edit().putLong("letzterStatus", v).apply()
+    var statusMeldung: String
+        get() = p.getString("statusMeldung", "") ?: ""
+        set(v) = p.edit().putString("statusMeldung", v.take(300)).apply()
+    /** Zufällige, feste Kennung dieses Boards (für den Dateinamen des Status-Berichts). */
+    val kennung: String
+        get() = p.getString("kennung", null) ?: java.util.UUID.randomUUID().toString().replace("-", "").take(12).also { p.edit().putString("kennung", it).apply() }
+
+    /** Zuletzt aufgeräumt (ms) – nicht zweimal in derselben Minute. */
+    var aufgeraeumt: Long
+        get() = p.getLong("aufgeraeumt", 0)
+        set(v) = p.edit().putLong("aufgeraeumt", v).apply()
+
+    // ---- Absturzberichte: die letzten drei (gekürzt), gehen mit dem Status-Bericht in den Vorlagen-Ordner
+    fun merkeAbsturzText(t: String) {
+        val alt = absturzTexte()
+        val neu = (alt + t.take(3000)).takeLast(3)
+        p.edit().putString("absturzTexte", org.json.JSONArray(neu).toString()).commit()
+    }
+
+    fun absturzTexte(): List<String> = try {
+        val a = org.json.JSONArray(p.getString("absturzTexte", "[]"))
+        (0 until a.length()).map { a.getString(it) }
+    } catch (_: Exception) { emptyList() }
+
+    fun absturzTexteVergessen() = p.edit().remove("absturzTexte").apply()
+
     // ---- Absturzschutz: Zeitpunkte der letzten Abstürze
     fun merkeAbsturz() {
         val alt = (p.getString("abstuerze", "") ?: "").split(',').mapNotNull { it.toLongOrNull() }

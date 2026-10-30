@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">DammLauncher</string>
+    <string name="hilfe_name">DammLauncher-Seitenleiste</string>
+    <string name="hilfe_beschreibung">Erlaubt den Knöpfen „Zurück“ und „Übersicht“ in der Seitenleiste von DammLauncher, diese Tasten auszulösen. Der Dienst liest keine Bildschirminhalte und keine Eingaben.</string>
 </resources>
