@@ -208,10 +208,19 @@ internal fun HomeActivity.seitenleisteAppWaehlen() = appAuswaehlen("In die Seite
 // ------------------------------------------------------------ Stundenplan
 
 /** Fächer je Wochentag: zuerst der Plan dieses Boards, sonst der aus dem Vorlagen-Ordner (Klasse des Boards). */
+/** Zuletzt gelesener Plan (die Kachel fragt jede Minute – nur bei geänderten Daten neu einlesen). */
+private var planZwischen: Pair<String, List<List<String>>>? = null
+
 internal fun HomeActivity.stundenplan(): List<List<String>> {
     val eigen = Geraet.stundenplan
-    if (eigen.isNotBlank()) return Zeiten.planAus(eigen.lines())
     val klasse = Geraet.klasse.trim().lowercase()
+    val schluessel = eigen + "\u0000" + klasse + "\u0000" + Geraet.stundenplanServer.hashCode()
+    planZwischen?.let { if (it.first == schluessel) return it.second }
+    return planLesen(eigen, klasse).also { planZwischen = schluessel to it }
+}
+
+private fun planLesen(eigen: String, klasse: String): List<List<String>> {
+    if (eigen.isNotBlank()) return Zeiten.planAus(eigen.lines())
     if (klasse.isEmpty()) return emptyList()
     return try {
         val o = JSONObject(Geraet.stundenplanServer.ifBlank { return emptyList() })

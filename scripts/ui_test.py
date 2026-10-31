@@ -118,7 +118,7 @@ def feld_mit_hinweis(hinweis, text):
 
 def scrolle_zu(name, x, teil=False, antippen=True):
     w, h = bildschirm()
-    for _ in range(16):
+    for _ in range(40):  # die Einstellungen sind seit 1.6 lang
         z = knoten(name, teil=teil)
         if z is not None and 120 < mitte(z)[1] < h - 120:
             if antippen:
