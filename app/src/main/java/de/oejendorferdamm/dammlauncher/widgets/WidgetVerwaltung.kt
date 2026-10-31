@@ -41,12 +41,21 @@ class WidgetVerwaltung(context: Context) {
         emptyList()
     }
 
-    /** Nur die Anbieter-Namen – schnell, ohne Beschriftungen zu laden (für jedes Neuzeichnen). */
-    fun anbieterNamen(): Set<String> = try {
-        manager.installedProviders.map { it.provider.flattenToString() }.toSet()
+    @Volatile
+    private var namen: Set<String>? = null
+
+    /**
+     * Nur die Anbieter-Namen – zwischengespeichert: zeigen() läuft bei jeder Änderung (auch bei jedem
+     * Schritt eines Schiebereglers), die Abfrage beim System kostet jedes Mal einen Prozesswechsel.
+     */
+    fun anbieterNamen(): Set<String> = namen ?: try {
+        manager.installedProviders.map { it.provider.flattenToString() }.toSet().also { namen = it }
     } catch (_: Exception) {
         emptySet()
     }
+
+    /** Apps installiert oder entfernt: Anbieter neu abfragen. */
+    fun vergiss() { namen = null }
 
     fun anbieterDa(provider: String): Boolean {
         val c = ComponentName.unflattenFromString(provider) ?: return false

@@ -92,8 +92,9 @@ class InfoKachel(context: Context, var quelle: () -> Anzeige) : KartenAnsicht(co
         val h = height.toFloat()
         if (w < 4 || h < 4) return
         karte(canvas)
-        val a = quelle()
-        contentDescription = listOf(a.oben, a.gross, a.unten).filter { it.isNotEmpty() }.joinToString(", ")
+        val roh = quelle()
+        contentDescription = listOf(roh.oben, roh.gross, roh.unten).filter { it.isNotEmpty() }.joinToString(", ")
+        val a = Anzeige(punktZeit(roh.oben), punktZeit(roh.gross), punktZeit(roh.unten))
         // Flache Kachel (z. B. 2×1): die Zeilen bekommen anteilig mehr Höhe
         val flach = h < w * 0.45f
         passe(oben, a.oben, w * 0.86f, h * (if (flach) 0.2f else 0.13f))
@@ -112,6 +113,9 @@ class InfoKachel(context: Context, var quelle: () -> Anzeige) : KartenAnsicht(co
     }
 
     private fun kurz(t: String, p: TextPaint, b: Float) = TextUtils.ellipsize(t, p, b, TextUtils.TruncateAt.END).toString()
+
+    /** „09:35“ → „9.35“: so schreibt man Uhrzeiten in der Grundschule – und der breite Doppelpunkt der Grundschrift fällt weg. */
+    private fun punktZeit(t: String) = t.replace(Regex("\\b0?(\\d{1,2}):(\\d{2})\\b"), "$1.$2")
 
     /** Größte Schrift, mit der [t] in [b]×[h] passt (Höhe begrenzt auch kurze Texte). */
     private fun passe(p: TextPaint, t: String, b: Float, h: Float) {

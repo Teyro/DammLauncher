@@ -50,13 +50,15 @@ object EigeneSymbole {
         val w = roh.width * k
         val h = roh.height * k
         Canvas(b).drawBitmap(roh, null, RectF((GROESSE - w) / 2, (GROESSE - h) / 2, (GROESSE + w) / 2, (GROESSE + h) / 2), Paint(Paint.FILTER_BITMAP_FLAG))
-        return speichere(b)
+        roh.recycle()
+        return speichere(b).also { b.recycle() }
     }
 
     /** Symbol einer anderen installierten App übernehmen. */
     fun ausApp(app: ComponentName): String? {
         val d = AppKatalog.originalIcon(app) ?: return null
-        return speichere(AppKatalog.zeichne(d, GROESSE))
+        val b = AppKatalog.zeichne(d, GROESSE)
+        return speichere(b).also { b.recycle() }
     }
 
     private fun speichere(b: Bitmap): String {

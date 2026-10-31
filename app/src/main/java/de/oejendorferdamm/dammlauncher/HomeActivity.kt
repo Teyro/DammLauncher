@@ -105,7 +105,10 @@ import java.util.concurrent.Executors
 /** Der Startbildschirm – die einzige von außen erreichbare Komponente. */
 class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
     internal val haupt = Handler(Looper.getMainLooper())
+    /** Kurze Arbeit ohne Netz (Bilder, PIN prüfen) – wartet nie hinter einer hängenden Verbindung. */
     internal val arbeit = Executors.newSingleThreadExecutor()
+    /** Alles mit Netz (Abgleich, Updates, Foto, Berichte) – eigener Faden, Zeitlimits bis zu einer Minute. */
+    internal val netz = Executors.newSingleThreadExecutor()
     internal lateinit var wurzel: FrameLayout
     internal lateinit var raster: RasterAnsicht
     private lateinit var kopfzeile: Kopfzeile
@@ -305,13 +308,13 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         }
         if (k.elemente.any { it is Element.Widget && it.provider == Element.STUNDE } && Geraet.server.isNotBlank() && System.currentTimeMillis() - Geraet.stundenplanGeladen > 6 * 60 * 60_000L) {
             Geraet.stundenplanGeladen = System.currentTimeMillis()
-            arbeit.execute { if (stundenplanLaden()) haupt.post { kachelnNeu() } }
+            netz.execute { if (stundenplanLaden()) haupt.post { kachelnNeu() } }
         }
-        if (Status.faellig()) arbeit.execute { Status.senden(this) }
+        if (Status.faellig()) netz.execute { Status.senden(this) }
         leistenSperren()
         if (k.elemente.any { it is Element.Widget && it.provider == Element.ABWESEND } && System.currentTimeMillis() - Geraet.abwesendGeladen > 5 * 60_000L) {
             Geraet.abwesendGeladen = System.currentTimeMillis() // auch bei Fehler nicht gleich wieder
-            arbeit.execute { if (Abwesenheit.laden(this)) haupt.post { kachelnNeu() } }
+            netz.execute { if (Abwesenheit.laden(this)) haupt.post { kachelnNeu() } }
         }
     }
 
@@ -356,6 +359,9 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
 
     override fun onDestroy() {
         haupt.removeCallbacksAndMessages(null)
+        // laufende Aufträge dürfen fertig werden, neue nimmt keiner mehr an (sonst bliebe bei jedem Neuaufbau ein Faden übrig)
+        arbeit.shutdown()
+        netz.shutdown()
         KonfigSpeicher.vergiss(konfigBeobachter)
         AppKatalog.vergiss(appBeobachter)
         super.onDestroy()
@@ -497,7 +503,7 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         if (unsplashLaeuft) return
         unsplashLaeuft = true
         if (vonHand) meldung("Holt ein neues Foto …")
-        arbeit.execute {
+        netz.execute {
             val t = FotoDesTages.laden(this, vonHand)
             haupt.post {
                 unsplashLaeuft = false
@@ -548,12 +554,8 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         // Schüler-Ansicht: langer Druck + PIN öffnet die Lehrer-Ansicht (Einstellungen danach wie gewohnt)
         if (schuelerAnsicht()) { mitErlaubnis { zurLehrerAnsicht() }; return }
         val pin = KonfigSpeicher.konfig.pin
-        if (pin == null || bossAktiv()) oeffnePanel() else frageGeheim("Einstellungen", "PIN eingeben", zahl = true) { eingabe, f ->
-            when (Passwort.pruefe("pin", eingabe, pin)) {
-                true -> { f.schliessen(); oeffnePanel() }
-                false -> meldung("Falsche PIN.")
-                null -> meldung("Zu viele Fehlversuche – gesperrt für ${Passwort.gesperrtNoch("pin")} s.")
-            }
+        if (pin == null || bossAktiv()) oeffnePanel() else frageGeheim("Einstellungen", "PIN eingeben", "pin", pin, zahl = true, falsch = "Falsche PIN.") { f ->
+            f.schliessen(); oeffnePanel()
         }
     }
 
@@ -863,16 +865,13 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
     internal fun mitErlaubnis(weiter: () -> Unit) {
         val pin = KonfigSpeicher.konfig.pin
         if (pin == null || bossAktiv()) { weiter(); return }
-        frageGeheim("PIN", "PIN eingeben", zahl = true) { eingabe, f ->
-            when (Passwort.pruefe("pin", eingabe, pin)) {
-                true -> { f.schliessen(); weiter() }
-                false -> meldung("Falsche PIN.")
-                null -> meldung("Zu viele Fehlversuche – gesperrt für ${Passwort.gesperrtNoch("pin")} s.")
-            }
+        frageGeheim("PIN", "PIN eingeben", "pin", pin, zahl = true, falsch = "Falsche PIN.") { f ->
+            f.schliessen(); weiter()
         }
     }
 
     private fun paketeGeaendert(entfernt: String?) {
+        widgets.vergiss()
         // Deinstallierte Apps und deren Widgets sauber vom Startbildschirm nehmen
         if (entfernt != null) KonfigSpeicher.aendere { k ->
             fun bleibt(e: Element) = when (e) {
@@ -1160,25 +1159,56 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
                 !p.matches(Regex("\\d{4,8}")) -> meldung("Bitte 4 bis 8 Ziffern.")
                 p != b.text.toString() -> meldung("Die beiden PINs sind verschieden.")
                 else -> {
-                    KonfigSpeicher.aendere { it.copy(pin = Passwort.erzeuge(p)) }
                     f.schliessen()
-                    panel?.aufbauen()
-                    meldung("PIN festgelegt.")
+                    hashen(p) { h ->
+                        KonfigSpeicher.aendere { it.copy(pin = h) }
+                        panel?.aufbauen()
+                        meldung("PIN festgelegt.")
+                    }
                 }
             }
         })
     }
 
-    /** Fenster mit Passwortfeld; [weiter] bekommt Eingabe und Fenster (rechnet im Hintergrund – PBKDF2 dauert). */
-    private fun frageGeheim(titel: String, hinweis: String, zahl: Boolean = false, weiter: (String, GrossFenster) -> Unit) {
+    /**
+     * Fenster mit Passwortfeld. Geprüft wird im Hintergrund (PBKDF2 dauert auf alten Boards eine
+     * halbe Sekunde – die Oberfläche bleibt dabei bedienbar); [ok] läuft danach auf dem Haupt-Faden.
+     */
+    private fun frageGeheim(titel: String, hinweis: String, art: String, hash: de.oejendorferdamm.dammlauncher.konfig.PasswortHash, zahl: Boolean = false, falsch: String, ok: (GrossFenster) -> Unit) {
         val f = neuesFenster(titel, 800)
         val feld = eingabe(this, hinweis, geheim = true, zahl = zahl)
         f.add(feld)
-        f.knoepfe(knopf(this, "Abbrechen") { f.schliessen() }, knopf(this, "OK", haupt = true) {
-            val t = feld.text.toString()
-            arbeit.execute { haupt.post { weiter(t, f) } }
-        })
+        var laeuft = false
+        val pruefen = {
+            if (!laeuft) {
+                laeuft = true
+                val t = feld.text.toString()
+                arbeit.execute {
+                    val r = Passwort.pruefe(art, t, hash)
+                    haupt.post {
+                        laeuft = false
+                        when (r) {
+                            true -> if (f.offen) ok(f)
+                            false -> { meldung(falsch); feld.setText("") }
+                            null -> meldung("Zu viele Fehlversuche – gesperrt für ${Passwort.gesperrtNoch(art)} s.")
+                        }
+                    }
+                }
+            }
+        }
+        f.knoepfe(knopf(this, "Abbrechen") { f.schliessen() }, knopf(this, "OK", haupt = true) { pruefen() })
+        // „Fertig“/Eingabe auf der Bildschirmtastatur prüft gleich
+        feld.imeOptions = feld.imeOptions or android.view.inputmethod.EditorInfo.IME_ACTION_DONE
+        feld.setOnEditorActionListener { _, _, _ -> pruefen(); true }
         feld.requestFocus()
+    }
+
+    /** PIN bzw. Passwort im Hintergrund in einen Hash verwandeln, dann [fertig] auf dem Haupt-Faden. */
+    private fun hashen(text: String, fertig: (de.oejendorferdamm.dammlauncher.konfig.PasswortHash) -> Unit) {
+        arbeit.execute {
+            val h = Passwort.erzeuge(text)
+            haupt.post { fertig(h) }
+        }
     }
 
     override fun bossAktiv() = bossSeit > 0 && System.currentTimeMillis() - bossSeit < 60 * 60_000L
@@ -1197,27 +1227,23 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
                     p.length < 8 -> meldung("Bitte mindestens 8 Zeichen.")
                     p != b.text.toString() -> meldung("Die beiden Eingaben sind verschieden.")
                     else -> {
-                        KonfigSpeicher.aendere { it.copy(boss = Passwort.erzeuge(p)) }
-                        bossSeit = System.currentTimeMillis()
                         f.schliessen()
-                        panel?.aufbauen()
-                        meldung("Boss-Modus aktiv.")
+                        hashen(p) { h ->
+                            KonfigSpeicher.aendere { it.copy(boss = h) }
+                            bossSeit = System.currentTimeMillis()
+                            panel?.aufbauen()
+                            meldung("Boss-Modus aktiv.")
+                        }
                     }
                 }
             })
             return
         }
-        frageGeheim("Boss-Modus", "Master-Passwort") { eingabe, f ->
-            when (Passwort.pruefe("boss", eingabe, hash)) {
-                true -> {
-                    bossSeit = System.currentTimeMillis()
-                    f.schliessen()
-                    panel?.aufbauen()
-                    meldung("Boss-Modus aktiv.")
-                }
-                false -> meldung("Falsches Passwort.")
-                null -> meldung("Zu viele Fehlversuche – gesperrt für ${Passwort.gesperrtNoch("boss")} s.")
-            }
+        frageGeheim("Boss-Modus", "Master-Passwort", "boss", hash, falsch = "Falsches Passwort.") { f ->
+            bossSeit = System.currentTimeMillis()
+            f.schliessen()
+            panel?.aufbauen()
+            meldung("Boss-Modus aktiv.")
         }
     }
 
@@ -1252,7 +1278,7 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
             val passwort = p.text.toString()
             f.schliessen()
             meldung("Lädt hoch …")
-            arbeit.execute {
+            netz.execute {
                 val t = Abgleich.hochladen(this, benutzer, passwort)
                 haupt.post {
                     meldung(t, lang = true)
@@ -1282,7 +1308,7 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
 
     override fun jetztAbgleichen() {
         meldung("Gleicht ab …")
-        arbeit.execute {
+        netz.execute {
             val t = Abgleich.pruefen(this, vonHand = true)
             haupt.post {
                 hintergrundStand = -1
@@ -1457,12 +1483,8 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         }
         val pin = KonfigSpeicher.konfig.pin
         if (pin == null) { frei(); return }
-        frageGeheim("Entsperren", "PIN eingeben", zahl = true) { eingabe, f ->
-            when (Passwort.pruefe("pin", eingabe, pin)) {
-                true -> { f.schliessen(); frei() }
-                false -> meldung("Falsche PIN.")
-                null -> meldung("Zu viele Fehlversuche – gesperrt für ${Passwort.gesperrtNoch("pin")} s.")
-            }
+        frageGeheim("Entsperren", "PIN eingeben", "pin", pin, zahl = true, falsch = "Falsche PIN.") { f ->
+            f.schliessen(); frei()
         }
     }
 
@@ -1728,7 +1750,7 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         f.knoepfe(
             knopf(this, "Jetzt laden") {
                 meldung("Lädt …")
-                arbeit.execute {
+                netz.execute {
                     Abwesenheit.laden(this)
                     haupt.post { kachelnNeu(); meldung(if (Geraet.abwesendDaten.isEmpty()) "Keine Meldung gefunden." else "Meldung gelesen.") }
                 }
@@ -1777,7 +1799,7 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
     // ------------------------------------------------------------ Hintergrund-Prüfungen beim Start
 
     private fun hintergrundPruefungen() {
-        if (Abgleich.faellig()) arbeit.execute {
+        if (Abgleich.faellig()) netz.execute {
             Abgleich.pruefen(this)
             haupt.post { widgetsAbgleichen(); zeigen() }
         }
@@ -1799,7 +1821,7 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         if (pruefungLaeuft) return
         pruefungLaeuft = true
         val automatisch = Geraet.autoUpdate && Update.darfInstallieren(this)
-        arbeit.execute {
+        netz.execute {
             // Automatisch: gleich mitladen und prüfen, installiert wird danach ohne Nachfrage
             val e = if (automatisch) TagesJob.updateVorladen(this) else Update.pruefen()
             haupt.post {
@@ -1908,7 +1930,7 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         }
         laedt = true
         status?.text = "Lädt …"
-        arbeit.execute {
+        netz.execute {
             val fehler = Update.vorbereiten(this, e.info) { p -> haupt.post { status?.text = "Lädt … ${(p * 100).toInt()} %" } }
             if (fehler == null) Geraet.updateBereit = e.info.version
             haupt.post {

@@ -522,7 +522,7 @@ internal fun HomeActivity.statusZugang() {
             KonfigSpeicher.aendere { it.copy(statusZugang = if (mitVorlage && z != null) de.oejendorferdamm.dammlauncher.konfig.Zugang(z.first, z.second) else null) }
             f.schliessen()
             meldung("Sendet …")
-            arbeit.execute {
+            netz.execute {
                 val t = Status.senden(this)
                 haupt.post { meldung(t, lang = true); panel?.aufbauen() }
             }
@@ -531,7 +531,7 @@ internal fun HomeActivity.statusZugang() {
 
 internal fun HomeActivity.tafelUebersicht() {
     meldung("Liest die Berichte …")
-    arbeit.execute {
+    netz.execute {
         val ergebnis = try { Result.success(Status.alle()) } catch (e: Exception) { Result.failure(e) }
         haupt.post {
             val liste = ergebnis.getOrNull()

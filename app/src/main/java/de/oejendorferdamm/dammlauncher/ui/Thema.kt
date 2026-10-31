@@ -133,6 +133,12 @@ class GlasFlaeche(context: Context, private val radius: () -> Float) : View(cont
     private val matrix = android.graphics.Matrix()
     private var shaderFuer: Bitmap? = null
 
+    /** Ohne feste Größe 0 – die Fläche passt sich dem Inhalt daneben an, statt allen Platz zu nehmen. */
+    override fun onMeasure(wSpec: Int, hSpec: Int) {
+        fun groesse(spec: Int) = if (MeasureSpec.getMode(spec) == MeasureSpec.EXACTLY) MeasureSpec.getSize(spec) else 0
+        setMeasuredDimension(groesse(wSpec), groesse(hSpec))
+    }
+
     override fun onDraw(canvas: Canvas) {
         val w = width.toFloat()
         val h = height.toFloat()

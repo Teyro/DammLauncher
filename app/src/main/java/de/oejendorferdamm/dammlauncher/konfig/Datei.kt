@@ -20,6 +20,9 @@ import java.util.zip.ZipOutputStream
 /** Export/Import als ZIP (konfig.json, hintergrund.jpg, icons/…) und das Hintergrundbild. */
 object Datei {
     private const val MAX_EINTRAG = 25L * 1024 * 1024
+    /** Gegen „ZIP-Bomben“: höchstens so viele Einträge und Bytes insgesamt. */
+    private const val MAX_EINTRAEGE = 500
+    private const val MAX_GESAMT = 120L * 1024 * 1024
 
     fun exportieren(context: Context, ziel: Uri) {
         val k = KonfigSpeicher.konfig
@@ -50,10 +53,18 @@ object Datei {
         val bilder = HashMap<String, ByteArray>()
         context.contentResolver.openInputStream(quelle)?.use { roh ->
             ZipInputStream(roh.buffered()).use { zip ->
+                var anzahl = 0
+                var gesamt = 0L
                 while (true) {
                     val e = zip.nextEntry ?: break
                     if (e.isDirectory) continue
+                    // Was wir nicht brauchen, gar nicht erst lesen
+                    val gebraucht = e.name == "konfig.json" || e.name == "hintergrund.jpg" || (e.name.startsWith("icons/") && KonfigJson.ICON_DATEI.matches(e.name.removePrefix("icons/")))
+                    if (!gebraucht) continue
+                    if (++anzahl > MAX_EINTRAEGE) throw IOException("Zu viele Einträge in der Datei")
                     val daten = lies(zip)
+                    gesamt += daten.size
+                    if (gesamt > MAX_GESAMT) throw IOException("Datei ist zu groß")
                     when {
                         e.name == "konfig.json" -> ergebnis = KonfigJson.lese(String(daten, Charsets.UTF_8))
                         e.name == "hintergrund.jpg" -> if (istBild(daten)) bilder["hintergrund.jpg"] = daten
