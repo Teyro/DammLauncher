@@ -13,6 +13,18 @@ auf dem Startbildschirm unten rechts.
 
 ## Funktionen
 
+- **Clevertouch-Aussehen (ab 1.6)**: wie die neuen Clevertouch-Boards mit Android 15 – oben Uhr,
+  Suchleiste und Schnelleinstellungen, unten ein Dock mit Lieblings-Apps, Farben passend zum
+  Hintergrund, Milchglas und einheitlich runde Symbole. Ohne Animationen und mit vorberechneten
+  Effekten, damit es auch auf Android-8-Boards flüssig bleibt (Einstellungen → Aussehen).
+- **Seitenleiste** am Bildschirmrand, auch über anderen Apps: Startbildschirm, Alle Apps, Whiteboard
+  (DammBoard), Timer (DammZeit), **Abdecken** (schwarzer Vorhang zum Aufziehen) und eigene Apps.
+  „Zurück“ und „Übersicht“ nach einmaligem Einschalten der Bedienungshilfe (liest keine Inhalte).
+- **Profile**: eigene Startbildschirme je Fach oder Klasse, auch automatisch beim Stundenwechsel.
+- **Zeitgesteuerte Nachrichten** an alle Boards (z. B. „Probealarm um 10:15“) und **Aufräumen**
+  (Apps im Hintergrund schließen, Lautstärke zurücksetzen – auf Knopfdruck, in den Pausen, zum Feierabend).
+- **Tafel-Übersicht** im Boss-Modus: Version, letzter Abgleich, Speicher und Abstürze aller Boards.
+
 - **Frei einstellbares Raster**: Spalten und Zeilen je 1–10, Randabstand oben/unten/links/rechts
   einzeln oder „alle gleich“ (0 = randlos), Abstand zwischen den Zellen, Symbol- und Schriftgröße,
   Namen ein-/ausblendbar. Sieht auf 1920×1080 und 3840×2160 gleich aus.
@@ -29,6 +41,9 @@ auf dem Startbildschirm unten rechts.
   **„Noch 12 min bis zur Pause“** (Pausenzeiten in den Einstellungen → Schulzeiten),
   **„Heute fehlen 2“** – nur die Zahl für die Klasse des Boards, die Kinder raten, wer fehlt (siehe
   unten) – und **QR-Code** mit einem Link oder dem Gäste-WLAN (eigener QR-Erzeuger, ohne Bibliothek).
+  Ab 1.6 dazu: **Stundenplan** („3. Stunde · Mathe · bis 10.15“), **Lautstärke-Regler**,
+  **Zufallsname bzw. -zahl** (Namen bleiben nur auf dem Board), **Bildschirm teilen** und
+  **Schnelleinstellungen** (Lautstärke, Helligkeit, WLAN, Abdecken, Aufräumen, Schoner).
 - **Ordner**: eine App auf einen Ordner ziehen legt sie hinein; antippen öffnet ihn groß. Neuer
   Ordner über langen Druck auf eine App → „In einen Ordner legen …“ oder Widgets → „Leerer Ordner“.
 - **Schüler-Ansicht**: Einzelne Apps, Widgets oder Ordner lassen sich für Kinder ausblenden
@@ -129,6 +144,9 @@ nicht zur Sperre.
 | `ACCESS_NETWORK_STATE` | Der tägliche Abgleich startet erst, wenn Netz da ist |
 | `REQUEST_INSTALL_PACKAGES` | Die geladene, geprüfte Update-APK an den System-Installer übergeben |
 | `SYSTEM_ALERT_WINDOW`, `FOREGROUND_SERVICE(_SPECIAL_USE)` | Nur wenn erlaubt: Wischgesten am Bildschirmrand – schmale, unsichtbare Leisten, die auch in anderen Apps zum Startbildschirm führen (Vordergrunddienst mit stiller Benachrichtigung) |
+| `KILL_BACKGROUND_PROCESSES` | „Aufräumen“: Apps im Hintergrund beenden |
+| `WRITE_SETTINGS` | Nur wenn erlaubt: Helligkeit in den Schnelleinstellungen |
+| Bedienungshilfe „DammLauncher-Seitenleiste“ | Nur wenn eingeschaltet: „Zurück“ und „Übersicht“ in der Seitenleiste – liest keine Bildschirminhalte |
 | `<queries>` (MAIN/LAUNCHER, Widget-Anbieter) | Apps mit Startsymbol und Widgets anzeigen – statt der weitreichenden `QUERY_ALL_PACKAGES` |
 
 Exportiert ist nur die Startbildschirm-Activity. Es werden keine persönlichen Daten gespeichert.
