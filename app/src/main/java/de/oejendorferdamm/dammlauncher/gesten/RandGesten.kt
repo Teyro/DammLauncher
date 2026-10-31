@@ -122,6 +122,7 @@ class RandGesten : Service() {
         if (g.randRechts != Gesten.AUS && slSeite != Seitenleiste.RECHTS) leiste(Rand.RECHTS, g.randRechts, dick, (m.heightPixels * 0.6f).toInt(), Gravity.END or Gravity.CENTER_VERTICAL)
         zeigen(!launcherVorne)
         if (k.seitenleiste.an) griffZeigen(k.seitenleiste.seite == Seitenleiste.LINKS)
+        griff?.visibility = if (sperre) View.GONE else View.VISIBLE
         if (leisten.isEmpty() && griff == null && vorhang == null) stopSelf()
     }
 
@@ -168,7 +169,7 @@ class RandGesten : Service() {
     private fun leisteZu() {
         entferne(leiste)
         leiste = null
-        griff?.visibility = View.VISIBLE
+        griff?.visibility = if (sperre) View.GONE else View.VISIBLE
     }
 
     private class Knopf(val zeichen: String, val name: String, val app: Element.App? = null, val aktion: () -> Unit)
@@ -200,7 +201,7 @@ class RandGesten : Service() {
 
     @SuppressLint("ClickableViewAccessibility")
     private fun leisteAuf(links: Boolean) {
-        if (leiste != null) { leisteZu(); return }
+        if (leiste != null || sperre) { leisteZu(); return }
         val spalte = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             background = runde(0xF01F2328.toInt(), 36f.vp)
@@ -345,7 +346,7 @@ class RandGesten : Service() {
      */
     @SuppressLint("ViewConstructor")
     private class Vorhang(c: Context, private val hoehe: (Int) -> Unit, private val zu: () -> Unit) : View(c) {
-        private val flaeche = Paint().apply { color = 0xFA0B0F14.toInt() }
+        private val flaeche = Paint().apply { color = 0xFF0B0F14.toInt() } // ganz deckend: nichts darf durchscheinen
         private val griff = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF3B4250.toInt() }
         private val schrift = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; textAlign = Paint.Align.CENTER }
         private val knopf = RectF()
@@ -400,6 +401,19 @@ class RandGesten : Service() {
         fun vorne(vorne: Boolean) {
             launcherVorne = vorne
             laufend?.zeigen(!vorne)
+        }
+
+        /** Feierabend- oder Update-Sperre im Launcher: Seitenleiste weg (sonst ginge es an der Sperre vorbei). */
+        @Volatile
+        private var sperre = false
+
+        fun gesperrt(an: Boolean) {
+            if (sperre == an) return
+            sperre = an
+            laufend?.let { d ->
+                if (an) d.leisteZu()
+                d.griff?.visibility = if (an) View.GONE else View.VISIBLE
+            }
         }
 
         fun erlaubt(c: Context) = Settings.canDrawOverlays(c)

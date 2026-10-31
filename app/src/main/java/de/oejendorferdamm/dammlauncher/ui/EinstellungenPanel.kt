@@ -87,13 +87,14 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
     }
     private val inhalt = LinearLayout(c).apply { orientation = LinearLayout.VERTICAL }
     private val scroll = ScrollView(c).apply { addView(inhalt); isFillViewport = false }
-    private var lage = 1 // 0 links, 1 Mitte, 2 rechts
+    /** 0 links (Standard: auf großen Boards gut erreichbar), 1 Mitte, 2 rechts. */
+    private var lage = 0
     private var raenderGleich = KonfigSpeicher.konfig.rand.gleich
 
     init {
         karte.addView(LinearLayout(c).apply {
             gravity = Gravity.CENTER_VERTICAL
-            addView(text(c, "Einstellungen", 40, fett = true), lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            addView(text(c, "Einstellungen", 36, fett = true), lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
             addView(knopf(c, "◀") { lage = (lage - 1).coerceAtLeast(0); setzeLage() }.apply { background = rundKnopf() }, lp(86.vp, 86.vp, rechts = 10.vp))
             addView(knopf(c, "▶") { lage = (lage + 1).coerceAtMost(2); setzeLage() }.apply { background = rundKnopf() }, lp(86.vp, 86.vp, rechts = 20.vp))
             addView(knopf(c, "Fertig", haupt = true) { a.panelZu() }, lp())
@@ -107,7 +108,8 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
 
     private fun setzeLage() {
         val m = c.resources.displayMetrics
-        val breite = minOf(880.vp, (m.widthPixels * 0.9f).toInt())
+        // höchstens ein Drittel des Bildschirms – so bleibt der Startbildschirm daneben sichtbar und auf 90 Zoll alles erreichbar
+        val breite = minOf(880.vp, maxOf(m.widthPixels / 3, minOf(560.vp, (m.widthPixels * 0.9f).toInt())))
         karte.layoutParams = FrameLayout.LayoutParams(breite, ViewGroup.LayoutParams.MATCH_PARENT, when (lage) {
             0 -> Gravity.START
             2 -> Gravity.END
@@ -131,10 +133,7 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
 
     private fun add(v: View, oben: Int = 8) = (aktuelleKarte ?: inhalt).addView(v, lp(ViewGroup.LayoutParams.MATCH_PARENT, oben = oben.vp))
 
-    private fun knoepfe(vararg k: View) = add(LinearLayout(c).apply {
-        orientation = LinearLayout.HORIZONTAL
-        k.forEach { addView(it, lp(rechts = 14.vp)) }
-    }, 12)
+    private fun knoepfe(vararg k: View) = add(Fluss(c).apply { k.forEach { addView(it) } }, 12)
 
     /** Inhalt (neu) aufbauen – z. B. nach Boss-Anmeldung oder „Ränder gleich“. */
     fun aufbauen() {
@@ -298,12 +297,12 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
             knopf(c, "Kein Bild") { aendere { it.copy(hintergrund = it.hintergrund.copy(bild = false, unsplash = false)) }; aufbauen() }.apply { isEnabled = k.hintergrund.bild || k.hintergrund.unsplash }
         )
         add(text(c, "Farbe:", 24, Farben.TEXT2), 14)
-        add(LinearLayout(c).apply {
+        add(Fluss(c).apply {
             FARBEN.forEach { f ->
                 addView(View(c).apply {
                     background = runde(f, 40f.vp, if (f == k.hintergrund.farbe) 6.vp else 2.vp, if (f == k.hintergrund.farbe) Farben.AKZENT else 0xFFB8C2CE.toInt())
                     setOnClickListener { aendere { it.copy(hintergrund = it.hintergrund.copy(farbe = f, bild = false, unsplash = false)) }; aufbauen() }
-                }, lp(80.vp, 80.vp, rechts = 14.vp))
+                }, ViewGroup.LayoutParams(80.vp, 80.vp))
             }
         })
 

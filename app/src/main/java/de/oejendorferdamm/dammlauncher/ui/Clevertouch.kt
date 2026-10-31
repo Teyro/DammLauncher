@@ -25,7 +25,8 @@ import java.util.Locale
 /** Glas-Pille mit Inhalt (Suchleiste, Knöpfe in Kopfzeile und Dock). */
 private fun glasPille(c: Context, inhalt: View, radius: () -> Float): FrameLayout = FrameLayout(c).apply {
     addView(GlasFlaeche(c, radius), FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
-    addView(inhalt, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+    // Inhalt bestimmt die Breite (sonst wird eine Pille mit WRAP_CONTENT so breit wie der ganze Platz)
+    addView(inhalt, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT, Gravity.CENTER_VERTICAL))
 }
 
 /**
@@ -126,13 +127,17 @@ class Dock(context: Context, private val starten: (Element.App, View) -> Unit, p
         addView(reihe, LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT, Gravity.CENTER))
     }
 
-    fun setze(liste: List<Element.App>) {
+    private var mitAlle = true
+
+    /** [mitAlle] = false: kein Knopf „Alle Apps“ (Schüler-Ansicht ohne App-Übersicht). */
+    fun setze(liste: List<Element.App>, mitAlle: Boolean = true) {
         val sichtbar = liste.filter { AppKatalog.istDa(it.paket, it.aktivitaet) }
-        if (sichtbar == apps && reihe.childCount > 0) {
+        if (sichtbar == apps && mitAlle == this.mitAlle && reihe.childCount > 0) {
             for (i in 0 until reihe.childCount) reihe.getChildAt(i).invalidate()
             return
         }
         apps = sichtbar
+        this.mitAlle = mitAlle
         reihe.removeAllViews()
         for (a in sichtbar) {
             reihe.addView(AppZelle(context).apply {
@@ -141,6 +146,7 @@ class Dock(context: Context, private val starten: (Element.App, View) -> Unit, p
                 setOnLongClickListener { menue(a); true }
             }, LinearLayout.LayoutParams(118.vp, 118.vp).apply { rightMargin = 10.vp })
         }
+        if (!mitAlle) return
         if (sichtbar.isNotEmpty()) reihe.addView(View(context).apply { setBackgroundColor(0x40FFFFFF) }, LinearLayout.LayoutParams(2.vp, 70.vp).apply { rightMargin = 22.vp; leftMargin = 10.vp })
         reihe.addView(TextView(context).apply {
             contentDescription = "Alle Apps"

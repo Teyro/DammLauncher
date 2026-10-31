@@ -308,6 +308,7 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
             arbeit.execute { if (stundenplanLaden()) haupt.post { kachelnNeu() } }
         }
         if (Status.faellig()) arbeit.execute { Status.senden(this) }
+        leistenSperren()
         if (k.elemente.any { it is Element.Widget && it.provider == Element.ABWESEND } && System.currentTimeMillis() - Geraet.abwesendGeladen > 5 * 60_000L) {
             Geraet.abwesendGeladen = System.currentTimeMillis() // auch bei Fehler nicht gleich wieder
             arbeit.execute { if (Abwesenheit.laden(this)) haupt.post { kachelnNeu() } }
@@ -416,7 +417,7 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         alleApps.visibility = if (k.alleAppsKnopf && !ohneApps && !Thema.clevertouch) View.VISIBLE else View.GONE
         kopfzeile.visibility = if (Thema.clevertouch) View.VISIBLE else View.GONE
         dock.visibility = if (Thema.clevertouch && !(ohneApps && k.dock.isEmpty())) View.VISIBLE else View.GONE
-        if (Thema.clevertouch) dock.setze(k.dock)
+        if (Thema.clevertouch) dock.setze(k.dock, mitAlle = !ohneApps)
         lehrerKnopf.visibility = if (k.schueler.an && !schueler) View.VISIBLE else View.GONE
         hinweisZeigen(k)
         hintergrund(k)
@@ -1434,12 +1435,18 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         ruhe = ebene
         wurzel.addView(ebene, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
         meldungAnsicht?.bringToFront()
+        leistenSperren()
     }
 
     private fun ruheWeg() {
+        if (ruhe == null) return
         ruhe?.let { wurzel.removeView(it) }
         ruhe = null
+        leistenSperren()
     }
+
+    /** Während Feierabend-, Update-Sperre und Bildschirmschoner keine Seitenleiste – sonst ließen sich darüber Apps starten. */
+    private fun leistenSperren() = RandGesten.gesperrt(ruhe != null || sperre != null || schoner != null)
 
     /** Mit der PIN (falls festgelegt) bis zum Ende dieses Feierabends freigeben. */
     private fun ruheEntsperren(ende: Long) {
@@ -1527,6 +1534,7 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         schoner = ebene
         wandern.run()
         wurzel.addView(ebene, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        leistenSperren()
         window.attributes = window.attributes.apply { screenBrightness = 0.05f }
     }
 
@@ -1534,6 +1542,7 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         val s = schoner ?: return
         schoner = null
         wurzel.removeView(s)
+        leistenSperren()
         window.attributes = window.attributes.apply { screenBrightness = android.view.WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE }
         letzteBeruehrung = System.currentTimeMillis()
     }
@@ -1874,11 +1883,14 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         }
         sperre = ebene
         wurzel.addView(ebene, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        leistenSperren()
     }
 
     private fun sperreAufheben() {
+        if (sperre == null) return
         sperre?.let { wurzel.removeView(it) }
         sperre = null
+        leistenSperren()
     }
 
     private var laedt = false
@@ -1939,7 +1951,7 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
     companion object {
         const val EXTRA_GESTE = "geste"
         /** Knöpfe der Kachel „Schnelleinstellungen“ (Reihenfolge = Index in schnellAktion). */
-        val SCHNELL_KNOEPFE = listOf("🔊" to "Lautstärke", "☀" to "Helligkeit", "📶" to "WLAN", "▬" to "Abdecken", "🧹" to "Aufräumen", "🌙" to "Schoner")
+        val SCHNELL_KNOEPFE = listOf("🔊" to "Lautstärke", "☀" to "Helligkeit", "📶" to "WLAN", "▬" to "Abdecken", "♻" to "Aufräumen", "🌙" to "Schoner")
         private const val WARTUNG_MS = 15 * 60_000L
         /** Wann zuletzt automatisch installiert wurde (hält, solange der Prozess lebt). */
         private var letzteAutoInstallation = 0L

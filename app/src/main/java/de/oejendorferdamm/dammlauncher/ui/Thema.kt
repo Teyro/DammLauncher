@@ -8,8 +8,6 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
-import android.graphics.Path
-import android.graphics.Rect
 import android.graphics.RectF
 import android.view.View
 
@@ -127,13 +125,13 @@ object Thema {
  * abgerundet und dunkel getönt. Ohne Bild bleibt nur die Tönung.
  */
 class GlasFlaeche(context: Context, private val radius: () -> Float) : View(context) {
-    private val bildPaint = Paint(Paint.FILTER_BITMAP_FLAG)
+    private val glasPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     private val ton = Paint(Paint.ANTI_ALIAS_FLAG)
     private val rand = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; color = 0x33FFFFFF }
-    private val pfad = Path()
     private val feld = RectF()
-    private val quelle = Rect()
     private val ort = IntArray(2)
+    private val matrix = android.graphics.Matrix()
+    private var shaderFuer: Bitmap? = null
 
     override fun onDraw(canvas: Canvas) {
         val w = width.toFloat()
@@ -141,23 +139,25 @@ class GlasFlaeche(context: Context, private val radius: () -> Float) : View(cont
         if (w < 2 || h < 2) return
         val r = radius()
         feld.set(0f, 0f, w, h)
-        pfad.reset()
-        pfad.addRoundRect(feld, r, r, Path.Direction.CW)
         val g = Thema.glas
         val wurzel = rootView
         if (g != null && wurzel.width > 0 && wurzel.height > 0) {
+            // Das winzige Bild über einen Shader auf Fenstergröße strecken: glatte Ecken (Kantenglättung), kein Zuschneiden
+            if (shaderFuer !== g) {
+                glasPaint.shader = android.graphics.BitmapShader(g, android.graphics.Shader.TileMode.CLAMP, android.graphics.Shader.TileMode.CLAMP)
+                shaderFuer = g
+            }
             getLocationInWindow(ort)
-            val sx = g.width.toFloat() / wurzel.width
-            val sy = g.height.toFloat() / wurzel.height
-            quelle.set((ort[0] * sx).toInt(), (ort[1] * sy).toInt(), ((ort[0] + w) * sx).toInt().coerceAtLeast((ort[0] * sx).toInt() + 1), ((ort[1] + h) * sy).toInt().coerceAtLeast((ort[1] * sy).toInt() + 1))
-            canvas.save()
-            canvas.clipPath(pfad)
-            canvas.drawBitmap(g, quelle, feld, bildPaint)
-            canvas.restore()
+            matrix.setScale(wurzel.width.toFloat() / g.width, wurzel.height.toFloat() / g.height)
+            matrix.postTranslate(-ort[0].toFloat(), -ort[1].toFloat())
+            glasPaint.shader.setLocalMatrix(matrix)
+            canvas.drawRoundRect(feld, r, r, glasPaint)
         }
         ton.color = Thema.glasTon
-        canvas.drawPath(pfad, ton)
-        rand.strokeWidth = maxOf(1f, 1.5f.vp.toFloat())
-        canvas.drawPath(pfad, rand)
+        canvas.drawRoundRect(feld, r, r, ton)
+        val d = maxOf(1f, 1.5f.vp)
+        rand.strokeWidth = d
+        feld.inset(d / 2, d / 2)
+        canvas.drawRoundRect(feld, r, r, rand)
     }
 }

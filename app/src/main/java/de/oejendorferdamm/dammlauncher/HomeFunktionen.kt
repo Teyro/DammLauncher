@@ -119,7 +119,7 @@ internal fun HomeActivity.schnell() {
     f.add(LinearLayout(this).apply {
         addView(knopf(context, "📶  WLAN …") { f.schliessen(); wlan() }, lp(rechts = 12.vp))
         addView(knopf(context, "▬  Abdecken") { f.schliessen(); abdecken() }, lp(rechts = 12.vp))
-        addView(knopf(context, "🧹  Aufräumen") { f.schliessen(); aufraeumen() }, lp(rechts = 12.vp))
+        addView(knopf(context, "♻  Aufräumen") { f.schliessen(); aufraeumen() }, lp(rechts = 12.vp))
         addView(knopf(context, "🌙  Schoner") { f.schliessen(); zeigeSchoner() }, lp())
     }, 22)
     val k = KonfigSpeicher.konfig

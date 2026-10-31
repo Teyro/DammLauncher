@@ -256,8 +256,8 @@ def main():
         tap(int(w - 80 * f), int(80 * f))  # ✕
         time.sleep(1.5)
         screenshot("46_abdecken_zu.png")
-    # Dock: Einstellungen aus dem Dock starten, zurück
-    lang(w // 2, h * 3 // 5)
+    # Langer Druck auf eine freie Zelle (unten in der Mitte) → Einstellungen, links und schmal
+    lang(int(w * 0.55), int(h * 0.64))
     time.sleep(1.5)
     screenshot("47_clevertouch_einstellungen.png")
     adb("shell", "input", "keyevent", "4")
@@ -354,12 +354,12 @@ def main():
     tippe("+")
     time.sleep(1)
     screenshot("11_spalten_live.png")
-    tippe("▶")
+    pass  # Panel steht links (Standard)
     time.sleep(1)
     screenshot("12_panel_rechts.png")
 
     # Widget hinzufügen
-    if scrolle_zu("Widget hinzufügen …", w * 3 // 4):
+    if scrolle_zu("Widget hinzufügen …", w // 6):
         time.sleep(2)
         screenshot("13_widget_liste.png")
         # erstes Android-Widget (nicht die eingebaute Uhr, die steht ganz oben)
@@ -407,20 +407,20 @@ def main():
     time.sleep(3)
     lang(w * 85 // 100, h * 70 // 100)
     time.sleep(2)
-    tippe("▶")
+    pass  # Panel steht links (Standard)
     time.sleep(1)
-    if scrolle_zu("Boss-Modus …", w * 3 // 4):
+    if scrolle_zu("Boss-Modus …", w // 6):
         time.sleep(1.5)
         if feld_mit_hinweis("Master-Passwort (mindestens 8 Zeichen)", "Masterpass1"):
             feld_mit_hinweis("Wiederholen", "Masterpass1")
             screenshot("15a_master_passwort.png")
             tippe("Festlegen")
             time.sleep(4)
-    if scrolle_zu("Als Vorlage für alle Geräte hochladen", w * 3 // 4, antippen=False):
+    if scrolle_zu("Als Vorlage für alle Geräte hochladen", w // 6, antippen=False):
         screenshot("15_boss_modus.png")
         # zuerst mit dem LESE-Zugang: muss abgelehnt werden
         for benutzer, passwort, bild in (("lesen", "lesen123", "16_hochladen_nur_lesen.png"), ("schreiben", "schreib123", "17_hochgeladen.png")):
-            scrolle_zu("Als Vorlage für alle Geräte hochladen", w * 3 // 4)
+            scrolle_zu("Als Vorlage für alle Geräte hochladen", w // 6)
             time.sleep(1.5)
             if feld_mit_hinweis("Benutzername (Schreibzugang)", benutzer):
                 feld_mit_hinweis("Passwort", passwort)
@@ -430,9 +430,9 @@ def main():
     # Vorlage „auf dem Server geändert“ (5 Spalten) → Jetzt synchronisieren
     steuer("neuer")
     for _ in range(8):  # zurück nach oben scrollen
-        adb("shell", "input", "swipe", str(w * 3 // 4), str(h // 3), str(w * 3 // 4), str(h * 3 // 4), "400")
+        adb("shell", "input", "swipe", str(w // 6), str(h // 3), str(w // 6), str(h * 3 // 4), "400")
         time.sleep(0.6)
-    if scrolle_zu("Jetzt synchronisieren", w * 3 // 4):
+    if scrolle_zu("Jetzt synchronisieren", w // 6):
         time.sleep(5)
         screenshot("18_abgeglichen.png")
     tippe("Fertig")
@@ -442,21 +442,21 @@ def main():
     # Foto des Tages: erst Wikimedia Commons (ohne Schlüssel), dann Unsplash mit Schlüssel
     lang(w * 85 // 100, h * 70 // 100)
     time.sleep(2)
-    tippe("▶")
+    pass  # Panel steht links (Standard)
     time.sleep(1)
-    if scrolle_zu("Jeden Tag ein neues Landschaftsfoto", w * 3 // 4):
+    if scrolle_zu("Jeden Tag ein neues Landschaftsfoto", w // 6):
         time.sleep(6)
-        scrolle_zu("Neues Foto jetzt", w * 3 // 4, antippen=False)
+        scrolle_zu("Neues Foto jetzt", w // 6, antippen=False)
         screenshot("19_commons_geladen.png")
         tippe("Unsplash (Schlüssel)")
         time.sleep(2)
-        scrolle_zu("Unsplash Access Key", w * 3 // 4, antippen=False)
+        scrolle_zu("Unsplash Access Key", w // 6, antippen=False)
         if feld_mit_hinweis("Unsplash Access Key", "TestSchluessel_0123456789abc"):
             screenshot("19a_unsplash_einstellungen.png")
             tastatur_zu()
-            scrolle_zu("Speichern", w * 3 // 4)
+            scrolle_zu("Speichern", w // 6)
             time.sleep(6)
-            scrolle_zu("Neues Foto jetzt", w * 3 // 4, antippen=False)
+            scrolle_zu("Neues Foto jetzt", w // 6, antippen=False)
             screenshot("19b_unsplash_geladen.png")
     tippe("Fertig")
     time.sleep(2)
@@ -553,9 +553,9 @@ def main():
     # Neues Widget-Menü mit den eingebauten Kacheln
     lang(w * 85 // 100, h * 80 // 100)
     time.sleep(2)
-    tippe("▶")  # Panel nach rechts – dort wird gescrollt
+    # Panel steht links (Standard) – dort wird gescrollt
     time.sleep(1)
-    if scrolle_zu("Widget hinzufügen …", w * 3 // 4):
+    if scrolle_zu("Widget hinzufügen …", w // 6):
         time.sleep(2)
         screenshot("23c_widget_liste_neu.png")
         adb("shell", "input", "keyevent", "4")
@@ -565,11 +565,11 @@ def main():
     time.sleep(1.5)
     lang(w * 85 // 100, h * 80 // 100)
     time.sleep(2)
-    tippe("▶")
+    pass  # Panel steht links (Standard)
     time.sleep(1)
-    if scrolle_zu("Schüler-Ansicht einschalten", w * 3 // 4):
+    if scrolle_zu("Schüler-Ansicht einschalten", w // 6):
         time.sleep(1.5)
-        scrolle_zu("Jetzt zur Schüler-Ansicht", w * 3 // 4, antippen=False)
+        scrolle_zu("Jetzt zur Schüler-Ansicht", w // 6, antippen=False)
         screenshot("24_schueler_einstellungen.png")
         # Ordner nur für Lehrkräfte – erst zur Schüler-Ansicht, wenn markiert
         tippe("Fertig")

@@ -74,6 +74,8 @@ object Status {
     fun senden(context: Context): String {
         Geraet.init(context)
         KonfigSpeicher.init(context)
+        // gleich vermerken: der Takt des Startbildschirms fragt alle 30 Sekunden, das Senden kann länger dauern
+        Geraet.letzterStatus = System.currentTimeMillis()
         val t = try {
             if (Geraet.server.isBlank()) throw Exception("Noch kein Server eingetragen.")
             val (b, p) = zugang() ?: throw Exception("Kein Status-Zugang eingetragen.")

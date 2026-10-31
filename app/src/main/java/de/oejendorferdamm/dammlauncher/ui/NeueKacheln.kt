@@ -54,7 +54,10 @@ class LautstaerkeKachel(context: Context) : KartenAnsicht(context) {
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
         // Lautstärke von außen geändert (Tasten am Board): neu zeichnen
-        try { context.registerReceiver(aenderung, IntentFilter("android.media.VOLUME_CHANGED_ACTION")) } catch (_: Exception) {}
+        try {
+            val filter = IntentFilter("android.media.VOLUME_CHANGED_ACTION")
+            if (android.os.Build.VERSION.SDK_INT >= 33) context.registerReceiver(aenderung, filter, Context.RECEIVER_EXPORTED) else context.registerReceiver(aenderung, filter)
+        } catch (_: Exception) {}
     }
 
     override fun onDetachedFromWindow() {
@@ -94,7 +97,6 @@ class LautstaerkeKachel(context: Context) : KartenAnsicht(context) {
         val a = audio ?: return false
         when (ev.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
-                parent?.requestDisallowInterceptTouchEvent(false)
                 if (knopf.contains(ev.x, ev.y)) {
                     val v = jetzt()
                     if (v > 0) { vorStumm = v; setze(a, 0) } else setze(a, vorStumm.takeIf { it > 0 } ?: (max() / 3))

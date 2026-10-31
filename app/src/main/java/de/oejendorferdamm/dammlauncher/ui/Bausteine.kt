@@ -125,6 +125,49 @@ class PunktRaster(private val g: Int, farbe: Int) : android.graphics.drawable.Dr
     override fun getOpacity() = android.graphics.PixelFormat.TRANSLUCENT
 }
 
+/**
+ * Knöpfe nebeneinander, die bei Platzmangel in die nächste Zeile umbrechen (schmale Einstellungen
+ * links am Rand) – statt abgeschnitten zu werden.
+ */
+class Fluss(c: Context, private val abstand: Int = 14.vp) : ViewGroup(c) {
+    override fun onMeasure(wSpec: Int, hSpec: Int) {
+        val breite = MeasureSpec.getSize(wSpec).let { if (MeasureSpec.getMode(wSpec) == MeasureSpec.UNSPECIFIED) Int.MAX_VALUE else it }
+        var x = 0
+        var y = 0
+        var zeile = 0
+        var max = 0
+        for (i in 0 until childCount) {
+            val k = getChildAt(i)
+            if (k.visibility == View.GONE) continue
+            val p = k.layoutParams
+            k.measure(
+                if (p != null && p.width >= 0) MeasureSpec.makeMeasureSpec(p.width, MeasureSpec.EXACTLY) else MeasureSpec.makeMeasureSpec(breite.coerceAtMost(100_000), MeasureSpec.AT_MOST),
+                if (p != null && p.height >= 0) MeasureSpec.makeMeasureSpec(p.height, MeasureSpec.EXACTLY) else MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED)
+            )
+            if (x > 0 && x + k.measuredWidth > breite) { x = 0; y += zeile + abstand; zeile = 0 }
+            x += k.measuredWidth + abstand
+            max = maxOf(max, x - abstand)
+            zeile = maxOf(zeile, k.measuredHeight)
+        }
+        setMeasuredDimension(if (breite == Int.MAX_VALUE) max else MeasureSpec.getSize(wSpec), y + zeile)
+    }
+
+    override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {
+        val breite = r - l
+        var x = 0
+        var y = 0
+        var zeile = 0
+        for (i in 0 until childCount) {
+            val k = getChildAt(i)
+            if (k.visibility == View.GONE) continue
+            if (x > 0 && x + k.measuredWidth > breite) { x = 0; y += zeile + abstand; zeile = 0 }
+            k.layout(x, y, x + k.measuredWidth, y + k.measuredHeight)
+            x += k.measuredWidth + abstand
+            zeile = maxOf(zeile, k.measuredHeight)
+        }
+    }
+}
+
 fun lp(b: Int = ViewGroup.LayoutParams.WRAP_CONTENT, h: Int = ViewGroup.LayoutParams.WRAP_CONTENT, gewicht: Float = 0f, oben: Int = 0, rechts: Int = 0) =
     LinearLayout.LayoutParams(b, h, gewicht).apply { topMargin = oben; rightMargin = rechts }
 
