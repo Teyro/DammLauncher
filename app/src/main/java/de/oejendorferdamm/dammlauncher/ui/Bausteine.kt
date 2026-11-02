@@ -361,3 +361,15 @@ fun karte(c: Context) = LinearLayout(c).apply {
     background = runde(Farben.KARTE, 26f.vp, 1.vp, Farben.LINIE)
     setPadding(30.vp, 22.vp, 30.vp, 24.vp)
 }
+
+/** Öffnet F-Droid mit der Frage „Paketquelle hinzufügen?“ (alle Damm-Apps) – ohne F-Droid die Anleitungsseite mit QR-Code. */
+fun oeffneFDroidRepo(c: Context): Boolean {
+    val repo = "teyro.github.io/damm-fdroid/repo?fingerprint=db7f158b6eb2c7eb17e79aa4a9ae0e9487c3c2228fe7de60b37a1979408c0604"
+    for (adresse in listOf("fdroidrepos://$repo", "https://teyro.github.io/damm-fdroid/")) {
+        try {
+            c.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(adresse)).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+            return true
+        } catch (_: android.content.ActivityNotFoundException) {}
+    }
+    return false
+}

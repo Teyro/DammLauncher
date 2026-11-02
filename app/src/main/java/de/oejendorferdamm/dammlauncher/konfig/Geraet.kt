@@ -147,6 +147,11 @@ object Geraet {
         get() = p.getLong("feierabendFrei", 0)
         set(v) = p.edit().putLong("feierabendFrei", v).apply()
 
+    /** Einmal (mit 1.6.1) nach der Vorlage der Schule gefragt? Danach nur noch über die Einstellungen. */
+    var schulVorlageGefragt: Boolean
+        get() = p.getBoolean("schulVorlageGefragt", false)
+        set(v) = p.edit().putBoolean("schulVorlageGefragt", v).apply()
+
     /** Einmalige Widget-Freigabe erledigt? */
     var widgetFreigabeGefragt: Boolean
         get() = p.getBoolean("widgetFreigabe", false)

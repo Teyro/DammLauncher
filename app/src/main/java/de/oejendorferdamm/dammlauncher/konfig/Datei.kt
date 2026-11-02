@@ -48,10 +48,13 @@ object Datei {
     }
 
     /** Liest eine Export-Datei; gibt die Konfiguration und Warnungen zurück. Übernommen wird erst danach. */
-    fun importieren(context: Context, quelle: Uri): KonfigJson.Ergebnis {
+    fun importieren(context: Context, quelle: Uri): KonfigJson.Ergebnis =
+        importieren(context.contentResolver.openInputStream(quelle) ?: throw IOException("Datei lässt sich nicht öffnen"))
+
+    fun importieren(eingabe: java.io.InputStream): KonfigJson.Ergebnis {
         var ergebnis: KonfigJson.Ergebnis? = null
         val bilder = HashMap<String, ByteArray>()
-        context.contentResolver.openInputStream(quelle)?.use { roh ->
+        eingabe.use { roh ->
             ZipInputStream(roh.buffered()).use { zip ->
                 var anzahl = 0
                 var gesamt = 0L
@@ -72,7 +75,7 @@ object Datei {
                     }
                 }
             }
-        } ?: throw IOException("Datei lässt sich nicht öffnen")
+        }
         var e = ergebnis ?: throw KonfigFehler("In der Datei steckt keine DammLauncher-Einrichtung.")
         bilder.forEach { (name, daten) ->
             val ziel = if (name == "hintergrund.jpg") KonfigSpeicher.hintergrundDatei else File(KonfigSpeicher.iconOrdner, name.removePrefix("icons/"))

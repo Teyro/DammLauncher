@@ -224,6 +224,11 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         Abgleich.planen(this)
         TagesJob.planen(this)
         hintergrundPruefungen()
+        // Einmalig (neue und bestehende Boards): Vorlage der Schule anbieten. Nicht im Testbuild – der Oberflächentest kennt das Fenster nicht.
+        if (!sicher && !Geraet.schulVorlageGefragt && !BuildConfig.DEBUG) {
+            Geraet.schulVorlageGefragt = true
+            haupt.postDelayed({ schulVorlageFragen(true) }, 2000)
+        }
     }
 
     /** Abstürze merken: mehrere in kurzer Zeit → beim nächsten Start sicherer Modus (keine Absturzschleife). */
@@ -1098,16 +1103,18 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
             }
             REQ_IMPORT -> if (resultCode == RESULT_OK && uri != null) arbeit.execute {
                 val ergebnis = try { Datei.importieren(this, uri) } catch (e: Exception) { haupt.post { meldung("Import fehlgeschlagen: ${e.message}") }; return@execute }
-                haupt.post {
-                    KonfigSpeicher.ersetze(ergebnis.konfig)
-                    hintergrundStand = -1
-                    widgetFreigabeGefragt = false
-                    widgetsAbgleichen()
-                    panel?.aufbauen()
-                    meldung(if (ergebnis.warnungen.isEmpty()) "Einrichtung importiert." else "Importiert, ${ergebnis.warnungen.size} Werte korrigiert.")
-                }
+                haupt.post { einrichtungUebernehmen(ergebnis) }
             }
         }
+    }
+
+    internal fun einrichtungUebernehmen(ergebnis: de.oejendorferdamm.dammlauncher.konfig.KonfigJson.Ergebnis) {
+        KonfigSpeicher.ersetze(ergebnis.konfig)
+        hintergrundStand = -1
+        widgetFreigabeGefragt = false
+        widgetsAbgleichen()
+        panel?.aufbauen()
+        meldung(if (ergebnis.warnungen.isEmpty()) "Einrichtung importiert." else "Importiert, ${ergebnis.warnungen.size} Werte korrigiert.")
     }
 
     private fun bildAuswahl(code: Int, typ: String) {
@@ -1147,6 +1154,8 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
     }
 
     override fun importieren() = bildAuswahl(REQ_IMPORT, "*/*")
+
+    override fun schulVorlage() = schulVorlageFragen(false)
 
     override fun pinFestlegen() {
         val f = neuesFenster("PIN für die Einstellungen", 900)

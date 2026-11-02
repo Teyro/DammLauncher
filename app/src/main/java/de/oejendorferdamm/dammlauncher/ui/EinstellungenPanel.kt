@@ -35,6 +35,7 @@ interface PanelAktionen {
     fun widgetHinzufuegen()
     fun exportieren()
     fun importieren()
+    fun schulVorlage()
     fun pinFestlegen()
     fun bossAnmelden()
     fun bossAbmelden()
@@ -384,6 +385,7 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
 
         abschnitt("Datei")
         knoepfe(knopf(c, "Einrichtung exportieren …") { a.exportieren() }, knopf(c, "Einrichtung importieren …") { a.importieren() })
+        knoepfe(knopf(c, "Vorlage der Schule laden …") { a.schulVorlage() })
 
         abschnitt("Zentrale Verteilung (IServ)")
         val boss = a.bossAktiv()
@@ -421,7 +423,7 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
         abschnitt("Updates")
         add(text(c, "Installiert: ${BuildConfig.VERSION_NAME}\n" + a.updateText(), 24, Farben.TEXT2))
         add(schalter(c, "Updates automatisch installieren", Geraet.autoUpdate) { an -> Geraet.autoUpdate = an })
-        knoepfe(knopf(c, "Jetzt nach Updates suchen") { a.updatePruefen() })
+        knoepfe(knopf(c, "Jetzt nach Updates suchen") { a.updatePruefen() }, knopf(c, "Damm-Apps in F-Droid hinzufügen") { if (!oeffneFDroidRepo(c)) a.meldung("Weder F-Droid noch ein Browser ist installiert.") })
         add(text(c,
             "Automatisch: Neue Versionen werden im Hintergrund geladen, geprüft und installiert, sobald der Startbildschirm unbenutzt vorne ist " +
                 "(bis Android 11 fragt Android dabei einmal „Installieren?“).\n" +

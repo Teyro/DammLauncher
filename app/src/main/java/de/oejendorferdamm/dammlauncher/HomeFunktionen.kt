@@ -571,3 +571,37 @@ internal fun HomeActivity.tafelUebersicht() {
         }
     }
 }
+
+// ------------------------------------------------------------ Vorlage der Schule
+
+/** Schul-Ordner (Schuldock-Freigabe https://cloudfiles.s5586.schuldock.de/s/mxmLySXtyzC6XFp). Das Passwort steht bewusst nicht im öffentlichen Code. */
+private const val SCHUL_WEBDAV = "https://cloudfiles.s5586.schuldock.de/public.php/webdav"
+private const val SCHUL_FREIGABE = "mxmLySXtyzC6XFp"
+
+/** Master.zip aus dem Schul-Ordner laden und als Einrichtung übernehmen. [einmalig] = automatische Frage nach dem Update. */
+internal fun HomeActivity.schulVorlageFragen(einmalig: Boolean, fehler: String? = null) {
+    val f = neuesFenster("Vorlage der Schule laden", 1000)
+    f.add(text(this, "Lädt die Standard-Einrichtung der Schule (Master.zip aus dem Schul-Ordner) und ersetzt damit die Einrichtung dieses Boards." +
+        (if (einmalig) " Diese Frage kommt nur einmal – später jederzeit unter Einstellungen → Datei." else ""), 22, Farben.TEXT2))
+    fehler?.let { f.add(text(this, it, 22, Farben.ROT)) }
+    val pw = eingabe(this, "Passwort des Schul-Ordners", geheim = true)
+    f.add(pw)
+    f.knoepfe(knopf(this, if (einmalig) "Nicht laden" else "Abbrechen") { f.schliessen() }, knopf(this, "Laden", haupt = true) {
+        val passwort = pw.text.toString()
+        if (passwort.isBlank()) return@knopf
+        f.schliessen()
+        meldung("Vorlage der Schule wird geladen …")
+        netz.execute {
+            val ergebnis = try {
+                val daten = WebDav(SCHUL_WEBDAV, SCHUL_FREIGABE, passwort).get("DammLauncher/Master.zip").daten
+                    ?: throw java.io.IOException("Master.zip liegt nicht im Schul-Ordner.")
+                de.oejendorferdamm.dammlauncher.konfig.Datei.importieren(daten.inputStream())
+            } catch (e: Exception) {
+                haupt.post { schulVorlageFragen(einmalig, "Laden fehlgeschlagen: ${e.message}") }
+                return@execute
+            }
+            haupt.post { einrichtungUebernehmen(ergebnis) }
+        }
+    })
+    pw.requestFocus()
+}
