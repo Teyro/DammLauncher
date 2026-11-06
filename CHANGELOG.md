@@ -1,5 +1,8 @@
 # Änderungen
 
+## 1.6.3
+- **Kein schwarzer Balken mehr unten** (auf Clevertouch-Boards mit „⋮“): der Startbildschirm malt randlos hinter die Navigationsleiste wie andere Apps; Raster, Dock, „Alle Apps“, Einstellungen und Fenster rücken darüber.
+
 ## 1.6.2
 - **Einstellungen neu gegliedert**: Übersicht mit sechs Bereichen (Aussehen, Startbildschirm, Bedienung, Schule,
   Verwaltung, Über) im Stil der Android-Einstellungen, jede Seite mit ihren Abschnitten; Zurück-Taste führt zur Übersicht.
