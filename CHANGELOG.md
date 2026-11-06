@@ -1,5 +1,12 @@
 # Änderungen
 
+## 1.6.2
+- **Einstellungen neu gegliedert**: Übersicht mit sechs Bereichen (Aussehen, Startbildschirm, Bedienung, Schule,
+  Verwaltung, Über) im Stil der Android-Einstellungen, jede Seite mit ihren Abschnitten; Zurück-Taste führt zur Übersicht.
+- **Fotos aus dem Schul-Ordner** (DammLauncher/Wallpaper): jeden Tag das nächste, auf allen Boards dasselbe.
+- **Aktuelles Hintergrundbild behalten**: das Foto wechselt nicht mehr täglich.
+- App-Symbole aus dem Schul-Ordner (DammLauncher/Symbole).
+
 ## 1.6.0
 - **Clevertouch-Aussehen**: Kopfzeile mit Uhr, Suche und Schnelleinstellungen, Dock, Farben aus dem
   Hintergrund, Milchglas, einheitliche Symbolformen – ohne Animationen.
