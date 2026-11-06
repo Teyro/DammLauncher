@@ -66,6 +66,7 @@ interface PanelAktionen {
     fun tafelnZeigen()
     fun aufraeumenJetzt()
     fun schnellOeffnen()
+    fun schulPasswort()
 }
 
 /**
@@ -92,10 +93,14 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
     private var lage = 0
     private var raenderGleich = KonfigSpeicher.konfig.rand.gleich
 
+    private val titel = text(c, "Einstellungen", 36, fett = true).apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END }
+    private val zurueck = knopf(c, "‹") { oeffne(null) }.apply { background = rundKnopf(); contentDescription = "Zurück zur Übersicht"; groesse(40) }
+
     init {
         karte.addView(LinearLayout(c).apply {
             gravity = Gravity.CENTER_VERTICAL
-            addView(text(c, "Einstellungen", 36, fett = true), lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            addView(zurueck, lp(86.vp, 86.vp, rechts = 16.vp))
+            addView(titel, lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
             addView(knopf(c, "◀") { lage = (lage - 1).coerceAtLeast(0); setzeLage() }.apply { background = rundKnopf() }, lp(86.vp, 86.vp, rechts = 10.vp))
             addView(knopf(c, "▶") { lage = (lage + 1).coerceAtMost(2); setzeLage() }.apply { background = rundKnopf() }, lp(86.vp, 86.vp, rechts = 20.vp))
             addView(knopf(c, "Fertig", haupt = true) { a.panelZu() }, lp())
@@ -136,13 +141,91 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
 
     private fun knoepfe(vararg k: View) = add(Fluss(c).apply { k.forEach { addView(it) } }, 12)
 
-    /** Inhalt (neu) aufbauen – z. B. nach Boss-Anmeldung oder „Ränder gleich“. */
+    /** Eine Seite der Einstellungen mit ihren Abschnitten (Karten). */
+    private class Seite(val titel: String, val symbol: String, val farbe: Int, val zusammenfassung: (Konfig) -> String, val teile: List<(Konfig) -> Unit>)
+
+    private val seiten: List<Seite> by lazy {
+        listOf(
+            Seite("Aussehen", "🎨", 0xFF7C3AED.toInt(), { k -> (if (k.aussehen == Aussehen.CLEVERTOUCH) "Clevertouch" else "Klassisch") + " · Hintergrund · Schrift" },
+                listOf(::teilAussehen, ::teilHintergrund, ::teilSymboleundSchrift)),
+            Seite("Startbildschirm", "▦", 0xFF2563EB.toInt(), { k -> "${k.spalten} × ${k.zeilen} Raster · Ränder · Widgets · Apps" },
+                listOf(::teilRaster, ::teilAbstandzumBildschirmrand, ::teilWidgetsundAblage, ::teilApps)),
+            Seite("Bedienung", "👆", 0xFF0891B2.toInt(), { k -> (if (k.pin == null) "ohne PIN" else "mit PIN") + " · Gesten · Seitenleiste " + (if (k.seitenleiste.an) "an" else "aus") },
+                listOf(::teilBedienung, ::teilGesten, ::teilSeitenleiste)),
+            Seite("Schule", "🏫", 0xFF16A34A.toInt(), { k -> "Stundenplan, Pausen, Hinweise, Schüler-Ansicht" + (if (k.schueler.an) " (an)" else "") },
+                listOf(::teilStundenplanundProfile, ::teilSchulzeiten, ::teilHinweisBand, ::teilSchuelerAnsicht, ::teilAbwesenheiten, ::teilAufraeumen)),
+            Seite("Verwaltung", "☁", 0xFFEA580C.toInt(), { _ -> "Vorlage für alle Boards, Datei, Updates" + (if (a.bossAktiv()) " · Boss-Modus aktiv" else "") },
+                listOf(::teilZentraleVerteilungIServ, ::teilDatei, ::teilUpdates)),
+            Seite("Über DammLauncher", "ℹ", 0xFF6B7280.toInt(), { _ -> "Version ${BuildConfig.VERSION_NAME} · Lizenzen" }, listOf(::teilUeberDammLauncher))
+        )
+    }
+
+    /** null = Übersicht, sonst die geöffnete Seite. */
+    private var seite: Seite? = null
+    private var letzteSeite: Seite? = null
+
+    /** Zurück-Taste: von einer Seite zur Übersicht; false = schon in der Übersicht. */
+    fun zurueck(): Boolean {
+        if (seite == null) return false
+        oeffne(null)
+        return true
+    }
+
+    private fun oeffne(s: Seite?) {
+        seite = s
+        aufbauen()
+    }
+
+    /** Übersicht im Stil der Android-Einstellungen: je Bereich eine Zeile mit Symbol, Titel und Kurzinfo. */
+    private fun uebersicht(k: Konfig) {
+        listOf(seiten.take(3), seiten.drop(3)).forEach { gruppe ->
+            val kk = karte(c).apply { setPadding(10.vp, 10.vp, 10.vp, 10.vp) }
+            gruppe.forEachIndexed { i, s ->
+                if (i > 0) kk.addView(View(c).apply { setBackgroundColor(Farben.LINIE) }, lp(ViewGroup.LayoutParams.MATCH_PARENT, 2.vp).apply { leftMargin = 112.vp })
+                kk.addView(LinearLayout(c).apply {
+                    gravity = Gravity.CENTER_VERTICAL
+                    setPadding(16.vp, 18.vp, 16.vp, 18.vp)
+                    background = android.graphics.drawable.StateListDrawable().apply {
+                        addState(intArrayOf(android.R.attr.state_pressed), runde(0xFFE8EDF5.toInt(), 22f.vp))
+                        addState(intArrayOf(), runde(0x00000000, 22f.vp))
+                    }
+                    isClickable = true
+                    contentDescription = s.titel
+                    setOnClickListener { oeffne(s) }
+                    addView(text(c, s.symbol, 34, android.graphics.Color.WHITE).apply {
+                        gravity = Gravity.CENTER
+                        background = runde(s.farbe, 40f.vp)
+                    }, lp(80.vp, 80.vp, rechts = 24.vp))
+                    addView(LinearLayout(c).apply {
+                        orientation = LinearLayout.VERTICAL
+                        addView(text(c, s.titel, 28, fett = true))
+                        addView(text(c, s.zusammenfassung(k), 21, Farben.TEXT2), lp(oben = 2.vp))
+                    }, lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+                    addView(text(c, "›", 44, Farben.TEXT2), lp())
+                }, lp(ViewGroup.LayoutParams.MATCH_PARENT))
+            }
+            inhalt.addView(kk, lp(ViewGroup.LayoutParams.MATCH_PARENT, oben = 22.vp))
+        }
+        add(text(c, "Jede Änderung wirkt sofort auf den Startbildschirm daneben. ◀ ▶ schiebt dieses Fenster zur Seite.", 20, Farben.TEXT2).apply { setPadding(12.vp, 0, 12.vp, 0) }, 18)
+    }
+
+    /** Inhalt (neu) aufbauen – z. B. nach Boss-Anmeldung oder „Ränder gleich“. Bleibt auf der geöffneten Seite. */
     fun aufbauen() {
-        val pos = scroll.scrollY
+        val pos = if (seite === letzteSeite) scroll.scrollY else 0
+        letzteSeite = seite
         inhalt.removeAllViews()
         aktuelleKarte = null
         val k = KonfigSpeicher.konfig
+        val s = seite
+        titel.text = s?.titel ?: "Einstellungen"
+        zurueck.visibility = if (s == null) View.GONE else View.VISIBLE
+        if (s == null) uebersicht(k) else s.teile.forEach { it(k) }
+        aktuelleKarte = null
+        add(View(c), 40)
+        scroll.post { scroll.scrollTo(0, pos); karte.requestFocus() }
+    }
 
+    private fun teilAussehen(k: Konfig) {
         abschnitt("Aussehen")
         val ct = k.aussehen == Aussehen.CLEVERTOUCH
         add(schalter(c, "Clevertouch-Aussehen (wie die neuen Boards)", ct) { an ->
@@ -157,11 +240,15 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
             "Milchglas – ohne Animationen, damit es auch auf älteren Boards flüssig bleibt. Apps kommen ins Dock über langes Drücken → „Ins Dock legen“.", 21, Farben.TEXT2), 6)
         auswahl("Form der App-Symbole", listOf(SymbolForm.ORIGINAL to "Original", SymbolForm.RUND to "Abgerundet", SymbolForm.KREIS to "Kreis"), k.symbolForm) { v -> aendere { it.copy(symbolForm = v) } }
         if (ct) add(text(c, "Im Dock: " + (if (k.dock.isEmpty()) "noch keine Apps" else k.dock.joinToString(", ") { d -> d.titel ?: AppKatalog.finde(d.paket, d.aktivitaet)?.name ?: d.paket }), 22, Farben.TEXT2), 10)
+    }
 
+    private fun teilRaster(k: Konfig) {
         abschnitt("Raster")
         add(regler(c, "Spalten", Grenzen.RASTER, k.spalten) { n -> aendereRaster(n, null) })
         add(regler(c, "Zeilen", Grenzen.RASTER, k.zeilen) { n -> aendereRaster(null, n) })
+    }
 
+    private fun teilAbstandzumBildschirmrand(k: Konfig) {
         abschnitt("Abstand zum Bildschirmrand")
         add(schalter(c, "Alle Ränder gleich", raenderGleich) { an ->
             raenderGleich = an
@@ -177,13 +264,17 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
             add(regler(c, "Rechts", Grenzen.RAND, k.rand.rechts, 5) { n -> aendere { it.copy(rand = it.rand.copy(rechts = n)) } })
         }
         add(regler(c, "Abstand zwischen den Zellen", Grenzen.ABSTAND, k.abstand, 2) { n -> aendere { it.copy(abstand = n) } })
+    }
 
+    private fun teilSymboleundSchrift(k: Konfig) {
         abschnitt("Symbole und Schrift")
         add(regler(c, "Symbolgröße", Grenzen.ICON, k.iconProzent, 5, " %") { n -> aendere { it.copy(iconProzent = n) } })
         add(schalter(c, "Namen unter den Symbolen", k.beschriftung) { an -> aendere { it.copy(beschriftung = an) } })
         add(regler(c, "Schriftgröße", Grenzen.TEXT, k.textGroesse) { n -> aendere { it.copy(textGroesse = n) } })
         auswahl("Schrift der App-Namen", Schrift.ALLE.map { it to Schriften.name(it) }, k.schrift, schriftVorschau = true) { s -> aendere { it.copy(schrift = s) } }
+    }
 
+    private fun teilGesten(k: Konfig) {
         abschnitt("Gesten")
         val wahlLauncher = listOf(Gesten.APPS to "Alle Apps", Gesten.EINSTELLUNGEN to "Einstellungen", Gesten.AUS to "Nichts")
         auswahl("Auf dem Startbildschirm nach oben wischen", wahlLauncher, k.gesten.hoch) { v -> aendere { it.copy(gesten = it.gesten.copy(hoch = v)) } }
@@ -199,7 +290,9 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
         } else if (k.gesten.randAn) {
             add(text(c, "Aktiv. Unten am Rand zeigt ein feiner Strich, wo man wischen kann.", 21, Farben.TEXT2), 8)
         }
+    }
 
+    private fun teilBedienung(k: Konfig) {
         abschnitt("Bedienung")
         add(schalter(c, "Knopf „Alle Apps“ unten anzeigen", k.alleAppsKnopf) { an -> aendere { it.copy(alleAppsKnopf = an) } })
         add(schalter(c, "Animationen", k.animationen) { an -> aendere { it.copy(animationen = an) } })
@@ -208,7 +301,9 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
             knopf(c, if (k.pin == null) "PIN für Einstellungen festlegen …" else "PIN ändern …") { a.pinFestlegen() },
             knopf(c, "PIN entfernen", gefahr = k.pin != null) { aendere { it.copy(pin = null) }; aufbauen() }.apply { isEnabled = k.pin != null }
         )
+    }
 
+    private fun teilSeitenleiste(k: Konfig) {
         abschnitt("Seitenleiste")
         val sl = k.seitenleiste
         add(schalter(c, "Seitenleiste am Bildschirmrand (auch über anderen Apps)", sl.an) { an -> aendere { it.copy(seitenleiste = it.seitenleiste.copy(an = an)) }; aufbauen() })
@@ -231,14 +326,18 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
             }
             if (sl.apps.size < Seitenleiste.MAX_APPS) knoepfe(knopf(c, "App hinzufügen …") { a.seitenleisteApp() })
         }
+    }
 
+    private fun teilStundenplanundProfile(k: Konfig) {
         abschnitt("Stundenplan und Profile")
         add(text(c, "Stunden: " + (if (k.stunden.isEmpty()) "noch keine" else "${k.stunden.size} (${Zeitraum.uhrzeit(k.stunden.first().von)}–${Zeitraum.uhrzeit(k.stunden.last().bis)})") +
             "\nStundenplan dieses Boards: " + (if (Geraet.stundenplan.isBlank()) "keiner (sonst stundenplan.json im Vorlagen-Ordner)" else "eingetragen") +
             "\nProfile: " + listOf(k.profil).plus(k.profile.map { it.name }).joinToString(", ") + " – aktiv: ${k.profil}" +
             (if (k.profilNachFach) "\nWechselt beim Stundenwechsel zum Profil des Fachs." else ""), 24, Farben.TEXT2))
         knoepfe(knopf(c, "Stundenzeiten …") { a.stundenZeiten() }, knopf(c, "Stundenplan …") { a.stundenplanBoard() }, knopf(c, "Profile …") { a.profileOeffnen() })
+    }
 
+    private fun teilSchuelerAnsicht(k: Konfig) {
         abschnitt("Schüler-Ansicht")
         val sa = k.schueler
         add(schalter(c, "Schüler-Ansicht einschalten", sa.an) { an ->
@@ -256,7 +355,9 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
             add(regler(c, "Zurück zur Schüler-Ansicht nach … ohne Berührung", 5..120, sa.zurueck.coerceIn(5, 120), 5, " min") { n -> aendere { it.copy(schueler = it.schueler.copy(zurueck = n)) } })
             knoepfe(knopf(c, "Jetzt zur Schüler-Ansicht", haupt = true) { a.zurSchuelerAnsicht() })
         }
+    }
 
+    private fun teilSchulzeiten(k: Konfig) {
         abschnitt("Schulzeiten")
         add(text(c, "Pausen: " + (if (k.pausen.isEmpty()) "noch keine" else k.pausen.joinToString(", ") { "${Zeitraum.uhrzeit(it.von)}–${Zeitraum.uhrzeit(it.bis)}" }), 24, Farben.TEXT2))
         knoepfe(knopf(c, "Pausenzeiten …") { a.pausenEinstellen() })
@@ -266,7 +367,9 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
         auswahl("Bildschirmschoner (dunkel, Uhr und Foto) nach", listOf("0" to "Aus", "5" to "5 min", "10" to "10 min", "15" to "15 min", "30" to "30 min", "60" to "1 Stunde"), k.schoner.toString()) { v ->
             aendere { it.copy(schoner = v.toInt()) }
         }
+    }
 
+    private fun teilHinweisBand(k: Konfig) {
         abschnitt("Hinweis-Band")
         val hw = k.hinweis
         add(text(c, if (hw == null) "Kein Hinweis." else "„${hw.text}“ – bis ${hw.bis.split('-').reversed().joinToString(".")}" +
@@ -276,7 +379,9 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
         val geplant = k.nachrichten.count { it.tag >= heute }
         add(text(c, "Zeitgesteuerte Nachrichten (z. B. „Probealarm um 10:15“): " + (if (geplant == 0) "keine geplant" else "$geplant geplant"), 24, Farben.TEXT2), 18)
         knoepfe(knopf(c, "Nachrichten …") { a.nachrichten() })
+    }
 
+    private fun teilAufraeumen(k: Konfig) {
         abschnitt("Aufräumen")
         add(text(c, "Schließt Apps im Hintergrund und setzt die Lautstärke zurück – damit die nächste Klasse ein ordentliches Board vorfindet.", 21, Farben.TEXT2))
         add(schalter(c, "Zu Beginn jeder Pause (nur wenn der Startbildschirm vorne ist)", k.aufraeumen.pausen) { an -> aendere { it.copy(aufraeumen = it.aufraeumen.copy(pausen = an)) } })
@@ -285,13 +390,17 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
             aendere { it.copy(aufraeumen = it.aufraeumen.copy(lautstaerke = v.toInt())) }
         }
         knoepfe(knopf(c, "Jetzt aufräumen") { a.aufraeumenJetzt() }, knopf(c, "Schnelleinstellungen …") { a.schnellOeffnen() })
+    }
 
+    private fun teilAbwesenheiten(k: Konfig) {
         abschnitt("Abwesenheiten")
         add(text(c, "Klasse dieses Boards: " + Geraet.klasse.ifBlank { "noch keine" } +
             "\nDie Kachel „Heute fehlen …“ zeigt nur die Zahl – die Kinder raten, wer fehlt.", 24, Farben.TEXT2))
         if (Geraet.klasse.isNotBlank()) add(text(c, "Jetzt: " + Abwesenheit.anzeige(Geraet.klasse).let { "${it.gross} ${it.unten}" }, 22, Farben.TEXT2), 6)
         knoepfe(knopf(c, "Klasse wählen …") { a.klasseEinstellen() })
+    }
 
+    private fun teilHintergrund(k: Konfig) {
         abschnitt("Hintergrund")
         knoepfe(
             knopf(c, "Bild wählen …") { a.bildWaehlen() },
@@ -308,9 +417,9 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
         })
 
         val h = k.hintergrund
-        add(schalter(c, "Jeden Tag ein neues Landschaftsfoto", h.unsplash) { an ->
+        add(schalter(c, "Jeden Tag ein neues Foto", h.unsplash) { an ->
             aendere { it.copy(hintergrund = it.hintergrund.copy(unsplash = an)) }
-            if (an && (h.quelle == Hintergrund.COMMONS || h.schluessel.isNotEmpty())) a.unsplashNeu()
+            if (an && (h.quelle == Hintergrund.COMMONS || h.schluessel.isNotEmpty() || (h.quelle == Hintergrund.SCHULE && de.oejendorferdamm.dammlauncher.abgleich.SchulOrdner.passwort() != null))) a.unsplashNeu()
             aufbauen()
         }, 18)
         if (h.unsplash) {
@@ -325,10 +434,23 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
                     aendere { it.copy(hintergrund = it.hintergrund.copy(quelle = Hintergrund.UNSPLASH)) }
                     if (h.schluessel.isNotEmpty()) a.unsplashNeu()
                     aufbauen()
+                },
+                knopf(c, "Schul-Ordner", haupt = h.quelle == Hintergrund.SCHULE) {
+                    aendere { it.copy(hintergrund = it.hintergrund.copy(quelle = Hintergrund.SCHULE)) }
+                    if (de.oejendorferdamm.dammlauncher.abgleich.SchulOrdner.passwort() != null) a.unsplashNeu() else a.schulPasswort()
+                    aufbauen()
                 }
             )
             if (Geraet.unsplashMeldung.isNotEmpty()) add(text(c, "Zuletzt: " + Geraet.unsplashMeldung, 21, Farben.TEXT2), 6)
-            if (h.quelle == Hintergrund.COMMONS) {
+            add(schalter(c, "Aktuelles Hintergrundbild behalten (nicht mehr täglich wechseln)", Geraet.fotoBehalten) { an -> Geraet.fotoBehalten = an }, 8)
+            if (h.quelle == Hintergrund.SCHULE) {
+                val pw = de.oejendorferdamm.dammlauncher.abgleich.SchulOrdner.passwort() != null
+                add(text(c, "Bilder aus dem Ordner DammLauncher/Wallpaper der Schul-Cloud – jeden Tag das nächste, auf allen Boards dasselbe. " +
+                    "Neue Bilder einfach in den Ordner legen.", 21, Farben.TEXT2), 8)
+                if (!pw) add(text(c, "Dafür einmal das Passwort des Schul-Ordners eingeben.", 22, Farben.ROT), 8)
+                knoepfe(knopf(c, if (pw) "Passwort ändern …" else "Passwort eingeben …", haupt = !pw) { a.schulPasswort() },
+                    knopf(c, "Neues Foto jetzt") { a.unsplashNeu() }.apply { isEnabled = pw })
+            } else if (h.quelle == Hintergrund.COMMONS) {
                 add(text(c, "Ausgezeichnete Landschaftsfotos von Wikimedia Commons – frei lizenziert, ohne Anmeldung und Schlüssel. " +
                     "Fotograf und Lizenz stehen klein unten rechts.", 21, Farben.TEXT2), 8)
                 knoepfe(knopf(c, "Neues Foto jetzt") { a.unsplashNeu() })
@@ -357,7 +479,9 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
                 )
             }
         }
+    }
 
+    private fun teilApps(k: Konfig) {
         abschnitt("Apps")
         val versteckt = k.ausgeblendet.mapNotNull { sch -> AppKatalog.apps.firstOrNull { AppKatalog.schluessel(it.komponente) == sch } }
         add(text(c, if (versteckt.isEmpty()) "In der App-Übersicht ist nichts ausgeblendet. Ausblenden: dort lange auf eine App drücken."
@@ -369,7 +493,9 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
             })
         }
         if (Geraet.starts().isNotEmpty()) knoepfe(knopf(c, "„Häufig benutzt“ zurücksetzen") { Geraet.startsVergessen(); a.meldung("Zurückgesetzt.") })
+    }
 
+    private fun teilWidgetsundAblage(k: Konfig) {
         abschnitt("Widgets und Ablage")
         knoepfe(knopf(c, "Widget hinzufügen …") { a.widgetHinzufuegen() })
         if (k.nichtPlatziert.isNotEmpty()) {
@@ -382,11 +508,15 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
                 knopf(c, "Verwerfen", gefahr = true) { aendere { it.copy(nichtPlatziert = emptyList()) }; aufbauen() }
             )
         }
+    }
 
+    private fun teilDatei(k: Konfig) {
         abschnitt("Datei")
         knoepfe(knopf(c, "Einrichtung exportieren …") { a.exportieren() }, knopf(c, "Einrichtung importieren …") { a.importieren() })
         knoepfe(knopf(c, "Vorlage der Schule laden …") { a.schulVorlage() })
+    }
 
+    private fun teilZentraleVerteilungIServ(k: Konfig) {
         abschnitt("Zentrale Verteilung (IServ)")
         val boss = a.bossAktiv()
         val stand = Geraet.vorlageStand
@@ -419,7 +549,9 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
         } else {
             knoepfe(knopf(c, "Boss-Modus …") { a.bossAnmelden() })
         }
+    }
 
+    private fun teilUpdates(k: Konfig) {
         abschnitt("Updates")
         add(text(c, "Installiert: ${BuildConfig.VERSION_NAME}\n" + a.updateText(), 24, Farben.TEXT2))
         add(schalter(c, "Updates automatisch installieren", Geraet.autoUpdate) { an -> Geraet.autoUpdate = an })
@@ -429,15 +561,15 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
                 "(bis Android 11 fragt Android dabei einmal „Installieren?“).\n" +
                 "Sicherheit: Ist eine neuere Version schon länger als 7 Tage veröffentlicht, sperrt sich der Launcher, bis aktualisiert ist. " +
                 "Ist GitHub nicht erreichbar, wird nie gesperrt.", 21, Farben.TEXT2))
+    }
 
+    private fun teilUeberDammLauncher(k: Konfig) {
         abschnitt("Über DammLauncher")
         add(text(c, "Freie Software unter der GNU GPL v3.\nQuelltext: github.com/Teyro/DammLauncher\n" +
             "Schrift: Grundschrift von Christian Urff (www.urff.info), Lizenz CC BY 3.0.\n" +
-            "Fotos des Tages: Wikimedia Commons bzw. Unsplash – Fotograf und Lizenz stehen unten rechts.", 22, Farben.TEXT2))
-        aktuelleKarte = null
-        add(View(c), 40)
-        scroll.post { scroll.scrollTo(0, pos); karte.requestFocus() }
+            "Fotos des Tages: Wikimedia Commons, Unsplash bzw. der Schul-Ordner – Fotograf und Lizenz stehen unten rechts.", 22, Farben.TEXT2))
     }
+
 
     /**
      * Auswahl als Reihe von Knöpfen (die gewählte Möglichkeit blau). [schriftVorschau]: jeder Knopf

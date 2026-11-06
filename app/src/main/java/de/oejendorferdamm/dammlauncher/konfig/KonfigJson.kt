@@ -227,7 +227,7 @@ object KonfigJson {
         // Quelle kam mit 1.2.0 – wer schon einen Unsplash-Schlüssel hat, bleibt bei Unsplash
         val quelle = when (val q = h?.optString("quelle", "").orEmpty()) {
             "" -> if (schluessel.isNotEmpty()) Hintergrund.UNSPLASH else Hintergrund.COMMONS
-            Hintergrund.COMMONS, Hintergrund.UNSPLASH -> q
+            Hintergrund.COMMONS, Hintergrund.UNSPLASH, Hintergrund.SCHULE -> q
             else -> { w.add("hintergrund.quelle unbekannt"); Hintergrund.COMMONS }
         }
 

@@ -30,6 +30,7 @@ import de.oejendorferdamm.dammlauncher.konfig.Seitenleiste
 import de.oejendorferdamm.dammlauncher.konfig.Zeiten
 import de.oejendorferdamm.dammlauncher.konfig.Zeitraum
 import de.oejendorferdamm.dammlauncher.pflege.Aufraeumen
+import de.oejendorferdamm.dammlauncher.sicherheit.Tresor
 import de.oejendorferdamm.dammlauncher.ui.AppUebersicht
 import de.oejendorferdamm.dammlauncher.ui.Farben
 import de.oejendorferdamm.dammlauncher.ui.eingabe
@@ -574,9 +575,8 @@ internal fun HomeActivity.tafelUebersicht() {
 
 // ------------------------------------------------------------ Vorlage der Schule
 
-/** Schul-Ordner (Schuldock-Freigabe https://cloudfiles.s5586.schuldock.de/s/mxmLySXtyzC6XFp). Das Passwort steht bewusst nicht im öffentlichen Code. */
-private const val SCHUL_WEBDAV = "https://cloudfiles.s5586.schuldock.de/public.php/webdav"
-private const val SCHUL_FREIGABE = "mxmLySXtyzC6XFp"
+private const val SCHUL_WEBDAV = de.oejendorferdamm.dammlauncher.abgleich.SchulOrdner.WEBDAV
+private const val SCHUL_FREIGABE = de.oejendorferdamm.dammlauncher.abgleich.SchulOrdner.FREIGABE
 
 /** Master.zip aus dem Schul-Ordner laden und als Einrichtung übernehmen. [einmalig] = automatische Frage nach dem Update. */
 internal fun HomeActivity.schulVorlageFragen(einmalig: Boolean, fehler: String? = null) {
@@ -600,8 +600,79 @@ internal fun HomeActivity.schulVorlageFragen(einmalig: Boolean, fehler: String? 
                 haupt.post { schulVorlageFragen(einmalig, "Laden fehlgeschlagen: ${e.message}") }
                 return@execute
             }
+            Tresor.verschluessle(passwort)?.let { Geraet.schulPasswortVerschluesselt = it }
             haupt.post { einrichtungUebernehmen(ergebnis) }
         }
     })
     pw.requestFocus()
+}
+
+/** Schul-Ordner-Passwort: einmal eingeben, dann verschlüsselt auf diesem Board gemerkt. [fehler] = gemerktes stimmte nicht. */
+internal fun HomeActivity.mitSchulPasswort(fehler: String? = null, frisch: Boolean = false, weiter: (String) -> Unit) {
+    val gemerkt = if (fehler == null && !frisch) Tresor.entschluessle(Geraet.schulPasswortVerschluesselt) else null
+    if (!gemerkt.isNullOrEmpty()) { weiter(gemerkt); return }
+    val f = neuesFenster("Schul-Ordner", 900)
+    f.add(text(this, "Einmal das Passwort des Schul-Ordners eingeben – danach merkt sich dieses Board es.", 22, Farben.TEXT2))
+    fehler?.let { f.add(text(this, it, 22, Farben.ROT)) }
+    val pw = eingabe(this, "Passwort des Schul-Ordners", geheim = true)
+    f.add(pw)
+    f.knoepfe(knopf(this, "Abbrechen") { f.schliessen() }, knopf(this, "Weiter", haupt = true) {
+        val p = pw.text.toString()
+        if (p.isBlank()) return@knopf
+        Tresor.verschluessle(p)?.let { Geraet.schulPasswortVerschluesselt = it }
+        f.schliessen()
+        weiter(p)
+    })
+    pw.requestFocus()
+}
+
+private const val MAX_SYMBOLE = 120
+private val SYMBOL_DATEI = Regex("(?i).+\\.(png|jpe?g|webp)$")
+
+/** Symbol-Galerie: Bilder aus „DammLauncher/Symbole“ im Schul-Ordner; antippen = [gewaehlt] mit den Bilddaten. */
+internal fun HomeActivity.schulSymbole(fehler: String? = null, gewaehlt: (ByteArray) -> Unit): Unit = mitSchulPasswort(fehler) { passwort ->
+    meldung("Symbole werden geladen …")
+    netz.execute {
+        val bilder = try {
+            val dav = WebDav(SCHUL_WEBDAV, SCHUL_FREIGABE, passwort)
+            dav.liste("DammLauncher/Symbole").filter { SYMBOL_DATEI.matches(it) }.sortedBy { it.lowercase() }.take(MAX_SYMBOLE).mapNotNull { name ->
+                val daten = dav.get("DammLauncher/Symbole/$name", max = 8 * 1024 * 1024).daten ?: return@mapNotNull null
+                val o = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                android.graphics.BitmapFactory.decodeByteArray(daten, 0, daten.size, o)
+                if (o.outWidth <= 0) return@mapNotNull null
+                var probe = 1
+                while (maxOf(o.outWidth, o.outHeight) / (probe * 2) >= 160) probe *= 2
+                val klein = android.graphics.BitmapFactory.decodeByteArray(daten, 0, daten.size, android.graphics.BitmapFactory.Options().apply { inSampleSize = probe }) ?: return@mapNotNull null
+                name to klein // nur das Vorschaubild behalten, das Original wird beim Antippen neu geholt
+            }
+        } catch (e: Exception) {
+            val abgelehnt = e.message?.startsWith("Anmeldung abgelehnt") == true
+            haupt.post { if (abgelehnt) schulSymbole("Das Passwort stimmt nicht (oder wurde geändert).", gewaehlt) else meldung("Symbole laden fehlgeschlagen: ${e.message}") }
+            return@execute
+        }
+        haupt.post {
+            if (bilder.isEmpty()) { meldung("Im Schul-Ordner liegen noch keine Symbole (Ordner DammLauncher/Symbole).", true); return@post }
+            val f = neuesFenster("Symbole aus dem Schul-Ordner", 1400)
+            f.add(de.oejendorferdamm.dammlauncher.ui.Fluss(this).apply {
+                bilder.forEach { (datei, klein) ->
+                    val name = datei.substringBeforeLast('.')
+                    addView(LinearLayout(context).apply {
+                        orientation = LinearLayout.VERTICAL
+                        gravity = Gravity.CENTER_HORIZONTAL
+                        setPadding(8.vp, 8.vp, 8.vp, 8.vp)
+                        contentDescription = name
+                        addView(android.widget.ImageView(context).apply { setImageBitmap(klein) }, lp(140.vp, 140.vp))
+                        addView(text(context, name, 18, Farben.TEXT2).apply { maxLines = 1; maxWidth = 160.vp; ellipsize = android.text.TextUtils.TruncateAt.END; gravity = Gravity.CENTER }, lp(160.vp, ViewGroup.LayoutParams.WRAP_CONTENT))
+                        setOnClickListener {
+                            f.schliessen()
+                            netz.execute {
+                                val daten = try { WebDav(SCHUL_WEBDAV, SCHUL_FREIGABE, passwort).get("DammLauncher/Symbole/$datei", max = 8 * 1024 * 1024).daten } catch (_: Exception) { null }
+                                haupt.post { if (daten == null) meldung("Symbol ließ sich nicht laden.") else gewaehlt(daten) }
+                            }
+                        }
+                    })
+                }
+            })
+        }
+    }
 }

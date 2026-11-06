@@ -390,7 +390,7 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
             fenster.isNotEmpty() -> fenster.last().schliessen()
             ruhe != null -> Unit // Feierabend: nur „Entsperren“ hilft
             uebersicht != null -> uebersichtZu()
-            panel != null -> panelZu()
+            panel != null -> if (panel?.zurueck() != true) panelZu()
             else -> raster.abbrechen() // ein Launcher beendet sich nicht
         }
     }
@@ -770,6 +770,17 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         f.add(LinearLayout(this).apply {
             addView(knopf(context, "Bild wählen (PNG, JPG …)") { iconFuer = e; bildAuswahl(REQ_ICON, "image/*") }, lp(rechts = 14.vp))
             addView(knopf(context, "Symbol einer anderen App …") { andereAppWaehlen() }, lp(rechts = 14.vp))
+            addView(knopf(context, "Aus dem Schul-Ordner …") {
+                schulSymbole { daten ->
+                    arbeit.execute {
+                        val name = try { EigeneSymbole.ausDaten(daten) } catch (_: Throwable) { null }
+                        haupt.post {
+                            if (name == null) meldung("Das Bild lässt sich nicht als Symbol verwenden.")
+                            else if (bearbeitung === b) { b.icon = name; vorschauZeigen(b, komp) }
+                        }
+                    }
+                }
+            }, lp(rechts = 14.vp))
             addView(knopf(context, "Originalsymbol") { b.icon = null; vorschauZeigen(b, komp) }, lp())
         })
         f.knoepfe(
@@ -1968,6 +1979,10 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
     override fun tafelnZeigen() = tafelUebersicht()
     override fun aufraeumenJetzt() = aufraeumen()
     override fun schnellOeffnen() = schnell()
+    override fun schulPasswort() = mitSchulPasswort(if (de.oejendorferdamm.dammlauncher.abgleich.SchulOrdner.passwort() != null) "Das gemerkte Passwort wird ersetzt." else null, frisch = true) {
+        panel?.aufbauen()
+        unsplashNeu()
+    }
 
     override fun gestenErlaubt() = RandGesten.erlaubt(this)
 

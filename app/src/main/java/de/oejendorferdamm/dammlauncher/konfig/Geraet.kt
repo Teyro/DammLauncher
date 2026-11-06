@@ -152,6 +152,16 @@ object Geraet {
         get() = p.getBoolean("schulVorlageGefragt", false)
         set(v) = p.edit().putBoolean("schulVorlageGefragt", v).apply()
 
+    /** Passwort des Schul-Ordners, verschlüsselt (Tresor); leer = noch keins. */
+    var schulPasswortVerschluesselt: String
+        get() = p.getString("schulPasswort", "") ?: ""
+        set(v) = p.edit().putString("schulPasswort", v).apply()
+
+    /** Foto des Tages nicht mehr wechseln – das aktuelle Bild bleibt. */
+    var fotoBehalten: Boolean
+        get() = p.getBoolean("fotoBehalten", false)
+        set(v) = p.edit().putBoolean("fotoBehalten", v).apply()
+
     /** Einmalige Widget-Freigabe erledigt? */
     var widgetFreigabeGefragt: Boolean
         get() = p.getBoolean("widgetFreigabe", false)

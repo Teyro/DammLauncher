@@ -53,14 +53,22 @@ object FotoDesTages {
     private fun heute() = SimpleDateFormat("yyyy-MM-dd", Locale.GERMAN).format(Date())
 
     /** Woran man merkt, dass das gespeicherte Foto nicht mehr zur Einstellung passt. */
-    private fun art(h: Hintergrund) = if (h.quelle == Hintergrund.UNSPLASH) "unsplash:${h.thema}" else "commons"
+    private fun art(h: Hintergrund) = when (h.quelle) {
+        Hintergrund.UNSPLASH -> "unsplash:${h.thema}"
+        Hintergrund.SCHULE -> "schule"
+        else -> "commons"
+    }
 
-    private fun bereit(h: Hintergrund) = h.unsplash && (h.quelle == Hintergrund.COMMONS || h.schluessel.isNotEmpty())
+    private fun bereit(h: Hintergrund) = h.unsplash && when (h.quelle) {
+        Hintergrund.UNSPLASH -> h.schluessel.isNotEmpty()
+        Hintergrund.SCHULE -> de.oejendorferdamm.dammlauncher.abgleich.SchulOrdner.passwort() != null
+        else -> true
+    }
 
     /** Muss heute (noch) ein Foto geholt werden? */
     fun faellig(): Boolean {
         val h = KonfigSpeicher.konfig.hintergrund
-        if (!bereit(h)) return false
+        if (!bereit(h) || Geraet.fotoBehalten) return false
         val veraltet = Geraet.unsplashTag != heute() || Geraet.unsplashThema != art(h) || !datei().exists()
         return veraltet && System.currentTimeMillis() - Geraet.unsplashVersuch > PAUSE
     }
@@ -72,13 +80,20 @@ object FotoDesTages {
         Geraet.init(context)
         val h = KonfigSpeicher.konfig.hintergrund
         if (!h.unsplash) return "Foto des Tages ist aus."
-        if (!bereit(h)) return "Bitte zuerst den Unsplash-Schlüssel eintragen."
+        if (!bereit(h)) return if (h.quelle == Hintergrund.SCHULE) "Bitte zuerst das Passwort des Schul-Ordners eingeben." else "Bitte zuerst den Unsplash-Schlüssel eintragen."
         if (!vonHand && !faellig()) return "Das Foto von heute ist schon da."
         Geraet.unsplashVersuch = System.currentTimeMillis()
         File(datei().parentFile, "unsplash.jpg").delete() // Datei von 1.1.0
         val ergebnis = try {
-            val foto = if (h.quelle == Hintergrund.UNSPLASH) unsplash(h.schluessel, h.thema) else commons()
-            Datei.einpassen(bildHolen(foto.bild), Geraet.bildBreite, Geraet.bildHoehe, datei())
+            val foto: Foto
+            if (h.quelle == Hintergrund.SCHULE) {
+                val (name, daten) = schulBild()
+                foto = Foto("", "Schul-Ordner · ${name.substringBeforeLast('.')}", "")
+                Datei.einpassen(daten, Geraet.bildBreite, Geraet.bildHoehe, datei())
+            } else {
+                foto = if (h.quelle == Hintergrund.UNSPLASH) unsplash(h.schluessel, h.thema) else commons()
+                Datei.einpassen(bildHolen(foto.bild), Geraet.bildBreite, Geraet.bildHoehe, datei())
+            }
             Geraet.unsplashTag = heute()
             Geraet.unsplashThema = art(h)
             Geraet.fotoNachweis = foto.nachweis
@@ -91,6 +106,19 @@ object FotoDesTages {
         }
         Geraet.unsplashMeldung = "${SimpleDateFormat("dd.MM. HH:mm", Locale.GERMAN).format(Date())} – $ergebnis"
         return ergebnis
+    }
+
+    // ------------------------------------------------------------ Schul-Ordner
+
+    /** Bild des Tages aus DammLauncher/Wallpaper (Name, Bilddaten). */
+    private fun schulBild(): Pair<String, ByteArray> {
+        val s = de.oejendorferdamm.dammlauncher.abgleich.SchulOrdner
+        val pw = s.passwort() ?: throw IOException("Passwort des Schul-Ordners fehlt")
+        val dav = s.dav(pw)
+        val name = s.bildDesTages(dav.liste(s.WALLPAPER), System.currentTimeMillis() / 86_400_000L)
+            ?: throw IOException("Im Schul-Ordner (${s.WALLPAPER}) liegen keine Bilder")
+        val daten = dav.get("${s.WALLPAPER}/$name", max = MAX_BILD.toInt()).daten ?: throw IOException("Bild fehlt")
+        return name to daten
     }
 
     // ------------------------------------------------------------ Wikimedia Commons

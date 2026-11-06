@@ -39,6 +39,11 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
+      - name: Platz schaffen (der Emulator braucht gut 7 GB, die GitHub-Rechner haben knapp zu wenig frei)
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/share/boost /opt/hostedtoolcache/CodeQL
+          df -h /home/runner | tail -1
+
       - name: Emulator starten, App installieren, Screenshots aufnehmen
         uses: reactivecircus/android-emulator-runner@v2
         with:

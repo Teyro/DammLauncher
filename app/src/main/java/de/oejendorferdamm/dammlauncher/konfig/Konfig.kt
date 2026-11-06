@@ -199,6 +199,8 @@ data class Hintergrund(
     companion object {
         const val COMMONS = "commons"
         const val UNSPLASH = "unsplash"
+        /** Bilder aus dem Schul-Ordner (DammLauncher/Wallpaper), jeden Tag das nächste. */
+        const val SCHULE = "schule"
         const val STANDARD_THEMA = "landscape"
         val THEMA = Regex("^[\\p{L}0-9 ,-]{1,40}$")
         val SCHLUESSEL = Regex("^[A-Za-z0-9_-]{20,80}$")

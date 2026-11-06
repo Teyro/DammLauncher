@@ -349,6 +349,9 @@ def main():
     lang(w * 85 // 100, h * 70 // 100)
     time.sleep(2)
     screenshot("10_einstellungen.png")
+    tippe("Startbildschirm")  # seit 1.6.2: Übersicht mit Bereichen
+    time.sleep(1.5)
+    screenshot("10b_einstellungen_startbildschirm.png")
     tippe("+")  # erster „+“ = Spalten
     time.sleep(0.6)
     tippe("+")
@@ -407,8 +410,8 @@ def main():
     time.sleep(3)
     lang(w * 85 // 100, h * 70 // 100)
     time.sleep(2)
-    pass  # Panel steht links (Standard)
-    time.sleep(1)
+    tippe("Verwaltung")
+    time.sleep(1.5)
     if scrolle_zu("Boss-Modus …", w // 6):
         time.sleep(1.5)
         if feld_mit_hinweis("Master-Passwort (mindestens 8 Zeichen)", "Masterpass1"):
@@ -442,9 +445,9 @@ def main():
     # Foto des Tages: erst Wikimedia Commons (ohne Schlüssel), dann Unsplash mit Schlüssel
     lang(w * 85 // 100, h * 70 // 100)
     time.sleep(2)
-    pass  # Panel steht links (Standard)
-    time.sleep(1)
-    if scrolle_zu("Jeden Tag ein neues Landschaftsfoto", w // 6):
+    tippe("Aussehen")
+    time.sleep(1.5)
+    if scrolle_zu("Jeden Tag ein neues Foto", w // 6):
         time.sleep(6)
         scrolle_zu("Neues Foto jetzt", w // 6, antippen=False)
         screenshot("19_commons_geladen.png")
@@ -553,8 +556,8 @@ def main():
     # Neues Widget-Menü mit den eingebauten Kacheln
     lang(w * 85 // 100, h * 80 // 100)
     time.sleep(2)
-    # Panel steht links (Standard) – dort wird gescrollt
-    time.sleep(1)
+    tippe("Startbildschirm")
+    time.sleep(1.5)
     if scrolle_zu("Widget hinzufügen …", w // 6):
         time.sleep(2)
         screenshot("23c_widget_liste_neu.png")
@@ -565,8 +568,8 @@ def main():
     time.sleep(1.5)
     lang(w * 85 // 100, h * 80 // 100)
     time.sleep(2)
-    pass  # Panel steht links (Standard)
-    time.sleep(1)
+    tippe("Schule")
+    time.sleep(1.5)
     if scrolle_zu("Schüler-Ansicht einschalten", w // 6):
         time.sleep(1.5)
         scrolle_zu("Jetzt zur Schüler-Ansicht", w // 6, antippen=False)

@@ -39,6 +39,11 @@ object EigeneSymbole {
             }
             aus.toByteArray()
         } ?: return null
+        return ausDaten(daten)
+    }
+
+    /** Bild aus Bytes (z. B. aus dem Schul-Ordner) als Symbol übernehmen. */
+    fun ausDaten(daten: ByteArray): String? {
         val o = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeByteArray(daten, 0, daten.size, o)
         if (o.outWidth <= 0) return null
