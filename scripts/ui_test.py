@@ -410,6 +410,13 @@ def main():
     time.sleep(3)
     lang(w * 85 // 100, h * 70 // 100)
     time.sleep(2)
+    # 1.6.4: Quelle beim Einschalten (Emulator hat keine Eingänge → Hinweis)
+    tippe("Bedienung")
+    time.sleep(1.5)
+    if scrolle_zu("Quelle beim Einschalten", w // 6, antippen=False):
+        screenshot("14z_quelle_beim_einschalten.png")
+    adb("shell", "input", "keyevent", "KEYCODE_BACK")
+    time.sleep(1.5)
     tippe("Verwaltung")
     time.sleep(1.5)
     if scrolle_zu("Boss-Modus …", w // 6):

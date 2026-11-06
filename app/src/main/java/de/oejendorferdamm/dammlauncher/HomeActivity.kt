@@ -227,6 +227,10 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         Abgleich.planen(this)
         TagesJob.planen(this)
         hintergrundPruefungen()
+        // Quelle beim Einschalten: warten, bis z. B. der PC Bild liefert, dann umschalten (einmal je Einschalten)
+        KonfigSpeicher.konfig.startQuelle.let { q ->
+            if (!sicher && q.id.isNotEmpty()) de.oejendorferdamm.dammlauncher.pflege.StartQuelle.beimStart(applicationContext, q.id, q.wartenSek, q.aufSignal) {}
+        }
         // Einmalig (neue und bestehende Boards): Vorlage der Schule anbieten. Nicht im Testbuild – der Oberflächentest kennt das Fenster nicht.
         if (!sicher && !Geraet.schulVorlageGefragt && !BuildConfig.DEBUG) {
             Geraet.schulVorlageGefragt = true

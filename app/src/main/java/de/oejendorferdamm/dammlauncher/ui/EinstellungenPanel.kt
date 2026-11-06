@@ -103,8 +103,8 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
                 listOf(::teilAussehen, ::teilHintergrund, ::teilSymboleundSchrift)),
             Seite("Startbildschirm", "▦", 0xFF2563EB.toInt(), { k -> "${k.spalten} × ${k.zeilen} Raster · Ränder · Widgets · Apps" },
                 listOf(::teilRaster, ::teilAbstandzumBildschirmrand, ::teilWidgetsundAblage, ::teilApps)),
-            Seite("Bedienung", "👆", 0xFF0891B2.toInt(), { k -> (if (k.pin == null) "ohne PIN" else "mit PIN") + " · Gesten · Seitenleiste " + (if (k.seitenleiste.an) "an" else "aus") },
-                listOf(::teilBedienung, ::teilGesten, ::teilSeitenleiste)),
+            Seite("Bedienung", "👆", 0xFF0891B2.toInt(), { k -> (if (k.pin == null) "ohne PIN" else "mit PIN") + (if (k.startQuelle.id.isNotEmpty()) " · Startquelle " + k.startQuelle.name.ifBlank { "an" } else "") + " · Gesten · Seitenleiste " + (if (k.seitenleiste.an) "an" else "aus") },
+                listOf(::teilBedienung, ::teilStartQuelle, ::teilGesten, ::teilSeitenleiste)),
             Seite("Schule", "🏫", 0xFF16A34A.toInt(), { k -> "Stundenplan, Pausen, Hinweise, Schüler-Ansicht" + (if (k.schueler.an) " (an)" else "") },
                 listOf(::teilStundenplanundProfile, ::teilSchulzeiten, ::teilHinweisBand, ::teilSchuelerAnsicht, ::teilAbwesenheiten, ::teilAufraeumen)),
             Seite("Verwaltung", "☁", 0xFFEA580C.toInt(), { _ -> "Vorlage für alle Boards, Datei, Updates" + (if (a.bossAktiv()) " · Boss-Modus aktiv" else "") },
@@ -292,6 +292,39 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
         } else if (k.gesten.randAn) {
             add(text(c, "Aktiv. Unten am Rand zeigt ein feiner Strich, wo man wischen kann.", 21, Farben.TEXT2), 8)
         }
+    }
+
+    /** Quelle beim Einschalten: auf den OPS-PC umschalten, sobald er Bild liefert (er fährt länger hoch als das Board). */
+    private fun teilStartQuelle(k: Konfig) {
+        abschnitt("Quelle beim Einschalten")
+        val q = k.startQuelle
+        add(text(c, "Nach dem Einschalten wartet der Launcher, bis der gewählte Eingang (z. B. der PC im Einschub) Bild liefert, und schaltet dann um – wie beim Einstecken eines HDMI-Kabels. Einmal je Einschalten, höchstens 10 Minuten lang.", 21, Farben.TEXT2))
+        val eingaenge = de.oejendorferdamm.dammlauncher.pflege.StartQuelle.eingaenge(c)
+        if (eingaenge.isEmpty()) {
+            add(text(c, "Dieses Gerät meldet Apps keine Eingänge – hier geht es nicht.", 22, Farben.ROT), 10)
+            return
+        }
+        add(text(c, "Eingang wählen:", 22, Farben.TEXT2), 12)
+        val knoepfeListe = eingaenge.map { e ->
+            val signal = when (e.signal) { true -> "Bild da"; false -> "kein Bild"; null -> "bereit" }
+            knopf(c, "${e.name} (${e.art}) · $signal", haupt = e.id == q.id) {
+                aendere { it.copy(startQuelle = it.startQuelle.copy(id = e.id, name = e.name.take(60))) }
+                aufbauen()
+            }
+        } + knopf(c, "Aus", haupt = q.id.isEmpty()) {
+            aendere { it.copy(startQuelle = it.startQuelle.copy(id = "", name = "")) }
+            aufbauen()
+        }
+        knoepfe(*knoepfeListe.toTypedArray())
+        if (q.id.isEmpty()) return
+        auswahl("Frühestens nach dem Einschalten", listOf("0" to "sofort", "30" to "30 s", "60" to "1 min", "90" to "1,5 min", "120" to "2 min", "180" to "3 min"), q.wartenSek.toString()) { v ->
+            aendere { it.copy(startQuelle = it.startQuelle.copy(wartenSek = v.toInt())) }
+        }
+        add(schalter(c, "Erst umschalten, wenn der Eingang Bild hat", q.aufSignal) { an -> aendere { it.copy(startQuelle = it.startQuelle.copy(aufSignal = an)) } })
+        add(text(c, "Schaltet das Board trotzdem zu früh oder nie um: hier ausschalten und die Wartezeit erhöhen.", 21, Farben.TEXT2), 4)
+        knoepfe(knopf(c, "Jetzt umschalten (Test)") {
+            if (!de.oejendorferdamm.dammlauncher.pflege.StartQuelle.wechseln(c, q.id)) a.meldung("Das Gerät lässt das Umschalten durch Apps nicht zu.")
+        })
     }
 
     private fun teilBedienung(k: Konfig) {

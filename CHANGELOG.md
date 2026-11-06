@@ -1,5 +1,8 @@
 # Änderungen
 
+## 1.6.4
+- **Quelle beim Einschalten** (Einstellungen → Bedienung): nach dem Einschalten wartet der Launcher, bis der gewählte Eingang – z. B. der OPS-PC im Einschub – Bild liefert, und schaltet dann um. Hilft, wenn der PC länger hochfährt als das Board. Mit Mindest-Wartezeit, Test-Knopf und Liste der Eingänge des Boards; wird mit der zentralen Verteilung auf alle Boards übertragen.
+
 ## 1.6.3
 - **Kein schwarzer Balken mehr unten** (auf Clevertouch-Boards mit „⋮“): der Startbildschirm malt randlos hinter die Navigationsleiste wie andere Apps; Raster, Dock, „Alle Apps“, Einstellungen und Fenster rücken darüber.
 

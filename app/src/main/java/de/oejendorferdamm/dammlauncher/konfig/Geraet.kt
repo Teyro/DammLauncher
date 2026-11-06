@@ -157,6 +157,11 @@ object Geraet {
         get() = p.getString("schulPasswort", "") ?: ""
         set(v) = p.edit().putString("schulPasswort", v).apply()
 
+    /** Einschaltzeitpunkt (ms), zu dem die Quelle beim Einschalten schon gewechselt wurde. */
+    var startQuelleErledigt: Long
+        get() = p.getLong("startQuelleErledigt", 0)
+        set(v) = p.edit().putLong("startQuelleErledigt", v).apply()
+
     /** Foto des Tages nicht mehr wechseln – das aktuelle Bild bleibt. */
     var fotoBehalten: Boolean
         get() = p.getBoolean("fotoBehalten", false)

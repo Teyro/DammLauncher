@@ -66,6 +66,8 @@ object KonfigJson {
             k.profile.forEach { p -> put(JSONObject().put("name", p.name).put("elemente", JSONArray().apply { p.elemente.forEach { put(element(it)) } })) }
         })
         put("profilNachFach", k.profilNachFach)
+        if (k.startQuelle.id.isNotEmpty()) put("startQuelle", JSONObject().put("id", k.startQuelle.id).put("name", k.startQuelle.name)
+            .put("wartenSek", k.startQuelle.wartenSek).put("aufSignal", k.startQuelle.aufSignal))
         k.statusZugang?.let { put("statusZugang", JSONObject().put("benutzer", it.benutzer).put("passwort", it.passwort)) }
     }.toString(2)
 
@@ -369,6 +371,11 @@ object KonfigJson {
             profil = profilName,
             profile = profile,
             profilNachFach = o.optBoolean("profilNachFach", false),
+            startQuelle = o.optJSONObject("startQuelle")?.let { q ->
+                val id = q.optString("id")
+                if (!StartQuelleEinstellung.ID.matches(id)) { w.add("startQuelle ungültig"); StartQuelleEinstellung() }
+                else StartQuelleEinstellung(id, q.optString("name").take(60), q.optInt("wartenSek", 30).coerceIn(StartQuelleEinstellung.WARTEN), q.optBoolean("aufSignal", true))
+            } ?: StartQuelleEinstellung(),
             statusZugang = o.optJSONObject("statusZugang")?.let { z ->
                 val b = z.optString("benutzer").trim()
                 val p = z.optString("passwort")
