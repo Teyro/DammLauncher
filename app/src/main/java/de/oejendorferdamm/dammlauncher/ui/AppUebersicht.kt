@@ -78,7 +78,7 @@ class AppUebersicht(
             setPadding(34.vp, 18.vp, 34.vp, 18.vp)
         }
         isClickable = true
-        val spalte = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL; setPadding(50.vp, 30.vp, 50.vp, 0) }
+        val spalte = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL; setPadding(50.vp, 30.vp, 50.vp, Masse.navUnten) }
         spalte.addView(LinearLayout(context).apply {
             gravity = Gravity.CENTER_VERTICAL
             addView(text(context, titel, 40, android.graphics.Color.WHITE, fett = true), lp(rechts = 30.vp))

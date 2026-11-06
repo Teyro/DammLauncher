@@ -14,6 +14,10 @@ object Masse {
     var faktor: Float = 1f
         private set
 
+    /** Höhe der Navigationsleiste unten in Pixeln (der Startbildschirm malt randlos dahinter). */
+    @Volatile
+    var navUnten: Int = 0
+
     fun aktualisiere(context: Context) {
         val m = context.resources.displayMetrics
         faktor = maxOf(m.widthPixels, m.heightPixels) / 1920f

@@ -144,7 +144,7 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
             0 -> Gravity.START
             2 -> Gravity.END
             else -> Gravity.CENTER_HORIZONTAL
-        }).apply { setMargins(30.vp, 30.vp, 30.vp, 30.vp) }
+        }).apply { setMargins(30.vp, 30.vp, 30.vp, 30.vp + Masse.navUnten) }
     }
 
     fun schliessen() = (ebene.parent as? ViewGroup)?.removeView(ebene)

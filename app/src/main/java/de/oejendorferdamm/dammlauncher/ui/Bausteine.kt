@@ -310,7 +310,7 @@ class GrossFenster(private val wurzel: FrameLayout, titel: String, breite: Int =
         }
         val m = c.resources.displayMetrics
         decke.addView(kasten, FrameLayout.LayoutParams(minOf(breite.vp, (m.widthPixels * 0.92f).toInt()), ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER).apply {
-            topMargin = 30.vp; bottomMargin = 30.vp
+            topMargin = 30.vp; bottomMargin = 30.vp + Masse.navUnten
         })
         wurzel.addView(decke, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
         // Einblenden nur mit eingeschalteten Animationen – ältere Boards ruckeln sonst

@@ -115,6 +115,8 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
     private lateinit var dock: Dock
     /** Zuletzt gesehene Stunde (für „Profil nach Fach“), -2 = noch keine. */
     private var stundeZuletzt: Int? = -2
+    /** Höhe der Navigationsleiste unten (der Startbildschirm malt randlos dahinter). */
+    private var navUnten = 0
     private lateinit var alleApps: TextView
     private lateinit var fotoHinweis: TextView
     private var vorne = false
@@ -210,6 +212,7 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         lehrerKnopf = glasKnopf(this, "Lehrer-Ansicht  ✕") { zurSchuelerAnsicht() }.apply { groesse(22); setPadding(30.vp, 12.vp, 30.vp, 12.vp); visibility = View.GONE }
         wurzel.addView(lehrerKnopf, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP or Gravity.END).apply { topMargin = 14.vp; rightMargin = 14.vp })
         setContentView(wurzel)
+        randlos()
 
         KonfigSpeicher.beobachte(konfigBeobachter)
         AppKatalog.beobachte(appBeobachter)
@@ -228,6 +231,32 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         if (!sicher && !Geraet.schulVorlageGefragt && !BuildConfig.DEBUG) {
             Geraet.schulVorlageGefragt = true
             haupt.postDelayed({ schulVorlageFragen(true) }, 2000)
+        }
+    }
+
+    /**
+     * Randlos wie andere Apps: Der Startbildschirm malt auch hinter die Navigationsleiste. Sonst zeichnet
+     * das System dort einen schwarzen Balken mit eigenen Knöpfen (auf Clevertouch-Boards mit „⋮“), während
+     * andere Apps nur den schmalen Wisch-Streifen zeigen. Bedienelemente rücken um die Leistenhöhe nach innen.
+     */
+    @Suppress("DEPRECATION")
+    private fun randlos() {
+        window.navigationBarColor = Color.TRANSPARENT
+        if (android.os.Build.VERSION.SDK_INT >= 29) window.isNavigationBarContrastEnforced = false
+        if (android.os.Build.VERSION.SDK_INT >= 30) window.setDecorFitsSystemWindows(false)
+        else wurzel.systemUiVisibility = wurzel.systemUiVisibility or View.SYSTEM_UI_FLAG_LAYOUT_STABLE or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+        wurzel.setOnApplyWindowInsetsListener { _, insets ->
+            // Nur was unten am Rand sitzt, rückt über die Leiste; Ebenen wie Bildschirmschoner und Sperren decken alles ab
+            if (navUnten != insets.systemWindowInsetBottom) {
+                navUnten = insets.systemWindowInsetBottom
+                Masse.navUnten = navUnten
+                fun hoch(v: View, basis: Int) { (v.layoutParams as FrameLayout.LayoutParams).let { it.bottomMargin = basis + navUnten; v.layoutParams = it } }
+                hoch(alleApps, 18.vp)
+                hoch(dock, 22.vp)
+                hoch(fotoHinweis, 10.vp)
+                rasterRaender()
+            }
+            insets
         }
     }
 
@@ -1405,7 +1434,7 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         val lp = raster.layoutParams as FrameLayout.LayoutParams
         val band = if (hinweisBand.visibility == View.VISIBLE) hinweisBand.height + 20.vp else 0
         val oben = if (Thema.clevertouch) Kopfzeile.HOEHE.vp + (if (band > 0) band + 6.vp else 0) else band
-        val unten = if (Thema.clevertouch && dock.visibility == View.VISIBLE) Dock.HOEHE.vp else 0
+        val unten = (if (Thema.clevertouch && dock.visibility == View.VISIBLE) Dock.HOEHE.vp else 0) + navUnten
         if (lp.topMargin != oben || lp.bottomMargin != unten) {
             lp.topMargin = oben
             lp.bottomMargin = unten
