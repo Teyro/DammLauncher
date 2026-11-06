@@ -76,13 +76,13 @@ class MinimalAnsicht(
                 text = ersatz
                 gravity = Gravity.CENTER
                 setTextColor(Color.WHITE)
-                textSize = 76f
+                setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 96f.vp)
                 background = runde(0x33FFFFFF, 34f.vp)
             }, LinearLayout.LayoutParams(g, g))
             addView(TextView(context).apply {
                 text = name
                 setTextColor(Color.WHITE)
-                textSize = 30f
+                setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 34f.vp)
                 typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
                 gravity = Gravity.CENTER
                 setShadowLayer(8f, 0f, 2f, 0x99000000.toInt())
