@@ -44,6 +44,7 @@ import de.oejendorferdamm.dammlauncher.konfig.Zeitraum
 import de.oejendorferdamm.dammlauncher.qr.QrCode
 import de.oejendorferdamm.dammlauncher.ui.AppZelle
 import de.oejendorferdamm.dammlauncher.ui.InfoKachel
+import de.oejendorferdamm.dammlauncher.ui.MinimalAnsicht
 import de.oejendorferdamm.dammlauncher.ui.QrAnsicht
 import android.view.MotionEvent
 import java.util.Calendar
@@ -128,6 +129,7 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
     private var meldungAnsicht: TextView? = null
     private lateinit var hinweisBand: TextView
     private lateinit var lehrerKnopf: TextView
+    internal lateinit var minimalAnsicht: MinimalAnsicht
     /** Feierabend-Sperre (über allem außer Update-Sperre, Fenstern und Meldungen). */
     private var ruhe: View? = null
     private var schoner: View? = null
@@ -211,6 +213,10 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         wurzel.addView(hinweisBand, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply { topMargin = 14.vp })
         lehrerKnopf = glasKnopf(this, "Lehrer-Ansicht  ✕") { zurSchuelerAnsicht() }.apply { groesse(22); setPadding(30.vp, 12.vp, 30.vp, 12.vp); visibility = View.GONE }
         wurzel.addView(lehrerKnopf, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP or Gravity.END).apply { topMargin = 14.vp; rightMargin = 14.vp })
+        minimalAnsicht = MinimalAnsicht(this,
+            { starteApp(RandGesten.DAMMBOARD, "DammBoard") }, { starteApp(RandGesten.DAMMZEIT, "DammZeit") }, { quelleKnopf() }, { langerDruckLeer() }
+        ).apply { visibility = View.GONE }
+        wurzel.addView(minimalAnsicht, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
         setContentView(wurzel)
         randlos()
 
@@ -305,6 +311,7 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         if (Geraet.veraltetGemeldet || System.currentTimeMillis() - Geraet.letzterUpdateCheck > 24 * 60 * 60_000L) updatePruefenStill()
         else bereitesUpdateInstallieren()
         if (FotoDesTages.faellig()) unsplashLaden(false)
+        zeitPruefen()
         haupt.removeCallbacks(wartung)
         haupt.postDelayed(wartung, WARTUNG_MS)
         haupt.removeCallbacks(takt)
@@ -463,6 +470,7 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         dock.visibility = if (Thema.clevertouch && !(ohneApps && k.dock.isEmpty())) View.VISIBLE else View.GONE
         if (Thema.clevertouch) dock.setze(k.dock, mitAlle = !ohneApps)
         lehrerKnopf.visibility = if (k.schueler.an && !schueler) View.VISIBLE else View.GONE
+        minimalZeigen(k)
         hinweisZeigen(k)
         hintergrund(k)
         // Widgets ihre Größe mitteilen, sobald sie liegen
@@ -475,6 +483,20 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
     }
 
     /** Unsplash-Foto vor eigenem Bild vor Farbe; über Fotos oben und unten ein leichter Schatten (Lesbarkeit). */
+/** Minimalmodus: Raster, Dock und Knöpfe weg, nur Uhr + Tafel/Timer/Quelle über dem Hintergrund. */
+    private fun minimalZeigen(k: Konfig) {
+        val an = k.minimal.an
+        minimalAnsicht.visibility = if (an) View.VISIBLE else View.GONE
+        if (!an) { raster.visibility = View.VISIBLE; return }
+        raster.visibility = View.GONE
+        alleApps.visibility = View.GONE
+        kopfzeile.visibility = View.GONE
+        dock.visibility = View.GONE
+        lehrerKnopf.visibility = View.GONE
+        fun symbol(p: String) = try { packageManager.getApplicationIcon(p) } catch (_: Exception) { null }
+        minimalAnsicht.setze(symbol(RandGesten.DAMMBOARD), symbol(RandGesten.DAMMZEIT), "Quelle")
+    }
+
     private fun hintergrund(k: Konfig) {
         val foto = FotoDesTages.datei()
         val mitFoto = k.hintergrund.unsplash && foto.exists()
@@ -1852,9 +1874,21 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
     // ------------------------------------------------------------ Hintergrund-Prüfungen beim Start
 
     private fun hintergrundPruefungen() {
+        zeitPruefen()
         if (Abgleich.faellig()) netz.execute {
             Abgleich.pruefen(this)
             haupt.post { widgetsAbgleichen(); zeigen() }
+        }
+    }
+
+    /** Uhrzeit mit dem Zeitserver abgleichen – beim Start und dann höchstens alle 6 Stunden. */
+    internal fun zeitPruefen(erzwingen: Boolean = false) {
+        val server = KonfigSpeicher.konfig.zeitServer
+        if (server.isEmpty()) return
+        if (!erzwingen && System.currentTimeMillis() - de.oejendorferdamm.dammlauncher.pflege.ZeitAbgleich.zuletzt < 6 * 60 * 60_000L) return
+        netz.execute {
+            de.oejendorferdamm.dammlauncher.pflege.ZeitAbgleich.abgleichen(applicationContext, server)
+            haupt.post { minimalAnsicht.invalidate(); raster.invalidate(); panel?.aufbauen() }
         }
     }
 
@@ -2012,6 +2046,8 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
     override fun tafelnZeigen() = tafelUebersicht()
     override fun aufraeumenJetzt() = aufraeumen()
     override fun schnellOeffnen() = schnell()
+    override fun minimalQuelleApp() = minimalQuelleAppWaehlen()
+    override fun zeitJetzt() = zeitPruefen(erzwingen = true)
     override fun schulPasswort() = mitSchulPasswort(if (de.oejendorferdamm.dammlauncher.abgleich.SchulOrdner.passwort() != null) "Das gemerkte Passwort wird ersetzt." else null, frisch = true) {
         panel?.aufbauen()
         unsplashNeu()

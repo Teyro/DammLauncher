@@ -1,7 +1,9 @@
 # Änderungen
 
 ## 1.6.4
-- **Quelle beim Einschalten** (Einstellungen → Bedienung): nach dem Einschalten wartet der Launcher, bis der gewählte Eingang – z. B. der OPS-PC im Einschub – Bild liefert, und schaltet dann um. Hilft, wenn der PC länger hochfährt als das Board. Mit Mindest-Wartezeit, Test-Knopf und Liste der Eingänge des Boards; wird mit der zentralen Verteilung auf alle Boards übertragen.
+- **Minimalmodus** (Einstellungen → Startbildschirm): nur Hintergrundbild, große Uhr und drei große Knöpfe – Tafel (DammBoard), Timer (DammZeit) und Quelle umschalten. Alles andere bleibt gespeichert; langer Druck öffnet die Einstellungen.
+- **Uhrzeit vom Zeitserver** (Einstellungen → Verwaltung): Standard PTB (amtliche Zeit). Geht die Board-Uhr falsch, zeigen die Uhren des Launchers trotzdem die richtige Zeit; mit der Erlaubnis WRITE_SECURE_SETTINGS (einmal per adb) stellt er auch die Systemuhr.
+- **Quelle beim Einschalten** (Einstellungen → Bedienung): wartet nach dem Einschalten, bis der gewählte Eingang Bild liefert, und schaltet dann um – nur auf Geräten, die Apps ihre Eingänge melden.
 
 ## 1.6.3
 - **Kein schwarzer Balken mehr unten** (auf Clevertouch-Boards mit „⋮“): der Startbildschirm malt randlos hinter die Navigationsleiste wie andere Apps; Raster, Dock, „Alle Apps“, Einstellungen und Fenster rücken darüber.

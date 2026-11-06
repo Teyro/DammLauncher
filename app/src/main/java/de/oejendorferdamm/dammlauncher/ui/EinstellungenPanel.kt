@@ -67,6 +67,8 @@ interface PanelAktionen {
     fun aufraeumenJetzt()
     fun schnellOeffnen()
     fun schulPasswort()
+    fun minimalQuelleApp()
+    fun zeitJetzt()
 }
 
 /**
@@ -101,14 +103,14 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
         listOf(
             Seite("Aussehen", "🎨", 0xFF7C3AED.toInt(), { k -> (if (k.aussehen == Aussehen.CLEVERTOUCH) "Clevertouch" else "Klassisch") + " · Hintergrund · Schrift" },
                 listOf(::teilAussehen, ::teilHintergrund, ::teilSymboleundSchrift)),
-            Seite("Startbildschirm", "▦", 0xFF2563EB.toInt(), { k -> "${k.spalten} × ${k.zeilen} Raster · Ränder · Widgets · Apps" },
-                listOf(::teilRaster, ::teilAbstandzumBildschirmrand, ::teilWidgetsundAblage, ::teilApps)),
+            Seite("Startbildschirm", "▦", 0xFF2563EB.toInt(), { k -> (if (k.minimal.an) "Minimalmodus · " else "") + "${k.spalten} × ${k.zeilen} Raster · Ränder · Widgets · Apps" },
+                listOf(::teilMinimal, ::teilRaster, ::teilAbstandzumBildschirmrand, ::teilWidgetsundAblage, ::teilApps)),
             Seite("Bedienung", "👆", 0xFF0891B2.toInt(), { k -> (if (k.pin == null) "ohne PIN" else "mit PIN") + (if (k.startQuelle.id.isNotEmpty()) " · Startquelle " + k.startQuelle.name.ifBlank { "an" } else "") + " · Gesten · Seitenleiste " + (if (k.seitenleiste.an) "an" else "aus") },
                 listOf(::teilBedienung, ::teilStartQuelle, ::teilGesten, ::teilSeitenleiste)),
             Seite("Schule", "🏫", 0xFF16A34A.toInt(), { k -> "Stundenplan, Pausen, Hinweise, Schüler-Ansicht" + (if (k.schueler.an) " (an)" else "") },
                 listOf(::teilStundenplanundProfile, ::teilSchulzeiten, ::teilHinweisBand, ::teilSchuelerAnsicht, ::teilAbwesenheiten, ::teilAufraeumen)),
             Seite("Verwaltung", "☁", 0xFFEA580C.toInt(), { _ -> "Vorlage für alle Boards, Datei, Updates" + (if (a.bossAktiv()) " · Boss-Modus aktiv" else "") },
-                listOf(::teilZentraleVerteilungIServ, ::teilDatei, ::teilUpdates)),
+                listOf(::teilZentraleVerteilungIServ, ::teilDatei, ::teilUpdates, ::teilUhrzeit)),
             Seite("Über DammLauncher", "ℹ", 0xFF6B7280.toInt(), { _ -> "Version ${BuildConfig.VERSION_NAME} · Lizenzen" }, listOf(::teilUeberDammLauncher))
         )
     }
@@ -292,6 +294,54 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
         } else if (k.gesten.randAn) {
             add(text(c, "Aktiv. Unten am Rand zeigt ein feiner Strich, wo man wischen kann.", 21, Farben.TEXT2), 8)
         }
+    }
+
+    /** Zeitserver: richtige Uhrzeit, auch wenn die Board-Uhr falsch geht. */
+    private fun teilUhrzeit(k: Konfig) {
+        abschnitt("Uhrzeit (Zeitserver)")
+        val z = de.oejendorferdamm.dammlauncher.pflege.ZeitAbgleich
+        add(text(c, "Standard ist der Zeitserver der PTB (amtliche Zeit in Deutschland). Leer = aus. Gilt mit der Vorlage für alle Boards.", 21, Farben.TEXT2))
+        val feld = eingabe(c, "Zeitserver, z. B. ${z.STANDARD}", k.zeitServer)
+        feld.imeOptions = feld.imeOptions or android.view.inputmethod.EditorInfo.IME_ACTION_DONE
+        add(feld, 10)
+        knoepfe(knopf(c, "Speichern") {
+            val s = feld.text.toString().trim()
+            if (s.isNotEmpty() && !z.SERVER.matches(s)) a.meldung("Das ist kein gültiger Servername.")
+            else { aendere { it.copy(zeitServer = s) }; a.zeitJetzt(); aufbauen() }
+        }, knopf(c, "PTB") { aendere { it.copy(zeitServer = z.STANDARD) }; a.zeitJetzt(); aufbauen() }, knopf(c, "Jetzt abgleichen") { a.zeitJetzt() })
+        val stand = when {
+            k.zeitServer.isEmpty() -> "Aus."
+            z.zuletzt == 0L -> "Noch nicht abgeglichen."
+            z.fehler != null -> z.fehler!!
+            z.versatzMs == 0L -> "Board-Uhr stimmt (weniger als 1 s Abweichung)."
+            else -> "Board-Uhr geht " + (if (z.versatzMs > 0) "nach" else "vor") + " um " + dauer(kotlin.math.abs(z.versatzMs)) + " – die Uhren des Launchers zeigen die richtige Zeit."
+        }
+        add(text(c, stand, 22, if (z.fehler != null) Farben.ROT else Farben.TEXT), 10)
+        add(text(c, if (z.darfSystem(c)) (if (z.systemGesetzt) "Systemzeit: Zeitserver eingestellt, „Uhrzeit automatisch“ an." else "Systemzeit: wird beim nächsten Abgleich eingestellt.")
+            else "Damit auch die Systemuhr (alle Apps) stimmt, braucht DammLauncher einmal eine Erlaubnis – per USB-Debugging: adb shell pm grant ${c.packageName} android.permission.WRITE_SECURE_SETTINGS (oder über die Geräteverwaltung).", 21, Farben.TEXT2), 6)
+    }
+
+    private fun dauer(ms: Long): String {
+        val s = ms / 1000
+        return when { s < 60 -> "$s s"; s < 3600 -> "${s / 60} min ${s % 60} s"; else -> "${s / 3600} h ${s % 3600 / 60} min" }
+    }
+
+    /** Minimalmodus: nur Uhr, Tafel, Timer und Quelle über dem Hintergrund. */
+    private fun teilMinimal(k: Konfig) {
+        abschnitt("Minimalmodus")
+        val m = k.minimal
+        add(schalter(c, "Minimalmodus: nur Hintergrund, große Uhr, Tafel, Timer und Quelle", m.an) { an -> aendere { it.copy(minimal = it.minimal.copy(an = an)) }; aufbauen() })
+        add(text(c, "Alles andere (Raster, Dock, Alle Apps) ist ausgeblendet, aber gespeichert – ausschalten holt es zurück. Langer Druck auf die freie Fläche öffnet die Einstellungen.", 21, Farben.TEXT2), 6)
+        if (!m.an) return
+        val eingaenge = de.oejendorferdamm.dammlauncher.pflege.StartQuelle.eingaenge(c)
+        add(text(c, "Quelle-Knopf: " + when {
+            eingaenge.isNotEmpty() && k.startQuelle.id.isNotEmpty() -> "schaltet auf „${k.startQuelle.name.ifBlank { k.startQuelle.id }}“ (Bedienung → Quelle beim Einschalten)."
+            eingaenge.isNotEmpty() -> "zeigt die Eingänge dieses Boards zur Auswahl."
+            m.quelle != null -> "öffnet „${m.quelle.titel ?: AppKatalog.finde(m.quelle.paket, m.quelle.aktivitaet)?.name ?: m.quelle.paket}“."
+            else -> "Dieses Board meldet Apps keine Eingänge – bitte die App wählen, mit der man hier die Quelle umschaltet."
+        }, 22, if (eingaenge.isEmpty() && m.quelle == null) Farben.ROT else Farben.TEXT), 12)
+        if (eingaenge.isEmpty()) knoepfe(knopf(c, if (m.quelle == null) "App für den Quelle-Knopf …" else "Andere App …") { a.minimalQuelleApp() },
+            *(if (m.quelle != null) arrayOf(knopf(c, "Keine App") { aendere { it.copy(minimal = it.minimal.copy(quelle = null)) }; aufbauen() }) else emptyArray()))
     }
 
     /** Quelle beim Einschalten: auf den OPS-PC umschalten, sobald er Bild liefert (er fährt länger hoch als das Board). */

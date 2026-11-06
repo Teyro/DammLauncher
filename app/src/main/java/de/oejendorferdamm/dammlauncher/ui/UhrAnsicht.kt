@@ -141,7 +141,7 @@ class UhrAnsicht(context: Context, transparent: Boolean = false, stil: UhrStil =
             if (!Thema.clevertouch) canvas.drawRoundRect(feld, radius(), radius(), rahmen)
         }
 
-        val jetzt = Date()
+        val jetzt = Date(de.oejendorferdamm.dammlauncher.pflege.ZeitAbgleich.jetzt())
         val z = uhrzeit.format(jetzt)
         val d = tag.format(jetzt)
         // Flach und breit: nur die Uhrzeit

@@ -74,6 +74,10 @@ data class Konfig(
     val statusZugang: Zugang? = null,
     /** Quelle beim Einschalten: Eingang (TvInputManager-Id, "" = aus), sein Name zur Anzeige, Mindest-Wartezeit, auf Signal warten. */
     val startQuelle: StartQuelleEinstellung = StartQuelleEinstellung(),
+    /** Minimalmodus: nur Hintergrund, große Uhr, Tafel, Timer und Quelle-Knopf. */
+    val minimal: Minimal = Minimal(),
+    /** Zeitserver (NTP) für die Uhrzeit; "" = aus. */
+    val zeitServer: String = de.oejendorferdamm.dammlauncher.pflege.ZeitAbgleich.STANDARD,
     /** Wann diese Einrichtung zuletzt geändert wurde (ms seit 1970) – dient auch als Vorlagen-Version. */
     val stand: Long = 0L
 )
@@ -119,6 +123,9 @@ data class Nachricht(val text: String, val tag: String, val von: Int, val bis: I
 data class Aufraeumen(val pausen: Boolean = false, val feierabend: Boolean = true, val lautstaerke: Int = 40)
 
 data class Zugang(val benutzer: String, val passwort: String)
+
+/** Minimalmodus; [quelle] = App, die der Quelle-Knopf öffnet, wenn das Gerät Apps keine Eingänge anbietet. */
+data class Minimal(val an: Boolean = false, val quelle: Element.App? = null)
 
 data class StartQuelleEinstellung(val id: String = "", val name: String = "", val wartenSek: Int = 30, val aufSignal: Boolean = true) {
     companion object {

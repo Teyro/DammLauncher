@@ -676,3 +676,39 @@ internal fun HomeActivity.schulSymbole(fehler: String? = null, gewaehlt: (ByteAr
         }
     }
 }
+
+// ------------------------------------------------------------ Minimalmodus
+
+internal fun HomeActivity.minimalQuelleAppWaehlen() = appAuswaehlen("App für den Quelle-Knopf …") { a ->
+    KonfigSpeicher.aendere { it.copy(minimal = it.minimal.copy(quelle = a.copy(spalte = 0, zeile = 0))) }
+    panel?.aufbauen()
+}
+
+/** Paket starten (Tafel, Timer) – fehlt es, kurz Bescheid sagen. */
+internal fun HomeActivity.starteApp(paket: String, name: String) {
+    val i = packageManager.getLaunchIntentForPackage(paket)
+    if (i == null) { meldung("$name ist auf diesem Board nicht installiert."); return }
+    try { startActivity(i.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) } catch (_: Exception) { meldung("$name lässt sich nicht starten.") }
+}
+
+/**
+ * Quelle-Knopf: gewählter Eingang (Einstellungen → Bedienung → Quelle beim Einschalten) → sofort umschalten;
+ * sonst Liste der Eingänge; bietet das Gerät Apps keine an, die dafür gewählte App öffnen.
+ */
+internal fun HomeActivity.quelleKnopf() {
+    val k = KonfigSpeicher.konfig
+    val eingaenge = de.oejendorferdamm.dammlauncher.pflege.StartQuelle.eingaenge(this)
+    val gewaehlt = eingaenge.firstOrNull { it.id == k.startQuelle.id }
+    when {
+        gewaehlt != null -> if (!de.oejendorferdamm.dammlauncher.pflege.StartQuelle.wechseln(this, gewaehlt.id)) meldung("Das Board lässt das Umschalten durch Apps nicht zu.")
+        eingaenge.isNotEmpty() -> android.app.AlertDialog.Builder(this)
+            .setTitle("Quelle wählen")
+            .setItems(eingaenge.map { e -> "${e.name} (${e.art})" + if (e.signal == true) " · Bild da" else "" }.toTypedArray()) { _, i ->
+                if (!de.oejendorferdamm.dammlauncher.pflege.StartQuelle.wechseln(this, eingaenge[i].id)) meldung("Das Board lässt das Umschalten durch Apps nicht zu.")
+            }
+            .setNegativeButton("Abbrechen", null)
+            .show()
+        k.minimal.quelle != null -> starte(k.minimal.quelle, minimalAnsicht)
+        else -> meldung("Dieses Board meldet Apps keine Eingänge. Einstellungen → Startbildschirm → Minimalmodus: eine App für den Quelle-Knopf wählen.", true)
+    }
+}

@@ -19,6 +19,9 @@
     <!-- Helligkeit in den Schnelleinstellungen (muss einmal erlaubt werden) -->
     <uses-permission android:name="android.permission.WRITE_SETTINGS"
         tools:ignore="ProtectedPermissions" />
+    <!-- Zeitserver des Systems einstellen – nur nach „adb shell pm grant … WRITE_SECURE_SETTINGS“ (sonst ohne Wirkung) -->
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS"
+        tools:ignore="ProtectedPermissions" />
 
     <!-- Statt QUERY_ALL_PACKAGES: nur Apps mit Startsymbol und Widget-Anbieter sehen -->
     <queries>

@@ -1,0 +1,93 @@
+/*
+ * DammLauncher – Copyright (C) 2026 Teyro – GNU GPL v3 oder neuer, siehe LICENSE
+ */
+package de.oejendorferdamm.dammlauncher.ui
+
+import android.annotation.SuppressLint
+import android.content.Context
+import android.graphics.Color
+import android.graphics.Typeface
+import android.graphics.drawable.Drawable
+import android.view.Gravity
+import android.view.MotionEvent
+import android.view.View
+import android.widget.FrameLayout
+import android.widget.ImageView
+import android.widget.LinearLayout
+import android.widget.TextView
+import de.oejendorferdamm.dammlauncher.konfig.UhrStil
+
+/**
+ * Minimalmodus: über dem Hintergrundbild nur eine große Uhr und drei große Knöpfe –
+ * Tafel (DammBoard), Timer (DammZeit) und Quelle umschalten. Langer Druck auf die freie
+ * Fläche öffnet wie sonst die Einstellungen (mit PIN, falls gesetzt).
+ */
+@SuppressLint("ViewConstructor", "ClickableViewAccessibility")
+class MinimalAnsicht(
+    context: Context,
+    private val tafel: () -> Unit,
+    private val timer: () -> Unit,
+    private val quelle: () -> Unit,
+    private val langerDruck: () -> Unit
+) : FrameLayout(context) {
+    private val uhr = UhrAnsicht(context, transparent = true, stil = UhrStil())
+    private val reihe = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER }
+
+    init {
+        val spalte = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+        }
+        val m = resources.displayMetrics
+        val breite = maxOf(m.widthPixels, m.heightPixels)
+        spalte.addView(uhr, LinearLayout.LayoutParams((breite * 0.5f).toInt(), (minOf(m.widthPixels, m.heightPixels) * 0.32f).toInt()))
+        spalte.addView(reihe, LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply { topMargin = 40.vp })
+        addView(spalte, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT, Gravity.CENTER))
+        val lang = Runnable { langerDruck() }
+        setOnTouchListener { _, e ->
+            when (e.actionMasked) {
+                MotionEvent.ACTION_DOWN -> postDelayed(lang, 900)
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> removeCallbacks(lang)
+            }
+            true
+        }
+    }
+
+    /** Knöpfe neu setzen (Symbole der Apps, sofern installiert). */
+    fun setze(tafelSymbol: Drawable?, timerSymbol: Drawable?, quelleName: String) {
+        reihe.removeAllViews()
+        reihe.addView(knopf(tafelSymbol, "✏", "Tafel", tafel))
+        reihe.addView(knopf(timerSymbol, "⏱", "Timer", timer))
+        reihe.addView(knopf(null, "⇄", quelleName, quelle))
+    }
+
+    private fun knopf(symbol: Drawable?, ersatz: String, name: String, klick: () -> Unit): View {
+        val g = 150.vp
+        return LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(30.vp, 26.vp, 30.vp, 22.vp)
+            background = runde(0x59000000, 36f.vp, 2.vp, 0x55FFFFFF)
+            isClickable = true
+            contentDescription = name
+            setOnClickListener { klick() }
+            if (symbol != null) addView(ImageView(context).apply { setImageDrawable(symbol); scaleType = ImageView.ScaleType.FIT_CENTER }, LinearLayout.LayoutParams(g, g))
+            else addView(TextView(context).apply {
+                text = ersatz
+                gravity = Gravity.CENTER
+                setTextColor(Color.WHITE)
+                textSize = 76f
+                background = runde(0x33FFFFFF, 34f.vp)
+            }, LinearLayout.LayoutParams(g, g))
+            addView(TextView(context).apply {
+                text = name
+                setTextColor(Color.WHITE)
+                textSize = 30f
+                typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                gravity = Gravity.CENTER
+                setShadowLayer(8f, 0f, 2f, 0x99000000.toInt())
+                maxLines = 1
+            }, LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply { topMargin = 14.vp })
+        }.also { v -> v.layoutParams = LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply { leftMargin = 24.vp; rightMargin = 24.vp } }
+    }
+}
