@@ -93,6 +93,30 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
     private var lage = 0
     private var raenderGleich = KonfigSpeicher.konfig.rand.gleich
 
+    // vor init: init baut den Inhalt schon auf
+    /** Eine Seite der Einstellungen mit ihren Abschnitten (Karten). */
+    private class Seite(val titel: String, val symbol: String, val farbe: Int, val zusammenfassung: (Konfig) -> String, val teile: List<(Konfig) -> Unit>)
+
+    private val seiten: List<Seite> by lazy {
+        listOf(
+            Seite("Aussehen", "🎨", 0xFF7C3AED.toInt(), { k -> (if (k.aussehen == Aussehen.CLEVERTOUCH) "Clevertouch" else "Klassisch") + " · Hintergrund · Schrift" },
+                listOf(::teilAussehen, ::teilHintergrund, ::teilSymboleundSchrift)),
+            Seite("Startbildschirm", "▦", 0xFF2563EB.toInt(), { k -> "${k.spalten} × ${k.zeilen} Raster · Ränder · Widgets · Apps" },
+                listOf(::teilRaster, ::teilAbstandzumBildschirmrand, ::teilWidgetsundAblage, ::teilApps)),
+            Seite("Bedienung", "👆", 0xFF0891B2.toInt(), { k -> (if (k.pin == null) "ohne PIN" else "mit PIN") + " · Gesten · Seitenleiste " + (if (k.seitenleiste.an) "an" else "aus") },
+                listOf(::teilBedienung, ::teilGesten, ::teilSeitenleiste)),
+            Seite("Schule", "🏫", 0xFF16A34A.toInt(), { k -> "Stundenplan, Pausen, Hinweise, Schüler-Ansicht" + (if (k.schueler.an) " (an)" else "") },
+                listOf(::teilStundenplanundProfile, ::teilSchulzeiten, ::teilHinweisBand, ::teilSchuelerAnsicht, ::teilAbwesenheiten, ::teilAufraeumen)),
+            Seite("Verwaltung", "☁", 0xFFEA580C.toInt(), { _ -> "Vorlage für alle Boards, Datei, Updates" + (if (a.bossAktiv()) " · Boss-Modus aktiv" else "") },
+                listOf(::teilZentraleVerteilungIServ, ::teilDatei, ::teilUpdates)),
+            Seite("Über DammLauncher", "ℹ", 0xFF6B7280.toInt(), { _ -> "Version ${BuildConfig.VERSION_NAME} · Lizenzen" }, listOf(::teilUeberDammLauncher))
+        )
+    }
+
+    /** null = Übersicht, sonst die geöffnete Seite. */
+    private var seite: Seite? = null
+    private var letzteSeite: Seite? = null
+
     private val titel = text(c, "Einstellungen", 36, fett = true).apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END }
     private val zurueck = knopf(c, "‹") { oeffne(null) }.apply { background = rundKnopf(); contentDescription = "Zurück zur Übersicht"; groesse(40) }
 
@@ -141,28 +165,6 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
 
     private fun knoepfe(vararg k: View) = add(Fluss(c).apply { k.forEach { addView(it) } }, 12)
 
-    /** Eine Seite der Einstellungen mit ihren Abschnitten (Karten). */
-    private class Seite(val titel: String, val symbol: String, val farbe: Int, val zusammenfassung: (Konfig) -> String, val teile: List<(Konfig) -> Unit>)
-
-    private val seiten: List<Seite> by lazy {
-        listOf(
-            Seite("Aussehen", "🎨", 0xFF7C3AED.toInt(), { k -> (if (k.aussehen == Aussehen.CLEVERTOUCH) "Clevertouch" else "Klassisch") + " · Hintergrund · Schrift" },
-                listOf(::teilAussehen, ::teilHintergrund, ::teilSymboleundSchrift)),
-            Seite("Startbildschirm", "▦", 0xFF2563EB.toInt(), { k -> "${k.spalten} × ${k.zeilen} Raster · Ränder · Widgets · Apps" },
-                listOf(::teilRaster, ::teilAbstandzumBildschirmrand, ::teilWidgetsundAblage, ::teilApps)),
-            Seite("Bedienung", "👆", 0xFF0891B2.toInt(), { k -> (if (k.pin == null) "ohne PIN" else "mit PIN") + " · Gesten · Seitenleiste " + (if (k.seitenleiste.an) "an" else "aus") },
-                listOf(::teilBedienung, ::teilGesten, ::teilSeitenleiste)),
-            Seite("Schule", "🏫", 0xFF16A34A.toInt(), { k -> "Stundenplan, Pausen, Hinweise, Schüler-Ansicht" + (if (k.schueler.an) " (an)" else "") },
-                listOf(::teilStundenplanundProfile, ::teilSchulzeiten, ::teilHinweisBand, ::teilSchuelerAnsicht, ::teilAbwesenheiten, ::teilAufraeumen)),
-            Seite("Verwaltung", "☁", 0xFFEA580C.toInt(), { _ -> "Vorlage für alle Boards, Datei, Updates" + (if (a.bossAktiv()) " · Boss-Modus aktiv" else "") },
-                listOf(::teilZentraleVerteilungIServ, ::teilDatei, ::teilUpdates)),
-            Seite("Über DammLauncher", "ℹ", 0xFF6B7280.toInt(), { _ -> "Version ${BuildConfig.VERSION_NAME} · Lizenzen" }, listOf(::teilUeberDammLauncher))
-        )
-    }
-
-    /** null = Übersicht, sonst die geöffnete Seite. */
-    private var seite: Seite? = null
-    private var letzteSeite: Seite? = null
 
     /** Zurück-Taste: von einer Seite zur Übersicht; false = schon in der Übersicht. */
     fun zurueck(): Boolean {
