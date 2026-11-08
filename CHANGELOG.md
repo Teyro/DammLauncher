@@ -1,5 +1,8 @@
 # Änderungen
 
+## 1.6.5
+- Einstellungen: oben rechts jetzt ein ✕ zum Schließen (statt „Fertig“) – immer sichtbar, gleich wie in DammBoard.
+
 ## 1.6.4
 - **Minimalmodus** (Einstellungen → Startbildschirm): nur Hintergrundbild, große Uhr und drei große Knöpfe – Tafel (DammBoard), Timer (DammZeit) und Quelle umschalten. Alles andere bleibt gespeichert; langer Druck öffnet die Einstellungen.
 - **Uhrzeit vom Zeitserver** (Einstellungen → Verwaltung): Standard PTB (amtliche Zeit). Geht die Board-Uhr falsch, zeigen die Uhren des Launchers trotzdem die richtige Zeit; mit der Erlaubnis WRITE_SECURE_SETTINGS (einmal per adb) stellt er auch die Systemuhr.

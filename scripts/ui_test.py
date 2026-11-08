@@ -65,6 +65,11 @@ def tippe(*namen, teil=False):
     return True
 
 
+def fertig():
+    """Offenes Fenster mit „Fertig“ schließen – sonst die Einstellungen über das ✕ (seit 1.6.5)."""
+    return tippe("Fertig") if knoten("Fertig") else tippe("Schließen")
+
+
 def lang(x, y, ms=1400):
     adb("shell", "input", "swipe", str(x), str(y), str(x), str(y), str(ms))
 
@@ -216,7 +221,7 @@ def main():
             tippe("Grundschrift fett")
             time.sleep(1)
             screenshot("00d_uhr_einstellen.png")
-            tippe("Fertig")
+            fertig()
             time.sleep(1.5)
             screenshot("00e_uhr_eingestellt.png")
 
@@ -239,7 +244,7 @@ def main():
     if tippe("Schnelleinstellungen"):
         time.sleep(1.5)
         screenshot("43_schnelleinstellungen.png")
-        tippe("Fertig")
+        fertig()
         time.sleep(1)
     # Seitenleiste: Griff am rechten Rand (Überlagerung – nicht im Oberflächenbaum)
     tap(w - 8, h // 2)
@@ -380,7 +385,7 @@ def main():
             if not laeuft() or knoten("Einstellungen") is None:
                 adb("shell", "input", "keyevent", "4")  # Einrichten-Fenster eines Widgets
                 time.sleep(2)
-    tippe("Fertig")
+    fertig()
     time.sleep(2)
     screenshot("14_mit_widget.png")
 
@@ -397,7 +402,7 @@ def main():
                 tippe("+")
                 time.sleep(0.6)
             screenshot("14b_widget_zoom.png")
-            tippe("Fertig")
+            fertig()
             time.sleep(1.5)
         else:
             adb("shell", "input", "keyevent", "4")
@@ -423,7 +428,7 @@ def main():
     tippe("Minimalmodus: nur Hintergrund", teil=True)
     time.sleep(1.5)
     screenshot("14x_minimal_einstellung.png")
-    tippe("Fertig")
+    fertig()
     time.sleep(2.5)
     screenshot("14y_minimalmodus.png")
     lang(w // 2, h * 88 // 100)
@@ -462,7 +467,7 @@ def main():
     if scrolle_zu("Jetzt synchronisieren", w // 6):
         time.sleep(5)
         screenshot("18_abgeglichen.png")
-    tippe("Fertig")
+    fertig()
     time.sleep(2)
     screenshot("19_nach_abgleich.png")
 
@@ -485,7 +490,7 @@ def main():
             time.sleep(6)
             scrolle_zu("Neues Foto jetzt", w // 6, antippen=False)
             screenshot("19b_unsplash_geladen.png")
-    tippe("Fertig")
+    fertig()
     time.sleep(2)
     screenshot("19c_unsplash_startbildschirm.png")
     # Uhr: über das Menü auf „transparent“ umstellen
@@ -497,7 +502,7 @@ def main():
             time.sleep(1.5)
             tippe("Transparent")
             time.sleep(1)
-            tippe("Fertig")
+            fertig()
             time.sleep(2)
             screenshot("19e_uhr_transparent.png")
         else:
@@ -555,7 +560,7 @@ def main():
             time.sleep(1.5)
             tippe("11:42:30 (mit Sekunden)")
             time.sleep(1)
-            tippe("Fertig")
+            fertig()
             time.sleep(2)
             screenshot("19i_uhr_sekunden.png")
 
@@ -588,7 +593,7 @@ def main():
         adb("shell", "input", "keyevent", "4")
         time.sleep(1)
     # Schüler-Ansicht einschalten und wechseln (Panel neu öffnen – es steht sonst weiter unten)
-    tippe("Fertig")
+    fertig()
     time.sleep(1.5)
     lang(w * 85 // 100, h * 80 // 100)
     time.sleep(2)
@@ -599,7 +604,7 @@ def main():
         scrolle_zu("Jetzt zur Schüler-Ansicht", w // 6, antippen=False)
         screenshot("24_schueler_einstellungen.png")
         # Ordner nur für Lehrkräfte – erst zur Schüler-Ansicht, wenn markiert
-        tippe("Fertig")
+        fertig()
         time.sleep(1.5)
         z = knoten("Ordner Mathe", teil=True)
         if z:
@@ -615,7 +620,7 @@ def main():
         time.sleep(2)
         screenshot("27_zurueck_lehrer.png")
     else:
-        tippe("Fertig")
+        fertig()
         time.sleep(1)
     # Feierabend-Sperre: ab jetzt gesperrt, „Entsperren“ (ohne PIN) gibt frei
     adb("shell", "am", "start", "-n", f"{PAKET}/.TestEinrichtungActivity", "--ez", "feierabend", "true")
