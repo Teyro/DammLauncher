@@ -237,11 +237,7 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         KonfigSpeicher.konfig.startQuelle.let { q ->
             if (!sicher && q.id.isNotEmpty()) de.oejendorferdamm.dammlauncher.pflege.StartQuelle.beimStart(applicationContext, q.id, q.wartenSek, q.aufSignal) {}
         }
-        // Einmalig (neue und bestehende Boards): Vorlage der Schule anbieten. Nicht im Testbuild – der Oberflächentest kennt das Fenster nicht.
-        if (!sicher && !Geraet.schulVorlageGefragt && !BuildConfig.DEBUG) {
-            Geraet.schulVorlageGefragt = true
-            haupt.postDelayed({ schulVorlageFragen(true) }, 2000)
-        }
+        // Die Vorlage der Schule wird nicht mehr von selbst angeboten (verwirrte nach Updates) – nur noch unter Einstellungen → Datei.
     }
 
     /**
@@ -1221,7 +1217,7 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
 
     override fun importieren() = bildAuswahl(REQ_IMPORT, "*/*")
 
-    override fun schulVorlage() = schulVorlageFragen(false)
+    override fun schulVorlage() = schulVorlageFragen()
 
     override fun pinFestlegen() {
         val f = neuesFenster("PIN für die Einstellungen", 900)

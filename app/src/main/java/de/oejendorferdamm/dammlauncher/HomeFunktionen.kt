@@ -578,15 +578,14 @@ internal fun HomeActivity.tafelUebersicht() {
 private const val SCHUL_WEBDAV = de.oejendorferdamm.dammlauncher.abgleich.SchulOrdner.WEBDAV
 private const val SCHUL_FREIGABE = de.oejendorferdamm.dammlauncher.abgleich.SchulOrdner.FREIGABE
 
-/** Master.zip aus dem Schul-Ordner laden und als Einrichtung übernehmen. [einmalig] = automatische Frage nach dem Update. */
-internal fun HomeActivity.schulVorlageFragen(einmalig: Boolean, fehler: String? = null) {
+/** Master.zip aus dem Schul-Ordner laden und als Einrichtung übernehmen (nur von Hand: Einstellungen → Datei). */
+internal fun HomeActivity.schulVorlageFragen(fehler: String? = null) {
     val f = neuesFenster("Vorlage der Schule laden", 1000)
-    f.add(text(this, "Lädt die Standard-Einrichtung der Schule (Master.zip aus dem Schul-Ordner) und ersetzt damit die Einrichtung dieses Boards." +
-        (if (einmalig) " Diese Frage kommt nur einmal – später jederzeit unter Einstellungen → Datei." else ""), 22, Farben.TEXT2))
+    f.add(text(this, "Lädt die Standard-Einrichtung der Schule (Master.zip aus dem Schul-Ordner) und ersetzt damit die Einrichtung dieses Boards.", 22, Farben.TEXT2))
     fehler?.let { f.add(text(this, it, 22, Farben.ROT)) }
     val pw = eingabe(this, "Passwort des Schul-Ordners", geheim = true)
     f.add(pw)
-    f.knoepfe(knopf(this, if (einmalig) "Nicht laden" else "Abbrechen") { f.schliessen() }, knopf(this, "Laden", haupt = true) {
+    f.knoepfe(knopf(this, "Abbrechen") { f.schliessen() }, knopf(this, "Laden", haupt = true) {
         val passwort = pw.text.toString()
         if (passwort.isBlank()) return@knopf
         f.schliessen()
@@ -597,7 +596,7 @@ internal fun HomeActivity.schulVorlageFragen(einmalig: Boolean, fehler: String? 
                     ?: throw java.io.IOException("Master.zip liegt nicht im Schul-Ordner.")
                 de.oejendorferdamm.dammlauncher.konfig.Datei.importieren(daten.inputStream())
             } catch (e: Exception) {
-                haupt.post { schulVorlageFragen(einmalig, "Laden fehlgeschlagen: ${e.message}") }
+                haupt.post { schulVorlageFragen("Laden fehlgeschlagen: ${e.message}") }
                 return@execute
             }
             Tresor.verschluessle(passwort)?.let { Geraet.schulPasswortVerschluesselt = it }

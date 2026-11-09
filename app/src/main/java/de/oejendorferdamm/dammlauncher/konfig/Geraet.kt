@@ -23,8 +23,9 @@ object Geraet {
 
     /** Automatischer Vorlagen-Abgleich (nur im Boss-Modus umschaltbar). */
     var abgleichAn: Boolean
-        get() = p.getBoolean("abgleichAn", true)
-        set(v) = p.edit().putBoolean("abgleichAn", v).apply()
+        // Neuer Schlüssel (1.6.6): auf allen Boards erst einmal aus, egal wie es vorher stand
+        get() = p.getBoolean("abgleichAn2", false)
+        set(v) = p.edit().putBoolean("abgleichAn2", v).apply()
 
     var letzterAbgleich: Long
         get() = p.getLong("letzterAbgleich", 0)
@@ -71,8 +72,9 @@ object Geraet {
 
     /** Updates im Hintergrund laden und gleich installieren (sonst nur anbieten). */
     var autoUpdate: Boolean
-        get() = p.getBoolean("autoUpdate", true)
-        set(v) = p.edit().putBoolean("autoUpdate", v).apply()
+        // Neuer Schlüssel (1.6.6): auf allen Boards erst einmal aus, egal wie es vorher stand
+        get() = p.getBoolean("autoUpdate2", false)
+        set(v) = p.edit().putBoolean("autoUpdate2", v).apply()
 
     /** Version, deren APK schon geladen und geprüft im Cache liegt ("" = keine). */
     var updateBereit: String
@@ -147,10 +149,6 @@ object Geraet {
         get() = p.getLong("feierabendFrei", 0)
         set(v) = p.edit().putLong("feierabendFrei", v).apply()
 
-    /** Einmal (mit 1.6.1) nach der Vorlage der Schule gefragt? Danach nur noch über die Einstellungen. */
-    var schulVorlageGefragt: Boolean
-        get() = p.getBoolean("schulVorlageGefragt", false)
-        set(v) = p.edit().putBoolean("schulVorlageGefragt", v).apply()
 
     /** Passwort des Schul-Ordners, verschlüsselt (Tresor); leer = noch keins. */
     var schulPasswortVerschluesselt: String
