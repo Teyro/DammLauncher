@@ -421,7 +421,8 @@ class RandGesten : Service() {
         /** Dienst passend zur Einrichtung starten, beenden oder ([neu]) die Leisten neu aufbauen. */
         fun abgleichen(c: Context, neu: Boolean = false) {
             val k = KonfigSpeicher.konfig
-            val an = (k.gesten.randAn || k.seitenleiste.an) && erlaubt(c)
+            // Leichtmodus: keine Randleisten (eigener Dienst mit Fenstern über allem – kostet auf alten Boards viel)
+            val an = (k.gesten.randAn || k.seitenleiste.an) && erlaubt(c) && !(k.minimal.an && k.minimal.leicht)
             try {
                 when {
                     an && (laufend == null || neu) -> c.startForegroundService(Intent(c, RandGesten::class.java))

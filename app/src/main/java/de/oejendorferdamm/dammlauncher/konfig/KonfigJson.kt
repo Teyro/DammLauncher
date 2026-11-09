@@ -69,7 +69,7 @@ object KonfigJson {
         if (k.startQuelle.id.isNotEmpty()) put("startQuelle", JSONObject().put("id", k.startQuelle.id).put("name", k.startQuelle.name)
             .put("wartenSek", k.startQuelle.wartenSek).put("aufSignal", k.startQuelle.aufSignal))
         put("zeitServer", k.zeitServer)
-        if (k.minimal.an || k.minimal.quelle != null) put("minimal", JSONObject().put("an", k.minimal.an).apply { k.minimal.quelle?.let { put("quelle", JSONArray().put(element(it))) } })
+        if (k.minimal.an || k.minimal.quelle != null || k.minimal.leicht) put("minimal", JSONObject().put("an", k.minimal.an).put("leicht", k.minimal.leicht).apply { k.minimal.quelle?.let { put("quelle", JSONArray().put(element(it))) } })
         k.statusZugang?.let { put("statusZugang", JSONObject().put("benutzer", it.benutzer).put("passwort", it.passwort)) }
     }.toString(2)
 
@@ -381,7 +381,7 @@ object KonfigJson {
             zeitServer = if (!o.has("zeitServer")) de.oejendorferdamm.dammlauncher.pflege.ZeitAbgleich.STANDARD else o.optString("zeitServer").trim().let { z ->
                 if (z.isEmpty() || de.oejendorferdamm.dammlauncher.pflege.ZeitAbgleich.SERVER.matches(z)) z else { w.add("zeitServer ungültig"); de.oejendorferdamm.dammlauncher.pflege.ZeitAbgleich.STANDARD }
             },
-            minimal = o.optJSONObject("minimal")?.let { m -> Minimal(m.optBoolean("an", false), appsAus(m.optJSONArray("quelle"), "minimal.quelle", 1).firstOrNull()) } ?: Minimal(),
+            minimal = o.optJSONObject("minimal")?.let { m -> Minimal(m.optBoolean("an", false), appsAus(m.optJSONArray("quelle"), "minimal.quelle", 1).firstOrNull(), m.optBoolean("leicht", false)) } ?: Minimal(),
             statusZugang = o.optJSONObject("statusZugang")?.let { z ->
                 val b = z.optString("benutzer").trim()
                 val p = z.optString("passwort")

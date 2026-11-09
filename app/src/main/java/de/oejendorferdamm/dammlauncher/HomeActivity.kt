@@ -286,8 +286,11 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
 
     override fun onStart() {
         super.onStart()
-        if (!sicher) widgets.starten()
+        if (!sicher && !leicht()) widgets.starten()
     }
+
+    /** Leichtmodus (nur im Minimalmodus): alles weglassen, was nicht unbedingt nötig ist. */
+    internal fun leicht() = KonfigSpeicher.konfig.minimal.let { it.an && it.leicht }
 
     override fun onStop() {
         super.onStop()
@@ -306,7 +309,7 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         RandGesten.abgleichen(this)
         if (Geraet.veraltetGemeldet || System.currentTimeMillis() - Geraet.letzterUpdateCheck > 24 * 60 * 60_000L) updatePruefenStill()
         else bereitesUpdateInstallieren()
-        if (FotoDesTages.faellig()) unsplashLaden(false)
+        if (!leicht() && FotoDesTages.faellig()) unsplashLaden(false)
         zeitPruefen()
         haupt.removeCallbacks(wartung)
         haupt.postDelayed(wartung, WARTUNG_MS)
@@ -331,6 +334,8 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         val jetzt = Calendar.getInstance()
         val ruhig = System.currentTimeMillis() - letzteBeruehrung
         if (Zeiten.feierabend(k.feierabend, jetzt) && System.currentTimeMillis() >= Geraet.feierabendFreiBis) zeigeRuhe() else ruheWeg()
+        // Leichtmodus: nur Feierabend – kein Schoner, keine Abrufe, kein Aufräumen, keine Profile
+        if (leicht()) return
         if (k.schueler.an && Geraet.lehrerAnsicht && ruhig > k.schueler.zurueck * 60_000L) zurSchuelerAnsicht()
         if (k.schoner > 0 && schoner == null && sperre == null && !laedt && ruhig > k.schoner * 60_000L) zeigeSchoner()
         hinweisZeigen(k)
@@ -382,7 +387,7 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
     private val wartung = object : Runnable {
         override fun run() {
             if (!vorne) return
-            if (FotoDesTages.faellig()) unsplashLaden(false) else hintergrund(KonfigSpeicher.konfig)
+            if (!leicht() && FotoDesTages.faellig()) unsplashLaden(false) else hintergrund(KonfigSpeicher.konfig)
             if (Geraet.veraltetGemeldet || System.currentTimeMillis() - Geraet.letzterUpdateCheck > 24 * 60 * 60_000L) updatePruefenStill()
             else bereitesUpdateInstallieren()
             haupt.postDelayed(this, WARTUNG_MS)
@@ -445,8 +450,11 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         val schueler = schuelerAnsicht()
         val alle = k.elemente.filter { !schueler || it.schluessel !in k.schueler.nurLehrer }
         val fehlt = alle.filter { it.schluessel !in da && !(sicher && it is Element.Widget) }.map { it.schluessel }.toSet()
-        val elemente = alle.filter { it.schluessel in da || it.schluessel in fehlt }
-        raster.setze(k, elemente, fehlt) { w ->
+        // Leichtmodus: Raster ganz leer (keine Widgets, die im Hintergrund weiterzeichnen)
+        val leer = k.minimal.an && k.minimal.leicht
+        if (leer) widgets.stoppen() else if (!sicher && vorne) widgets.starten()
+        val elemente = if (leer) emptyList() else alle.filter { it.schluessel in da || it.schluessel in fehlt }
+        raster.setze(k, elemente, if (leer) emptySet() else fehlt) { w ->
             when (w.provider) {
                 Element.UHR, Element.UHR_TRANSPARENT -> UhrAnsicht(this, w.provider == Element.UHR_TRANSPARENT, w.uhr)
                 Element.PAUSE -> InfoKachel(this) { Zeiten.pause(KonfigSpeicher.konfig.pausen, Calendar.getInstance()) }
@@ -490,7 +498,11 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         dock.visibility = View.GONE
         lehrerKnopf.visibility = View.GONE
         fun symbol(p: String) = try { packageManager.getApplicationIcon(p) } catch (_: Exception) { null }
-        minimalAnsicht.setze(symbol(RandGesten.DAMMBOARD), symbol(RandGesten.DAMMZEIT), "Quelle")
+        // Kann dieses Board die Quelle nicht per App wechseln (und ist nichts dafür gewählt), fällt der Knopf weg –
+        // stattdessen sagt ein gut lesbares Band unten, wie man zum Board kommt.
+        val quelleGeht = de.oejendorferdamm.dammlauncher.pflege.StartQuelle.eingaenge(this).isNotEmpty() || k.minimal.quelle != null
+        minimalAnsicht.setze(symbol(RandGesten.DAMMBOARD), symbol(RandGesten.DAMMZEIT), "Quelle", quelleGeht,
+            if (quelleGeht) null else "Minimalmodus · Zum CTOUCH-Startbildschirm bitte am Board die Quelle wechseln")
     }
 
     private fun hintergrund(k: Konfig) {
@@ -2043,6 +2055,7 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
     override fun aufraeumenJetzt() = aufraeumen()
     override fun schnellOeffnen() = schnell()
     override fun minimalQuelleApp() = minimalQuelleAppWaehlen()
+    override fun minimalQuelleAktivitaet() = minimalQuelleAktivitaetWaehlen()
     override fun zeitJetzt() = zeitPruefen(erzwingen = true)
     override fun schulPasswort() = mitSchulPasswort(if (de.oejendorferdamm.dammlauncher.abgleich.SchulOrdner.passwort() != null) "Das gemerkte Passwort wird ersetzt." else null, frisch = true) {
         panel?.aufbauen()

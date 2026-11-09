@@ -68,6 +68,7 @@ interface PanelAktionen {
     fun schnellOeffnen()
     fun schulPasswort()
     fun minimalQuelleApp()
+    fun minimalQuelleAktivitaet()
     fun zeitJetzt()
 }
 
@@ -331,17 +332,24 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
     private fun teilMinimal(k: Konfig) {
         abschnitt("Minimalmodus")
         val m = k.minimal
-        add(schalter(c, "Minimalmodus: nur Hintergrund, große Uhr, Tafel, Timer und Quelle", m.an) { an -> aendere { it.copy(minimal = it.minimal.copy(an = an)) }; aufbauen() })
+        // Auf Android 8 gleich mit Leichtmodus (dort ruckelt sonst alles)
+        add(schalter(c, "Minimalmodus: nur Hintergrund, große Uhr, Tafel, Timer und Quelle", m.an) { an ->
+            aendere { it.copy(minimal = it.minimal.copy(an = an, leicht = if (an && !it.minimal.an && android.os.Build.VERSION.SDK_INT < 28) true else it.minimal.leicht)) }; aufbauen()
+        })
         add(text(c, "Alles andere (Raster, Dock, Alle Apps) ist ausgeblendet, aber gespeichert – ausschalten holt es zurück. Langer Druck auf die freie Fläche öffnet die Einstellungen.", 21, Farben.TEXT2), 6)
         if (!m.an) return
+        add(schalter(c, "Leichtmodus für langsame Boards (Android 8)", m.leicht) { an -> aendere { it.copy(minimal = it.minimal.copy(leicht = an)) }; aufbauen() })
+        add(text(c, "Wirft alles ab, was nicht nötig ist: keine Widgets, keine Randleisten, kein Tagesfoto-Abruf, kein Bildschirmschoner, keine Abrufe im Hintergrund. Nur Uhr, Tafel, Timer und Quelle bleiben.", 21, Farben.TEXT2), 6)
         val eingaenge = de.oejendorferdamm.dammlauncher.pflege.StartQuelle.eingaenge(c)
         add(text(c, "Quelle-Knopf: " + when {
             eingaenge.isNotEmpty() && k.startQuelle.id.isNotEmpty() -> "schaltet auf „${k.startQuelle.name.ifBlank { k.startQuelle.id }}“ (Bedienung → Quelle beim Einschalten)."
             eingaenge.isNotEmpty() -> "zeigt die Eingänge dieses Boards zur Auswahl."
             m.quelle != null -> "öffnet „${m.quelle.titel ?: AppKatalog.finde(m.quelle.paket, m.quelle.aktivitaet)?.name ?: m.quelle.paket}“."
-            else -> "Dieses Board meldet Apps keine Eingänge – bitte die App wählen, mit der man hier die Quelle umschaltet."
+            else -> "Dieses Board meldet Apps keine Eingänge. Der Knopf ist ausgeblendet, unten steht stattdessen ein Hinweis zum Quelle-Wechseln am Board. " +
+                "Ist die Quellen-Auswahl des Boards ein Systemfenster ohne eigene App, lässt sie sich unter „Systemfenster …“ wählen (mit ⇄ markiert)."
         }, 22, if (eingaenge.isEmpty() && m.quelle == null) Farben.ROT else Farben.TEXT), 12)
-        if (eingaenge.isEmpty()) knoepfe(knopf(c, if (m.quelle == null) "App für den Quelle-Knopf …" else "Andere App …") { a.minimalQuelleApp() },
+        if (eingaenge.isEmpty()) knoepfe(knopf(c, if (m.quelle == null) "App …" else "Andere App …") { a.minimalQuelleApp() },
+            knopf(c, "Systemfenster …") { a.minimalQuelleAktivitaet() },
             *(if (m.quelle != null) arrayOf(knopf(c, "Keine App") { aendere { it.copy(minimal = it.minimal.copy(quelle = null)) }; aufbauen() }) else emptyArray()))
     }
 

@@ -683,6 +683,41 @@ internal fun HomeActivity.minimalQuelleAppWaehlen() = appAuswaehlen("App für de
     panel?.aufbauen()
 }
 
+/**
+ * Systemfenster (Aktivität ohne Startsymbol) für den Quelle-Knopf wählen – z. B. die Quellen-Auswahl des Boards,
+ * die keine eigene App ist. Was nach Quelle/Eingang klingt, steht oben.
+ */
+internal fun HomeActivity.minimalQuelleAktivitaetWaehlen() {
+    meldung("Systemfenster werden gesucht …")
+    arbeit.execute {
+        val pm = packageManager
+        val passend = Regex("(?i)source|input|quelle|signal|hdmi|tvinput|channel|switch|eingang")
+        val liste = try {
+            @Suppress("DEPRECATION")
+            pm.getInstalledPackages(android.content.pm.PackageManager.GET_ACTIVITIES).flatMap { p ->
+                (p.activities ?: emptyArray()).filter { it.exported && it.enabled && it.permission == null }.map { a ->
+                    val app = try { p.applicationInfo?.loadLabel(pm)?.toString() ?: p.packageName } catch (_: Exception) { p.packageName }
+                    Triple(app, a, passend.containsMatchIn(a.name) || passend.containsMatchIn(p.packageName))
+                }
+            }.sortedWith(compareBy({ !it.third }, { it.first.lowercase() }, { it.second.name }))
+        } catch (_: Exception) { emptyList() }
+        haupt.post {
+            if (liste.isEmpty()) { meldung("Keine Systemfenster gefunden."); return@post }
+            android.app.AlertDialog.Builder(this)
+                .setTitle("Systemfenster für den Quelle-Knopf")
+                .setItems(liste.map { (app, a, treffer) -> (if (treffer) "⇄ " else "") + "$app – " + a.name.substringAfterLast('.') }.toTypedArray()) { _, i ->
+                    val (app, a, _) = liste[i]
+                    KonfigSpeicher.aendere { it.copy(minimal = it.minimal.copy(quelle = Element.App(a.packageName, a.name, 0, 0, titel = "$app – " + a.name.substringAfterLast('.')))) }
+                    panel?.aufbauen()
+                    // Gleich ausprobieren, damit man sieht, ob es das richtige ist
+                    if (!de.oejendorferdamm.dammlauncher.apps.AppKatalog.starte(android.content.ComponentName(a.packageName, a.name), null)) meldung("Dieses Fenster lässt sich nicht öffnen – bitte ein anderes wählen.")
+                }
+                .setNegativeButton("Abbrechen", null)
+                .show()
+        }
+    }
+}
+
 /** Paket starten (Tafel, Timer) – fehlt es, kurz Bescheid sagen. */
 internal fun HomeActivity.starteApp(paket: String, name: String) {
     val i = packageManager.getLaunchIntentForPackage(paket)

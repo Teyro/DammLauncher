@@ -32,6 +32,16 @@ class MinimalAnsicht(
 ) : FrameLayout(context) {
     private val uhr = UhrAnsicht(context, transparent = true, stil = UhrStil())
     private val reihe = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER }
+    /** Hinweis-Band unten: hellgrau, schwarze Schrift – auf jedem Hintergrundbild lesbar. */
+    private val band = TextView(context).apply {
+        setTextColor(Color.BLACK)
+        setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 30f.vp)
+        typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+        gravity = Gravity.CENTER
+        setPadding(40.vp, 18.vp, 40.vp, 18.vp)
+        background = runde(0xF0E5E7EB.toInt(), 24f.vp)
+        visibility = View.GONE
+    }
 
     init {
         val spalte = LinearLayout(context).apply {
@@ -43,6 +53,7 @@ class MinimalAnsicht(
         spalte.addView(uhr, LinearLayout.LayoutParams((breite * 0.5f).toInt(), (minOf(m.widthPixels, m.heightPixels) * 0.32f).toInt()))
         spalte.addView(reihe, LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply { topMargin = 40.vp })
         addView(spalte, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT, Gravity.CENTER))
+        addView(band, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply { bottomMargin = 48.vp })
         val lang = Runnable { langerDruck() }
         setOnTouchListener { _, e ->
             when (e.actionMasked) {
@@ -54,11 +65,13 @@ class MinimalAnsicht(
     }
 
     /** Knöpfe neu setzen (Symbole der Apps, sofern installiert). */
-    fun setze(tafelSymbol: Drawable?, timerSymbol: Drawable?, quelleName: String) {
+    fun setze(tafelSymbol: Drawable?, timerSymbol: Drawable?, quelleName: String, mitQuelle: Boolean = true, hinweis: String? = null) {
         reihe.removeAllViews()
         reihe.addView(knopf(tafelSymbol, "✏", "Tafel", tafel))
         reihe.addView(knopf(timerSymbol, "⏱", "Timer", timer))
-        reihe.addView(knopf(null, "⇄", quelleName, quelle))
+        if (mitQuelle) reihe.addView(knopf(null, "⇄", quelleName, quelle))
+        band.text = hinweis ?: ""
+        band.visibility = if (hinweis.isNullOrBlank()) View.GONE else View.VISIBLE
     }
 
     private fun knopf(symbol: Drawable?, ersatz: String, name: String, klick: () -> Unit): View {

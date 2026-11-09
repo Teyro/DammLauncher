@@ -15,7 +15,7 @@ import org.junit.Test
 class MinimalZeitTest {
     @Test
     fun minimalUndZeitserverHinUndZurueck() {
-        val k = Konfig(minimal = Minimal(true, Element.App("com.cvte.source", "com.cvte.source.Main", 0, 0)), zeitServer = "de.pool.ntp.org", stand = 3L)
+        val k = Konfig(minimal = Minimal(true, Element.App("com.cvte.source", "com.cvte.source.Main", 0, 0), leicht = true), zeitServer = "de.pool.ntp.org", stand = 3L)
         val text = KonfigJson.schreibe(k)
         val e = KonfigJson.lese(text)
         assertTrue(e.warnungen.toString(), e.warnungen.isEmpty())

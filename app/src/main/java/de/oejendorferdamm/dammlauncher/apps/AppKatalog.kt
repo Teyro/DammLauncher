@@ -96,7 +96,12 @@ object AppKatalog {
     fun starte(app: ComponentName, quelle: android.graphics.Rect?): Boolean = try {
         // Ohne Animationen startet die App sofort (kein Aufzoomen – spart auf älteren Boards spürbar Zeit)
         val optionen = if (KonfigSpeicher.konfig.animationen) null else android.app.ActivityOptions.makeCustomAnimation(kontext, 0, 0).toBundle()
-        la.startMainActivity(app, Process.myUserHandle(), quelle, optionen)
+        try {
+            la.startMainActivity(app, Process.myUserHandle(), quelle, optionen)
+        } catch (_: Exception) {
+            // Kein Startsymbol (z. B. das Quellen-Fenster des Boards): direkt als Aktivität öffnen
+            kontext.startActivity(android.content.Intent().setComponent(app).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK), optionen)
+        }
         try { de.oejendorferdamm.dammlauncher.konfig.Geraet.merkeStart(schluessel(app)) } catch (_: Exception) {}
         true
     } catch (_: Exception) {

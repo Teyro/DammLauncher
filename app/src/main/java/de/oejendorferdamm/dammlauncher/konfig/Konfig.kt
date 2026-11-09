@@ -124,8 +124,11 @@ data class Aufraeumen(val pausen: Boolean = false, val feierabend: Boolean = tru
 
 data class Zugang(val benutzer: String, val passwort: String)
 
-/** Minimalmodus; [quelle] = App, die der Quelle-Knopf öffnet, wenn das Gerät Apps keine Eingänge anbietet. */
-data class Minimal(val an: Boolean = false, val quelle: Element.App? = null)
+/**
+ * Minimalmodus; [quelle] = App oder Systemfenster, das der Quelle-Knopf öffnet, wenn das Gerät Apps keine Eingänge anbietet.
+ * [leicht] = Leichtmodus für langsame Boards (Android 8): keine Widgets, Randleisten, Tagesfotos, Hintergrund-Abrufe.
+ */
+data class Minimal(val an: Boolean = false, val quelle: Element.App? = null, val leicht: Boolean = false)
 
 data class StartQuelleEinstellung(val id: String = "", val name: String = "", val wartenSek: Int = 30, val aufSignal: Boolean = true) {
     companion object {
