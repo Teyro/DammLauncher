@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Vier Stifte wie im Schulwappen (Schule Öjendorfer Damm), ohne Schriftzug –
+         bewusst nur gerade Kanten (Rechtecke + Dreiecksspitzen), alle Punkte innerhalb der
+         sicheren 66dp-Mittelzone für adaptive Icons. -->
+    <path android:fillColor="#E91E8C" android:pathData="M30.5,37 L38.5,37 L38.5,74 L30.5,74 Z" />
+    <path android:fillColor="#E91E8C" android:pathData="M30.5,37 L38.5,37 L34.5,30 Z" />
+
+    <path android:fillColor="#42A5F5" android:pathData="M43.5,42 L51.5,42 L51.5,74 L43.5,74 Z" />
+    <path android:fillColor="#42A5F5" android:pathData="M43.5,42 L51.5,42 L47.5,35 Z" />
+
+    <path android:fillColor="#66BB6A" android:pathData="M56.5,36 L64.5,36 L64.5,74 L56.5,74 Z" />
+    <path android:fillColor="#66BB6A" android:pathData="M56.5,36 L64.5,36 L60.5,29 Z" />
+
+    <path android:fillColor="#FFA726" android:pathData="M69.5,40 L77.5,40 L77.5,74 L69.5,74 Z" />
+    <path android:fillColor="#FFA726" android:pathData="M69.5,40 L77.5,40 L73.5,33 Z" />
+</vector>

@@ -501,11 +501,22 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         dock.visibility = View.GONE
         lehrerKnopf.visibility = View.GONE
         fun symbol(p: String) = try { packageManager.getApplicationIcon(p) } catch (_: Exception) { null }
+        // Tafel und Timer: die eigenen Vektor-Symbole in genau der Knopfgröße – das System-Symbol wäre hochskaliert unscharf
+        fun scharf(p: String, vorne: Int, hinten: android.graphics.drawable.Drawable): android.graphics.drawable.Drawable? {
+            if (symbol(p) == null) return null
+            return try {
+                val d = android.graphics.drawable.AdaptiveIconDrawable(hinten, getDrawable(vorne))
+                android.graphics.drawable.BitmapDrawable(resources, de.oejendorferdamm.dammlauncher.apps.AppKatalog.zeichne(d, 150.vp, k.symbolForm))
+            } catch (_: Exception) { symbol(p) }
+        }
         // Kann dieses Board die Quelle nicht per App wechseln (und ist nichts dafür gewählt), fällt der Knopf weg –
         // stattdessen sagt ein gut lesbares Band unten, wie man zum Board kommt.
         val quelleGeht = de.oejendorferdamm.dammlauncher.pflege.StartQuelle.eingaenge(this).isNotEmpty() || k.minimal.quelle != null
-        minimalAnsicht.setze(symbol(RandGesten.DAMMBOARD), symbol(RandGesten.DAMMZEIT), "Quelle", quelleGeht,
-            if (quelleGeht) null else "Minimalmodus · Zum CTOUCH-Startbildschirm bitte am Board die Quelle wechseln")
+        minimalAnsicht.setze(
+            scharf(RandGesten.DAMMBOARD, R.drawable.symbol_dammboard_vordergrund, getDrawable(R.drawable.symbol_dammboard_hintergrund)!!),
+            scharf(RandGesten.DAMMZEIT, R.drawable.symbol_dammzeit_vordergrund, ColorDrawable(0xFFF6F7F9.toInt())),
+            "Quelle", quelleGeht,
+            if (quelleGeht) null else "Minimalmodus · Zum Clevertouch-Startbildschirm bitte am Board die Quelle wechseln")
     }
 
     private fun hintergrund(k: Konfig) {
