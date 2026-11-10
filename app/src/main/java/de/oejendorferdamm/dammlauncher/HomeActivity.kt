@@ -43,6 +43,7 @@ import de.oejendorferdamm.dammlauncher.konfig.Zeiten
 import de.oejendorferdamm.dammlauncher.konfig.Zeitraum
 import de.oejendorferdamm.dammlauncher.qr.QrCode
 import de.oejendorferdamm.dammlauncher.ui.AppZelle
+import de.oejendorferdamm.dammlauncher.ui.Leistung
 import de.oejendorferdamm.dammlauncher.ui.InfoKachel
 import de.oejendorferdamm.dammlauncher.ui.MinimalAnsicht
 import de.oejendorferdamm.dammlauncher.ui.QrAnsicht
@@ -168,6 +169,8 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         sicher = Geraet.absturzSchleife()
         if (sicher) Geraet.vergissAbstuerze()
         KonfigSpeicher.init(this, sicher)
+        // Sparsam (Android 8/9 oder von Hand): auch keine Fenster-Animationen beim Öffnen und Schließen
+        if (Leistung.sparsam) window.setWindowAnimations(0)
         Masse.aktualisiere(this)
         resources.displayMetrics.let { m ->
             Geraet.bildBreite = maxOf(m.widthPixels, m.heightPixels)
@@ -516,7 +519,7 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
             if (stand == hintergrundStand) return
             hintergrundStand = stand
             arbeit.execute {
-                val b = try { BitmapFactory.decodeFile(datei.absolutePath) } catch (_: Throwable) { null }
+                val b = try { ladeHintergrund(datei) } catch (_: Throwable) { null }
                 // Farben und Milchglas einmal je Bild ausrechnen (wenige Millisekunden, im Hintergrund)
                 val thema = try { b?.let { Thema.ausBild(it) } } catch (_: Throwable) { null } ?: Thema.ausFarbe(k.hintergrund.farbe)
                 haupt.post {
@@ -536,6 +539,39 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
             hintergrundStand = -1L - k.hintergrund.farbe
             wurzel.background = ColorDrawable(k.hintergrund.farbe)
         }
+    }
+
+    /**
+     * Hintergrundbild genau in Bildschirmgröße: nur so groß dekodieren wie nötig (ein Tagesfoto hat oft 4000 × 3000 –
+     * das sind fast 50 MB und kostet bei jedem Neuzeichnen), mittig auf das Bildschirmformat zuschneiden (sonst verzerrt)
+     * und im Sparmodus mit halber Farbtiefe.
+     */
+    private fun ladeHintergrund(datei: java.io.File): android.graphics.Bitmap? {
+        val m = android.util.DisplayMetrics()
+        @Suppress("DEPRECATION") windowManager.defaultDisplay.getRealMetrics(m)
+        val zielB = m.widthPixels.coerceAtLeast(1)
+        val zielH = m.heightPixels.coerceAtLeast(1)
+        val masse = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(datei.absolutePath, masse)
+        if (masse.outWidth <= 0 || masse.outHeight <= 0) return null
+        var probe = 1
+        while (masse.outWidth / (probe * 2) >= zielB && masse.outHeight / (probe * 2) >= zielH) probe *= 2
+        val sparsam = Leistung.sparsam
+        val roh = BitmapFactory.decodeFile(datei.absolutePath, BitmapFactory.Options().apply {
+            inSampleSize = probe
+            inPreferredConfig = if (sparsam) android.graphics.Bitmap.Config.RGB_565 else android.graphics.Bitmap.Config.ARGB_8888
+        }) ?: return null
+        // mittig zuschneiden auf das Seitenverhältnis des Bildschirms, dann genau auf Bildschirmgröße
+        val faktor = maxOf(zielB.toFloat() / roh.width, zielH.toFloat() / roh.height)
+        val ausschnittB = (zielB / faktor).toInt().coerceIn(1, roh.width)
+        val ausschnittH = (zielH / faktor).toInt().coerceIn(1, roh.height)
+        val x = (roh.width - ausschnittB) / 2
+        val y = (roh.height - ausschnittH) / 2
+        val aus = android.graphics.Bitmap.createBitmap(zielB, zielH, if (sparsam) android.graphics.Bitmap.Config.RGB_565 else android.graphics.Bitmap.Config.ARGB_8888)
+        android.graphics.Canvas(aus).drawBitmap(roh, android.graphics.Rect(x, y, x + ausschnittB, y + ausschnittH), android.graphics.Rect(0, 0, zielB, zielH),
+            android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG))
+        if (aus !== roh) roh.recycle()
+        return aus
     }
 
     /** Neue Farben: Glasflächen und Kacheln neu zeichnen. */
@@ -899,7 +935,7 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         uebersicht = u
         wurzel.addView(u, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
         if (suche) u.sucheOeffnen()
-        if (KonfigSpeicher.konfig.animationen) {
+        if (Leistung.animationen) {
             u.translationY = resources.displayMetrics.heightPixels.toFloat()
             u.animate().translationY(0f).setDuration(220).start()
         }

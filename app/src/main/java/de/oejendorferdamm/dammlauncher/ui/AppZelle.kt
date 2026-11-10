@@ -30,7 +30,7 @@ class AppZelle(context: Context) : View(context) {
     private var mitText = true
     private val textPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
-        setShadowLayer(6f, 0f, 2f, 0xE6000000.toInt())
+        setShadowLayer(Leistung.schatten(6f), 0f, 2f, 0xE6000000.toInt())
     }
     private val bildPaint = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG)
     private val ziel = RectF()
@@ -40,7 +40,7 @@ class AppZelle(context: Context) : View(context) {
         set(v) {
             field = v
             textPaint.color = if (v) 0xFF1F2328.toInt() else Color.WHITE
-            if (v) textPaint.clearShadowLayer() else textPaint.setShadowLayer(6f, 0f, 2f, 0xE6000000.toInt())
+            if (v) textPaint.clearShadowLayer() else textPaint.setShadowLayer(Leistung.schatten(6f), 0f, 2f, 0xE6000000.toInt())
             invalidate()
         }
 

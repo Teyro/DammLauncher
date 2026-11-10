@@ -95,7 +95,7 @@ object AppKatalog {
 
     fun starte(app: ComponentName, quelle: android.graphics.Rect?): Boolean = try {
         // Ohne Animationen startet die App sofort (kein Aufzoomen – spart auf älteren Boards spürbar Zeit)
-        val optionen = if (KonfigSpeicher.konfig.animationen) null else android.app.ActivityOptions.makeCustomAnimation(kontext, 0, 0).toBundle()
+        val optionen = if (de.oejendorferdamm.dammlauncher.ui.Leistung.animationen) null else android.app.ActivityOptions.makeCustomAnimation(kontext, 0, 0).toBundle()
         try {
             la.startMainActivity(app, Process.myUserHandle(), quelle, optionen)
         } catch (_: Exception) {

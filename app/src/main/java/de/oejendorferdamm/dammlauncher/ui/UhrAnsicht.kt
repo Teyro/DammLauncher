@@ -95,12 +95,12 @@ class UhrAnsicht(context: Context, transparent: Boolean = false, stil: UhrStil =
     }
 
     private fun farben() {
-        elevation = if (transparent || Thema.clevertouch) 0f else 10f.vp
+        elevation = if (transparent || Thema.clevertouch) 0f else Leistung.hoehe(10f.vp)
         zeit.color = if (transparent) 0xFFFFFFFF.toInt() else 0xFF111827.toInt()
         datum.color = if (transparent) 0xF2FFFFFF.toInt() else 0xFF4B5563.toInt()
         if (transparent) {
-            zeit.setShadowLayer(10f.vp, 0f, 3f.vp, 0xB3000000.toInt())
-            datum.setShadowLayer(8f.vp, 0f, 2f.vp, 0xB3000000.toInt())
+            zeit.setShadowLayer(Leistung.schatten(10f.vp), 0f, 3f.vp, 0xB3000000.toInt())
+            datum.setShadowLayer(Leistung.schatten(8f.vp), 0f, 2f.vp, 0xB3000000.toInt())
         } else {
             zeit.clearShadowLayer()
             datum.clearShadowLayer()

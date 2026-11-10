@@ -32,7 +32,7 @@ abstract class KartenAnsicht(context: Context) : View(context) {
     private val feld = RectF()
 
     init {
-        elevation = 10f.vp
+        elevation = Leistung.hoehe(10f.vp)
         outlineProvider = object : ViewOutlineProvider() {
             override fun getOutline(v: View, o: Outline) = o.setRoundRect(0, 0, v.width, v.height, radius())
         }
@@ -46,7 +46,7 @@ abstract class KartenAnsicht(context: Context) : View(context) {
         feld.set(dick / 2, dick / 2, width - dick / 2, height - dick / 2)
         // Clevertouch: getönte Fläche ohne Rahmen und ohne Schatten (spart auch Rechenzeit)
         flaeche.color = if (Thema.clevertouch) Thema.karte else Color.WHITE
-        elevation = if (Thema.clevertouch) 0f else 10f.vp
+        elevation = if (Thema.clevertouch) 0f else Leistung.hoehe(10f.vp)
         canvas.drawRoundRect(feld, radius(), radius(), flaeche)
         if (!Thema.clevertouch) canvas.drawRoundRect(feld, radius(), radius(), rahmen)
     }
@@ -189,7 +189,7 @@ class OrdnerZelle(context: Context) : View(context) {
     private val bildPaint = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG)
     private val textPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
-        setShadowLayer(6f, 0f, 2f, 0xE6000000.toInt())
+        setShadowLayer(Leistung.schatten(6f), 0f, 2f, 0xE6000000.toInt())
     }
     private val feld = RectF()
 

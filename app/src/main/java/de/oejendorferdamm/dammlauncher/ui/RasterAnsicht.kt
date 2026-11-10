@@ -547,7 +547,7 @@ class PlatzhalterAnsicht(context: Context, private var e: Element) : View(contex
     }
     private val schrift = android.text.TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE; textAlign = Paint.Align.CENTER
-        setShadowLayer(6f, 0f, 2f, 0xE6000000.toInt())
+        setShadowLayer(Leistung.schatten(6f), 0f, 2f, 0xE6000000.toInt())
     }
     private val plus = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xE6FFFFFF.toInt(); textAlign = Paint.Align.CENTER }
     private val feld = RectF()

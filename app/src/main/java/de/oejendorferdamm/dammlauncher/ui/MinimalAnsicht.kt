@@ -98,7 +98,7 @@ class MinimalAnsicht(
                 setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 34f.vp)
                 typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
                 gravity = Gravity.CENTER
-                setShadowLayer(8f, 0f, 2f, 0x99000000.toInt())
+                setShadowLayer(Leistung.schatten(8f), 0f, 2f, 0x99000000.toInt())
                 maxLines = 1
             }, LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply { topMargin = 14.vp })
         }.also { v -> v.layoutParams = LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply { leftMargin = 24.vp; rightMargin = 24.vp } }

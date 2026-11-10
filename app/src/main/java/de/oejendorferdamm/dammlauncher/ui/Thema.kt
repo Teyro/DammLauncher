@@ -147,7 +147,7 @@ class GlasFlaeche(context: Context, private val radius: () -> Float) : View(cont
         feld.set(0f, 0f, w, h)
         val g = Thema.glas
         val wurzel = rootView
-        if (g != null && wurzel.width > 0 && wurzel.height > 0) {
+        if (g != null && !Leistung.sparsam && wurzel.width > 0 && wurzel.height > 0) {
             // Das winzige Bild über einen Shader auf Fenstergröße strecken: glatte Ecken (Kantenglättung), kein Zuschneiden
             if (shaderFuer !== g) {
                 glasPaint.shader = android.graphics.BitmapShader(g, android.graphics.Shader.TileMode.CLAMP, android.graphics.Shader.TileMode.CLAMP)

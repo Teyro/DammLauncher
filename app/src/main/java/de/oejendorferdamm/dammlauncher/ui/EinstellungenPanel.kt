@@ -389,7 +389,16 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
     private fun teilBedienung(k: Konfig) {
         abschnitt("Bedienung")
         add(schalter(c, "Knopf „Alle Apps“ unten anzeigen", k.alleAppsKnopf) { an -> aendere { it.copy(alleAppsKnopf = an) } })
-        add(schalter(c, "Animationen", k.animationen) { an -> aendere { it.copy(animationen = an) } })
+        add(schalter(c, "Animationen" + if (Leistung.sparsam) " (im Sparmodus aus)" else "", k.animationen) { an -> aendere { it.copy(animationen = an) } })
+        auswahl("Leistung dieses Boards", listOf(
+            Leistung.AUTO to "Automatisch (" + (if (Leistung.automatischSparsam) "sparsam" else "voll") + ")",
+            Leistung.VOLL to "Volle Darstellung",
+            Leistung.SPAR to "Sparsam"
+        ), de.oejendorferdamm.dammlauncher.konfig.Geraet.leistung) { v ->
+            de.oejendorferdamm.dammlauncher.konfig.Geraet.leistung = v
+            (c as? android.app.Activity)?.recreate() // Schatten, Glas und Hintergrund neu aufbauen
+        }
+        add(text(c, "Android ${android.os.Build.VERSION.RELEASE}: Automatisch heißt ab Android 10 volle Darstellung, darunter sparsam – keine Animationen, schmale Schatten, kein Milchglas, Hintergrundbild in Bildschirmgröße. Gilt nur für dieses Board.", 21, Farben.TEXT2), 6)
         add(schalter(c, "Startbildschirm gegen Verändern sperren", k.bearbeitenGesperrt) { an -> aendere { it.copy(bearbeitenGesperrt = an) } })
         knoepfe(
             knopf(c, if (k.pin == null) "PIN für Einstellungen festlegen …" else "PIN ändern …") { a.pinFestlegen() },

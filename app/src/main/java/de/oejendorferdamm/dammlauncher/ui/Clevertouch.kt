@@ -39,12 +39,12 @@ class Kopfzeile(context: Context, suchen: () -> Unit, schnell: () -> Unit) : Lin
         groesse(46)
         setTextColor(Color.WHITE)
         typeface = Typeface.create("sans-serif-light", Typeface.NORMAL)
-        setShadowLayer(8f, 0f, 2f, 0x99000000.toInt())
+        setShadowLayer(Leistung.schatten(8f), 0f, 2f, 0x99000000.toInt())
     }
     private val datum = TextView(context).apply {
         groesse(22)
         setTextColor(0xE6FFFFFF.toInt())
-        setShadowLayer(6f, 0f, 2f, 0x99000000.toInt())
+        setShadowLayer(Leistung.schatten(6f), 0f, 2f, 0x99000000.toInt())
     }
     private val takt = object : BroadcastReceiver() {
         override fun onReceive(c: Context, i: Intent) = zeit()

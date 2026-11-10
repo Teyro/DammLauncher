@@ -140,6 +140,11 @@ object Geraet {
         set(v) = p.edit().putLong("abwesendGeladen", v).apply()
 
     /** Lehrer-Ansicht offen (sonst Schüler-Ansicht, wenn diese eingeschaltet ist). */
+    /** Leistung dieses Boards: "auto" (ab Android 10 voll, darunter sparsam), "voll" oder "spar" */
+    var leistung: String
+        get() = p.getString("leistung", "auto") ?: "auto"
+        set(v) = p.edit().putString("leistung", v).apply()
+
     var lehrerAnsicht: Boolean
         get() = p.getBoolean("lehrer", false)
         set(v) = p.edit().putBoolean("lehrer", v).apply()

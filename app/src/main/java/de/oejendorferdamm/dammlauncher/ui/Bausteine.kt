@@ -314,7 +314,7 @@ class GrossFenster(private val wurzel: FrameLayout, titel: String, breite: Int =
         })
         wurzel.addView(decke, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
         // Einblenden nur mit eingeschalteten Animationen – ältere Boards ruckeln sonst
-        if (de.oejendorferdamm.dammlauncher.konfig.KonfigSpeicher.konfig.animationen) {
+        if (Leistung.animationen) {
             decke.alpha = 0f
             decke.animate().alpha(1f).setDuration(120).start()
             kasten.scaleX = 0.96f; kasten.scaleY = 0.96f
