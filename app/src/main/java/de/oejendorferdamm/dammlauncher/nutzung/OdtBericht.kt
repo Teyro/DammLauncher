@@ -135,7 +135,7 @@ ${bilder.joinToString("\n") { " <manifest:file-entry manifest:full-path=\"Pictur
             "Ø je genutztem Tag" to Auswertung.dauer(if (genutzt.isEmpty()) 0 else genutzt.sumOf { it.anMs } / genutzt.size),
             "Apps offen" to Auswertung.dauer(tage.sumOf { it.appMs }),
             "Meistgenutzt" to (jeApp.firstOrNull()?.let { d.name(it.first) } ?: "–"),
-            "Abends noch an (nach ${Auswertung.ABEND_STUNDE} Uhr)" to "${Auswertung.abendsAn(tage)} Tage"
+            "Abends noch an (nach ${Auswertung.ABEND_STUNDE} Uhr)" to Auswertung.abendsAn(tage).let { "$it ${if (it == 1) "Tag" else "Tage"}" }
         )
         body.append("<table:table table:style-name=\"Tab\"><table:table-column table:number-columns-repeated=\"3\"/>")
         kennzahlen.chunked(3).forEach { reihe ->

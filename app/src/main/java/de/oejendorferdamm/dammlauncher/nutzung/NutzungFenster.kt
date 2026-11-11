@@ -123,7 +123,7 @@ internal fun HomeActivity.nutzungZeigen(anzahl: Int = 7, tagIndex: Int = 0) {
     // --- Export, Löschen, Aufzeichnen
     f.add(schalter(this, "Nutzung auf diesem Board aufzeichnen", Nutzung.an) { an -> Nutzung.an = an }, 16)
     f.knoepfe(
-        knopf(this, "Statistik löschen", gefahr = true) {
+        knopf(this, "Statistik löschen …") {
             f.schliessen()
             val g = neuesFenster("Statistik löschen?", 900)
             g.add(text(this, "Alle aufgezeichneten Zeiten dieses Boards werden gelöscht.", 24))
