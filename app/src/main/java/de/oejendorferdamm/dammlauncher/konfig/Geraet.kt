@@ -202,6 +202,13 @@ object Geraet {
     var statusMeldung: String
         get() = p.getString("statusMeldung", "") ?: ""
         set(v) = p.edit().putString("statusMeldung", v.take(300)).apply()
+    /** Online-Meldung zusätzlich per HTTPS an diese Adresse (vorbereitet für ein Dashboard im Schulnetz) */
+    var onlineAdresse: String
+        get() = p.getString("onlineAdresse", "") ?: ""
+        set(v) = p.edit().putString("onlineAdresse", v.trim().take(300)).apply()
+    var letzteOnlineMeldung: Long
+        get() = p.getLong("letzteOnlineMeldung", 0)
+        set(v) = p.edit().putLong("letzteOnlineMeldung", v).apply()
     /** Zufällige, feste Kennung dieses Boards (für den Dateinamen des Status-Berichts). */
     val kennung: String
         get() = p.getString("kennung", null) ?: java.util.UUID.randomUUID().toString().replace("-", "").take(12).also { p.edit().putString("kennung", it).apply() }

@@ -196,7 +196,7 @@ class RandGesten : Service() {
     private fun startbar(paket: String) = packageManager.getLaunchIntentForPackage(paket) != null
 
     private fun starte(paket: String) {
-        try { packageManager.getLaunchIntentForPackage(paket)?.let { startActivity(it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } } catch (_: Exception) {}
+        try { packageManager.getLaunchIntentForPackage(paket)?.let { startActivity(it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); de.oejendorferdamm.dammlauncher.nutzung.Nutzung.appStart(paket) } } catch (_: Exception) {}
     }
 
     @SuppressLint("ClickableViewAccessibility")

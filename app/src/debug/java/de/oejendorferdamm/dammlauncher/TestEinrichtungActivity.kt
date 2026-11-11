@@ -33,6 +33,14 @@ class TestEinrichtungActivity : Activity() {
         val b = intent.getStringExtra("benutzer")
         val p = intent.getStringExtra("passwort")
         if (b != null && p != null) Abgleich.speichereZugang(b, p)
+        // „nutzung“: 14 Tage Beispieldaten für die Nutzungsstatistik
+        if (intent.getBooleanExtra("nutzung", false)) {
+            de.oejendorferdamm.dammlauncher.nutzung.Nutzung.init(this)
+            de.oejendorferdamm.dammlauncher.nutzung.Nutzung.beispiel(listOf(
+                "com.android.chrome", "com.android.settings", "com.google.android.apps.photos", "com.android.camera2",
+                "com.google.android.calendar", "com.android.contacts", "com.google.android.youtube", "com.android.deskclock", "com.google.android.apps.maps"
+            ))
+        }
         // „leer“: schlichte Einrichtung (6 × 4, nur die Uhr, Knopf „Alle Apps“) für den Oberflächentest
         if (intent.getBooleanExtra("leer", false)) {
             KonfigSpeicher.init(this)

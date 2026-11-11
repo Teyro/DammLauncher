@@ -66,6 +66,70 @@ object Status {
             .put("abstuerze", JSONArray(Geraet.absturzTexte()))
     }
 
+    // ---------------------------------------------------------------- Online-Meldung (alle 5 Minuten)
+
+    /** Unterordner der Online-Meldungen */
+    const val ONLINE = "online"
+    const val ONLINE_TAKT = 5 * 60_000L
+
+    /**
+     * Bewusst knapp: Board an, ob gerade eine App vorn ist (ohne Namen), Version.
+     * Wer sehen will, was genau lief, muss ans Board (Einstellungen → Verwaltung → Nutzungsstatistik).
+     */
+    fun onlineBericht(appVorn: Boolean): JSONObject = JSONObject()
+        .put("kennung", Geraet.kennung)
+        .put("name", Geraet.name)
+        .put("klasse", Geraet.klasse)
+        .put("zeit", System.currentTimeMillis())
+        .put("appOffen", appVorn)
+        .put("version", BuildConfig.VERSION_NAME)
+
+    fun onlineFaellig() = System.currentTimeMillis() - Geraet.letzteOnlineMeldung >= ONLINE_TAKT - 15_000L &&
+        ((Geraet.server.isNotBlank() && hatZugang()) || Geraet.onlineAdresse.startsWith("https://"))
+
+    /** In den Status-Ordner (WebDAV) und – falls eingetragen – per HTTPS an die Dashboard-Adresse */
+    @Synchronized
+    fun onlineSenden(appVorn: Boolean) {
+        Geraet.letzteOnlineMeldung = System.currentTimeMillis()
+        val inhalt = onlineBericht(appVorn).toString().toByteArray(Charsets.UTF_8)
+        if (Geraet.server.isNotBlank()) zugang()?.let { (b, p) ->
+            try {
+                val dav = WebDav(Geraet.server, b, p)
+                val ordner = "${Geraet.ordner}/$ORDNER/$ONLINE"
+                try { dav.ordner("${Geraet.ordner}/$ORDNER") } catch (_: Exception) {}
+                try { dav.ordner(ordner) } catch (_: Exception) {}
+                dav.putAtomar("$ordner/${Geraet.kennung}.json", inhalt, "application/json")
+            } catch (_: Exception) {}
+        }
+        val adresse = Geraet.onlineAdresse
+        if (adresse.startsWith("https://")) try {
+            val v = java.net.URL(adresse).openConnection() as javax.net.ssl.HttpsURLConnection
+            v.connectTimeout = 10_000; v.readTimeout = 10_000
+            v.requestMethod = "POST"; v.doOutput = true
+            v.setRequestProperty("Content-Type", "application/json")
+            v.outputStream.use { it.write(inhalt) }
+            v.responseCode
+            v.disconnect()
+        } catch (_: Exception) {}
+    }
+
+    data class Online(val zeit: Long, val appOffen: Boolean)
+
+    /** Online-Meldungen aller Boards (Lesezugang), je Kennung */
+    fun onlineAlle(): Map<String, Online> {
+        val (b, p) = Abgleich.leseZugang() ?: return emptyMap()
+        val dav = WebDav(Geraet.server, b, p)
+        val ordner = "${Geraet.ordner}/$ORDNER/$ONLINE"
+        return try {
+            dav.liste(ordner).filter { Regex("^[A-Za-z0-9_-]{1,40}\\.json$").matches(it) }.take(300).mapNotNull { n ->
+                try {
+                    val o = JSONObject(String(dav.get("$ordner/$n", max = 8 * 1024).daten ?: return@mapNotNull null, Charsets.UTF_8))
+                    o.optString("kennung").take(40) to Online(o.optLong("zeit"), o.optBoolean("appOffen"))
+                } catch (_: Exception) { null }
+            }.toMap()
+        } catch (_: Exception) { emptyMap() }
+    }
+
     /** Fällig: kein Bericht in den letzten 6 Stunden. */
     fun faellig() = Geraet.server.isNotBlank() && hatZugang() && System.currentTimeMillis() - Geraet.letzterStatus > 6 * 60 * 60_000L
 

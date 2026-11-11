@@ -44,6 +44,8 @@ import de.oejendorferdamm.dammlauncher.konfig.Zeitraum
 import de.oejendorferdamm.dammlauncher.qr.QrCode
 import de.oejendorferdamm.dammlauncher.ui.AppZelle
 import de.oejendorferdamm.dammlauncher.ui.EckBand
+import de.oejendorferdamm.dammlauncher.nutzung.nutzungZeigen
+import de.oejendorferdamm.dammlauncher.nutzung.nutzungBericht
 import de.oejendorferdamm.dammlauncher.ui.Leistung
 import de.oejendorferdamm.dammlauncher.ui.InfoKachel
 import de.oejendorferdamm.dammlauncher.ui.MinimalAnsicht
@@ -167,6 +169,7 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Geraet.init(this)
+        de.oejendorferdamm.dammlauncher.nutzung.Nutzung.init(this)
         absturzSchutz()
         sicher = Geraet.absturzSchleife()
         if (sicher) Geraet.vergissAbstuerze()
@@ -239,6 +242,13 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         }
         // Läuft er 30 Sekunden stabil, ist die Absturzschleife vorbei
         haupt.postDelayed({ Geraet.vergissAbstuerze() }, 30_000)
+        // Nutzungs-Statistik: Bildschirm an/aus mitbekommen, jede Minute ein Lebenszeichen (auch wenn eine App vorn ist)
+        try {
+            registerReceiver(bildschirmEmpfaenger, android.content.IntentFilter().apply {
+                addAction(Intent.ACTION_SCREEN_OFF); addAction(Intent.ACTION_SCREEN_ON)
+            })
+        } catch (_: Exception) {}
+        puls.run()
         Abgleich.planen(this)
         TagesJob.planen(this)
         hintergrundPruefungen()
@@ -314,6 +324,7 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
             panel?.aufbauen()
         }
         vorne = true
+        de.oejendorferdamm.dammlauncher.nutzung.Nutzung.launcherVorn()
         RandGesten.vorne(true)
         RandGesten.abgleichen(this)
         if (Geraet.veraltetGemeldet || System.currentTimeMillis() - Geraet.letzterUpdateCheck > 24 * 60 * 60_000L) updatePruefenStill()
@@ -324,6 +335,28 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         haupt.postDelayed(wartung, WARTUNG_MS)
         haupt.removeCallbacks(takt)
         takt.run()
+    }
+
+    private val bildschirmEmpfaenger = object : android.content.BroadcastReceiver() {
+        override fun onReceive(c: android.content.Context, i: Intent) {
+            when (i.action) {
+                Intent.ACTION_SCREEN_OFF -> de.oejendorferdamm.dammlauncher.nutzung.Nutzung.bildschirmAus()
+                Intent.ACTION_SCREEN_ON -> de.oejendorferdamm.dammlauncher.nutzung.Nutzung.bildschirmAn(vorne)
+            }
+        }
+    }
+
+    /** Jede Minute, auch wenn eine andere App vorn ist: Lebenszeichen für die Statistik, alle 5 Minuten die Online-Meldung. */
+    private val puls = object : Runnable {
+        override fun run() {
+            val an = try { getSystemService(android.os.PowerManager::class.java).isInteractive } catch (_: Exception) { true }
+            de.oejendorferdamm.dammlauncher.nutzung.Nutzung.puls(an)
+            if (an && Status.onlineFaellig()) {
+                val appVorn = !vorne && de.oejendorferdamm.dammlauncher.nutzung.Nutzung.appVorn
+                try { netz.execute { Status.onlineSenden(appVorn) } } catch (_: Exception) {}
+            }
+            haupt.postDelayed(this, 60_000)
+        }
     }
 
     /**
@@ -413,6 +446,7 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
     }
 
     override fun onDestroy() {
+        try { unregisterReceiver(bildschirmEmpfaenger) } catch (_: Exception) {}
         haupt.removeCallbacksAndMessages(null)
         // laufende Aufträge dürfen fertig werden, neue nimmt keiner mehr an (sonst bliebe bei jedem Neuaufbau ein Faden übrig)
         arbeit.shutdown()
@@ -1240,6 +1274,14 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
                 val t = try { Datei.exportieren(this, uri); "Einrichtung exportiert." } catch (e: Exception) { "Export fehlgeschlagen: ${e.message}" }
                 haupt.post { meldung(t) }
             }
+            REQ_NUTZUNG -> if (resultCode == RESULT_OK && uri != null) arbeit.execute {
+                val t = try {
+                    val daten = nutzungBericht(nutzungTage)
+                    contentResolver.openOutputStream(uri, "w")?.use { it.write(daten) } ?: throw java.io.IOException("Ziel nicht beschreibbar")
+                    "Statistik exportiert."
+                } catch (e: Exception) { "Export fehlgeschlagen: ${e.message}" }
+                haupt.post { meldung(t) }
+            }
             REQ_IMPORT -> if (resultCode == RESULT_OK && uri != null) arbeit.execute {
                 val ergebnis = try { Datei.importieren(this, uri) } catch (e: Exception) { haupt.post { meldung("Import fehlgeschlagen: ${e.message}") }; return@execute }
                 haupt.post { einrichtungUebernehmen(ergebnis) }
@@ -1293,6 +1335,28 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
     }
 
     override fun importieren() = bildAuswahl(REQ_IMPORT, "*/*")
+
+    /** Statistik als .odt: Dateiauswahl (USB-Stick wählen); gibt es keine, direkt auf den USB-Stick */
+    internal fun nutzungExportieren(anzahl: Int) {
+        nutzungTage = anzahl
+        try {
+            startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType(de.oejendorferdamm.dammlauncher.nutzung.OdtBericht.MIME)
+                .putExtra(Intent.EXTRA_TITLE, de.oejendorferdamm.dammlauncher.nutzung.nutzungDateiname()), REQ_NUTZUNG)
+        } catch (_: Exception) {
+            arbeit.execute {
+                val t = try {
+                    // Ohne Dateiauswahl: in den App-Ordner auf dem USB-Stick (dafür braucht es keine Erlaubnis)
+                    val stick = getExternalFilesDirs(null).drop(1).firstOrNull { it != null && android.os.Environment.isExternalStorageRemovable(it) }
+                        ?: throw java.io.IOException("Kein USB-Stick gefunden.")
+                    val ziel = java.io.File(stick, de.oejendorferdamm.dammlauncher.nutzung.nutzungDateiname())
+                    ziel.writeBytes(nutzungBericht(anzahl))
+                    "Gespeichert auf dem USB-Stick: ${ziel.absolutePath.substringAfter("/Android/").let { "Android/$it" }}"
+                } catch (e: Exception) { "Export fehlgeschlagen: ${e.message}" }
+                haupt.post { meldung(t, lang = true) }
+            }
+        }
+    }
+    private var nutzungTage = 7
 
     override fun schulVorlage() = schulVorlageFragen()
 
@@ -2117,6 +2181,7 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
     override fun hilfeErlauben() { if (!de.oejendorferdamm.dammlauncher.gesten.SeitenleisteHilfe.einstellungenOeffnen(this)) meldung("Dieses Board bietet die Bedienungshilfen-Einstellungen nicht an.") }
     override fun statusZugangEinstellen() = statusZugang()
     override fun tafelnZeigen() = tafelUebersicht()
+    override fun nutzung() = nutzungZeigen()
     override fun aufraeumenJetzt() = aufraeumen()
     override fun schnellOeffnen() = schnell()
     override fun minimalQuelleApp() = minimalQuelleAppWaehlen()
@@ -2150,5 +2215,6 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         private const val REQ_ICON = 14
         private const val REQ_EXPORT = 15
         private const val REQ_IMPORT = 16
+        private const val REQ_NUTZUNG = 17
     }
 }

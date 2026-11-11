@@ -70,6 +70,7 @@ interface PanelAktionen {
     fun minimalQuelleApp()
     fun minimalQuelleAktivitaet()
     fun zeitJetzt()
+    fun nutzung()
 }
 
 /**
@@ -111,7 +112,7 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
             Seite("Schule", "🏫", 0xFF16A34A.toInt(), { k -> "Stundenplan, Pausen, Hinweise, Schüler-Ansicht" + (if (k.schueler.an) " (an)" else "") },
                 listOf(::teilStundenplanundProfile, ::teilSchulzeiten, ::teilHinweisBand, ::teilSchuelerAnsicht, ::teilAbwesenheiten, ::teilAufraeumen)),
             Seite("Verwaltung", "☁", 0xFFEA580C.toInt(), { _ -> "Vorlage für alle Boards, Datei, Updates" + (if (a.bossAktiv()) " · Boss-Modus aktiv" else "") },
-                listOf(::teilZentraleVerteilungIServ, ::teilDatei, ::teilUpdates, ::teilUhrzeit)),
+                listOf(::teilZentraleVerteilungIServ, ::teilNutzung, ::teilDatei, ::teilUpdates, ::teilUhrzeit)),
             Seite("Über DammLauncher", "ℹ", 0xFF6B7280.toInt(), { _ -> "Version ${BuildConfig.VERSION_NAME} · Lizenzen" }, listOf(::teilUeberDammLauncher))
         )
     }
@@ -614,6 +615,22 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
                 knopf(c, "Verwerfen", gefahr = true) { aendere { it.copy(nichtPlatziert = emptyList()) }; aufbauen() }
             )
         }
+    }
+
+    private fun teilNutzung(k: Konfig) {
+        abschnitt("Nutzungsstatistik")
+        add(text(c, "Wann war das Board an, welche App lief wann – letzte 7 oder 14 Tage, als Übersicht und zum Exportieren (OpenOffice-Datei auf den USB-Stick). " +
+            "Bleibt auf diesem Board. " + if (de.oejendorferdamm.dammlauncher.nutzung.Nutzung.an) "Aufzeichnung: an." else "Aufzeichnung: aus.", 22, Farben.TEXT2))
+        knoepfe(knopf(c, "Statistik ansehen …", haupt = true) { a.nutzung() })
+        add(text(c, "Online-Meldung für ein Dashboard (alle 5 Minuten, nur „an“ und „App offen ja/nein“): in den Status-Ordner, sobald der Status-Zugang eingetragen ist. " +
+            "Zusätzlich an eine eigene Adresse im Schulnetz (https://…, leer = aus):", 21, Farben.TEXT2), 16)
+        val adresse = eingabe(c, "https://dashboard.schule.local/melden", Geraet.onlineAdresse)
+        add(adresse, 8)
+        knoepfe(knopf(c, "Adresse speichern") {
+            val t = adresse.text.toString().trim()
+            if (t.isNotEmpty() && !t.startsWith("https://")) a.meldung("Bitte eine https://-Adresse eintragen.")
+            else { Geraet.onlineAdresse = t; a.meldung(if (t.isEmpty()) "Keine eigene Adresse." else "Adresse gespeichert.") }
+        })
     }
 
     private fun teilDatei(k: Konfig) {

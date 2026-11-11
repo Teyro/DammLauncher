@@ -103,6 +103,7 @@ object AppKatalog {
             kontext.startActivity(android.content.Intent().setComponent(app).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK), optionen)
         }
         try { de.oejendorferdamm.dammlauncher.konfig.Geraet.merkeStart(schluessel(app)) } catch (_: Exception) {}
+        de.oejendorferdamm.dammlauncher.nutzung.Nutzung.appStart(app.packageName)
         true
     } catch (_: Exception) {
         false

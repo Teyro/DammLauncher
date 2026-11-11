@@ -543,11 +543,21 @@ internal fun HomeActivity.tafelUebersicht() {
     meldung("Liest die Berichte …")
     netz.execute {
         val ergebnis = try { Result.success(Status.alle()) } catch (e: Exception) { Result.failure(e) }
+        val online = try { Status.onlineAlle() } catch (_: Exception) { emptyMap() }
         haupt.post {
-            val liste = ergebnis.getOrNull()
-            if (liste == null) { meldung("Fehler: ${ergebnis.exceptionOrNull()?.message ?: "Berichte nicht lesbar"}", lang = true); return@post }
+            val roh = ergebnis.getOrNull()
+            if (roh == null) { meldung("Fehler: ${ergebnis.exceptionOrNull()?.message ?: "Berichte nicht lesbar"}", lang = true); return@post }
+            // Online = Meldung in den letzten 12 Minuten (jedes Board meldet sich alle 5 Minuten, solange der Bildschirm an ist)
+            fun an(k: String) = online[k]?.let { System.currentTimeMillis() - it.zeit < 12 * 60_000L } == true
+            val liste = roh.sortedWith(compareByDescending<Status.Bericht> { an(it.kennung) }.thenBy { it.name.lowercase() })
             val f = neuesFenster("Tafel-Übersicht (${liste.size})", 1500)
             if (liste.isEmpty()) f.add(text(this, "Noch keine Berichte. Jedes Board braucht dafür den Status-Zugang (Boss-Modus → Tafel-Übersicht).", 24, Farben.TEXT2))
+            else {
+                val anzahlAn = liste.count { an(it.kennung) }
+                val mitApp = liste.count { an(it.kennung) && online[it.kennung]?.appOffen == true }
+                f.add(text(this, if (online.isEmpty()) "Online-Anzeige: noch keine Meldungen (ab Version 1.10 melden sich die Boards alle 5 Minuten)."
+                    else "Gerade an: $anzahlAn von ${liste.size} Boards" + (if (mitApp > 0) " · bei $mitApp ist eine App offen" else ""), 26, if (anzahlAn > 0) Farben.TEXT else Farben.TEXT2, fett = true))
+            }
             val neueste = liste.map { it.version }.maxWithOrNull { a, b -> if (de.oejendorferdamm.dammlauncher.update.Update.istNeuer(a, b)) 1 else if (a == b) 0 else -1 }
             val format = SimpleDateFormat("dd.MM. HH:mm", Locale.GERMAN)
             for (r in liste) {
@@ -559,6 +569,11 @@ internal fun HomeActivity.tafelUebersicht() {
                     setPadding(24.vp, 16.vp, 24.vp, 16.vp)
                     addView(text(context, "${r.name.ifBlank { "(ohne Namen)" }}" + (if (r.klasse.isNotBlank()) " · Klasse ${r.klasse}" else "") + " · Version ${r.version}" +
                         (if (veraltet) "  ⚠ veraltet" else ""), 26, if (veraltet) Farben.ROT else Farben.TEXT, fett = true))
+                    online[r.kennung]?.let { o ->
+                        val istAn = an(r.kennung)
+                        addView(text(context, if (istAn) "●  an" + (if (o.appOffen) " – eine App ist offen" else " – Startbildschirm") else "○  aus (zuletzt gemeldet ${format.format(Date(o.zeit))})",
+                            24, if (istAn) Farben.GRUEN else Farben.TEXT2, fett = istAn), lp(oben = 4.vp))
+                    }
                     addView(text(context, "Bericht ${format.format(Date(r.zeit))}" + (if (alt) " (älter als 2 Tage)" else "") +
                         " · ${if (r.freiMb >= 0) "${r.freiMb} MB frei" else "Speicher ?"} · ${r.modell}, Android-API ${r.android}" +
                         (if (r.profil.isNotBlank()) " · Profil ${r.profil}" else ""), 21, if (alt) Farben.ROT else Farben.TEXT2), lp(oben = 4.vp))
@@ -722,7 +737,7 @@ internal fun HomeActivity.minimalQuelleAktivitaetWaehlen() {
 internal fun HomeActivity.starteApp(paket: String, name: String) {
     val i = packageManager.getLaunchIntentForPackage(paket)
     if (i == null) { meldung("$name ist auf diesem Board nicht installiert."); return }
-    try { startActivity(i.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) } catch (_: Exception) { meldung("$name lässt sich nicht starten.") }
+    try { startActivity(i.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)); de.oejendorferdamm.dammlauncher.nutzung.Nutzung.appStart(paket) } catch (_: Exception) { meldung("$name lässt sich nicht starten.") }
 }
 
 /**

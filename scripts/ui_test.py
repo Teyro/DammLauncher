@@ -643,6 +643,37 @@ def main():
     else:
         fertig()
         time.sleep(1)
+    # 1.10: Nutzungsstatistik (Beispieldaten) und Export als OpenOffice-Datei
+    adb("shell", "am", "start", "-n", f"{PAKET}/.TestEinrichtungActivity", "--ez", "nutzung", "true")
+    time.sleep(3)
+    home()
+    time.sleep(3)
+    lang(w * 85 // 100, h * 70 // 100)
+    time.sleep(2)
+    tippe("Verwaltung")
+    time.sleep(1.5)
+    if scrolle_zu("Statistik ansehen …", w // 6):
+        time.sleep(3)
+        screenshot("60_statistik.png")
+        for n in ("61_statistik_tagesverlauf.png", "62_statistik_detail.png"):
+            adb("shell", "input", "swipe", str(w // 2), str(h * 3 // 4), str(w // 2), str(h // 5), "700")
+            time.sleep(1.5)
+            screenshot(n)
+        if scrolle_zu("Exportieren (USB-Stick) …", w // 2):
+            time.sleep(4)
+            screenshot("63_export_dateiauswahl.png")
+            tippe("SAVE", "Save", "SPEICHERN", "Speichern")
+            time.sleep(4)
+            screenshot("64_exportiert.png")
+            dateien = adb("shell", "ls", "/sdcard/Download/").stdout.split()
+            for d in dateien:
+                if d.startswith("Nutzung_") and d.endswith(".odt"):
+                    adb("pull", f"/sdcard/Download/{d}", os.path.join(ORDNER, d))
+                    print("Export geholt:", d)
+        fertig()
+        time.sleep(1)
+    fertig()
+    time.sleep(1)
     # Feierabend-Sperre: ab jetzt gesperrt, „Entsperren“ (ohne PIN) gibt frei
     adb("shell", "am", "start", "-n", f"{PAKET}/.TestEinrichtungActivity", "--ez", "feierabend", "true")
     time.sleep(3)
