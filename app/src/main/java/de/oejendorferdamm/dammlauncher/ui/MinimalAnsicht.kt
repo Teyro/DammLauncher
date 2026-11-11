@@ -64,7 +64,7 @@ class MinimalAnsicht(
             setOnTouchListener { _, e ->
                 if (e.actionMasked == MotionEvent.ACTION_DOWN) {
                     val jetzt = android.os.SystemClock.uptimeMillis()
-                    if (jetzt - erster > 3000) { erster = jetzt; tipps = 0 }
+                    if (jetzt - erster > 4000) { erster = jetzt; tipps = 0 }
                     if (++tipps >= 5) { tipps = 0; erster = 0L; notausgang() }
                 }
                 true

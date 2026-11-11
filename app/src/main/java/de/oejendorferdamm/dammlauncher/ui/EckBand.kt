@@ -34,7 +34,7 @@ class EckBand(context: Context, private val text: String = "CTOUCH-Modus") : Vie
 
     override fun onDraw(c: Canvas) {
         val dicke = 46f.vp
-        val abstand = 150f.vp // Abstand der Bandmitte von der Ecke, entlang beider Kanten
+        val abstand = 250f.vp // doppelter Abstand der Bandmitte von der Ecke – so passt der Text ganz aufs Band
         schrift.textSize = 24f.vp
         c.save()
         // Ecke unten rechts: Band quer über die Ecke, 45° gedreht

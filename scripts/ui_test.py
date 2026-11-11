@@ -432,9 +432,7 @@ def main():
     time.sleep(2.5)
     screenshot("14y_minimalmodus.png")
     # 1.9.0: Notausgang – 5× oben rechts tippen öffnet die Einstellungen (statt langem Druck)
-    for _ in range(5):
-        tap(w - 60, 60)
-        time.sleep(0.25)
+    adb("shell", "; ".join([f"input tap {w - 60} 60"] * 5))  # in einem Rutsch – einzelne adb-Aufrufe sind zu langsam
     time.sleep(2)
     if knoten("Startbildschirm"):
         screenshot("14y2_notausgang_einstellungen.png")
