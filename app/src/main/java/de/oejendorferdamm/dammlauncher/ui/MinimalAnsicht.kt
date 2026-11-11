@@ -28,7 +28,8 @@ class MinimalAnsicht(
     private val tafel: () -> Unit,
     private val timer: () -> Unit,
     private val quelle: () -> Unit,
-    private val langerDruck: () -> Unit
+    private val langerDruck: () -> Unit,
+    private val notausgang: () -> Unit
 ) : FrameLayout(context) {
     private val uhr = UhrAnsicht(context, transparent = true, stil = UhrStil())
     private val reihe = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER }
@@ -54,6 +55,21 @@ class MinimalAnsicht(
         spalte.addView(reihe, LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply { topMargin = 40.vp })
         addView(spalte, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT, Gravity.CENTER))
         addView(band, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply { bottomMargin = 48.vp })
+        // Unsichtbare Fläche oben rechts: 5× schnell tippen öffnet die Einstellungen (falls der lange Druck nicht ankommt)
+        var tipps = 0
+        var erster = 0L
+        addView(View(context).apply {
+            contentDescription = null
+            importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
+            setOnTouchListener { _, e ->
+                if (e.actionMasked == MotionEvent.ACTION_DOWN) {
+                    val jetzt = android.os.SystemClock.uptimeMillis()
+                    if (jetzt - erster > 3000) { erster = jetzt; tipps = 0 }
+                    if (++tipps >= 5) { tipps = 0; erster = 0L; notausgang() }
+                }
+                true
+            }
+        }, LayoutParams(180.vp, 180.vp, Gravity.TOP or Gravity.END))
         val lang = Runnable { langerDruck() }
         setOnTouchListener { _, e ->
             when (e.actionMasked) {

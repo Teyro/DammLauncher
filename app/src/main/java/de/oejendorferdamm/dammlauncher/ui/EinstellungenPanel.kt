@@ -244,6 +244,9 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
         })
         add(text(c, "Oben Uhr, Suchleiste und Schnelleinstellungen, unten ein Dock mit Lieblings-Apps, Farben passend zum Hintergrund, " +
             "Milchglas – ohne Animationen, damit es auch auf älteren Boards flüssig bleibt. Apps kommen ins Dock über langes Drücken → „Ins Dock legen“.", 21, Farben.TEXT2), 6)
+        add(schalter(c, "Band „CTOUCH-Modus“ unten rechts", k.ctouchBand) { an -> aendere { it.copy(ctouchBand = an) } }, 12)
+        add(text(c, "Ein schmales schräges Band über der Ecke zeigt: Das ist ein älteres CTOUCH-Board mit der neuen Oberfläche. " +
+            "Es lässt sich nicht antippen, alles darunter bleibt bedienbar.", 21, Farben.TEXT2), 6)
         auswahl("Form der App-Symbole", listOf(SymbolForm.ORIGINAL to "Original", SymbolForm.RUND to "Abgerundet", SymbolForm.KREIS to "Kreis"), k.symbolForm) { v -> aendere { it.copy(symbolForm = v) } }
         if (ct) add(text(c, "Im Dock: " + (if (k.dock.isEmpty()) "noch keine Apps" else k.dock.joinToString(", ") { d -> d.titel ?: AppKatalog.finde(d.paket, d.aktivitaet)?.name ?: d.paket }), 22, Farben.TEXT2), 10)
     }
@@ -684,7 +687,7 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
             isHorizontalScrollBarEnabled = false
             addView(LinearLayout(c).apply {
                 moeglich.forEach { (schluessel, name) ->
-                    addView(knopf(c, name, haupt = schluessel == wert) { setze(schluessel); aufbauen() }.apply {
+                    addView(chip(c, name, schluessel == wert) { setze(schluessel); aufbauen() }.apply {
                         if (schriftVorschau) typeface = Schriften.von(c, schluessel, fettFallsSystem = true)
                     }, lp(rechts = 12.vp))
                 }

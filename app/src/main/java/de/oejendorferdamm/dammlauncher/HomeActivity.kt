@@ -43,6 +43,7 @@ import de.oejendorferdamm.dammlauncher.konfig.Zeiten
 import de.oejendorferdamm.dammlauncher.konfig.Zeitraum
 import de.oejendorferdamm.dammlauncher.qr.QrCode
 import de.oejendorferdamm.dammlauncher.ui.AppZelle
+import de.oejendorferdamm.dammlauncher.ui.EckBand
 import de.oejendorferdamm.dammlauncher.ui.Leistung
 import de.oejendorferdamm.dammlauncher.ui.InfoKachel
 import de.oejendorferdamm.dammlauncher.ui.MinimalAnsicht
@@ -131,6 +132,7 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
     private lateinit var hinweisBand: TextView
     private lateinit var lehrerKnopf: TextView
     internal lateinit var minimalAnsicht: MinimalAnsicht
+    private lateinit var eckBand: EckBand
     /** Feierabend-Sperre (über allem außer Update-Sperre, Fenstern und Meldungen). */
     private var ruhe: View? = null
     private var schoner: View? = null
@@ -217,9 +219,13 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         lehrerKnopf = glasKnopf(this, "Lehrer-Ansicht  ✕") { zurSchuelerAnsicht() }.apply { groesse(22); setPadding(30.vp, 12.vp, 30.vp, 12.vp); visibility = View.GONE }
         wurzel.addView(lehrerKnopf, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP or Gravity.END).apply { topMargin = 14.vp; rightMargin = 14.vp })
         minimalAnsicht = MinimalAnsicht(this,
-            { starteApp(RandGesten.DAMMBOARD, "DammBoard") }, { starteApp(RandGesten.DAMMZEIT, "DammZeit") }, { quelleKnopf() }, { langerDruckLeer() }
+            { starteApp(RandGesten.DAMMBOARD, "DammBoard") }, { starteApp(RandGesten.DAMMZEIT, "DammZeit") }, { quelleKnopf() }, { langerDruckLeer() },
+            { notEinstellungen() }
         ).apply { visibility = View.GONE }
         wurzel.addView(minimalAnsicht, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        // über Raster und Minimalmodus, unter Einstellungen (30) und Meldungen (40)
+        eckBand = EckBand(this).apply { visibility = View.GONE; elevation = 25f.vp }
+        wurzel.addView(eckBand, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
         setContentView(wurzel)
         randlos()
 
@@ -478,6 +484,7 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         if (Thema.clevertouch) dock.setze(k.dock, mitAlle = !ohneApps)
         lehrerKnopf.visibility = if (k.schueler.an && !schueler) View.VISIBLE else View.GONE
         minimalZeigen(k)
+        eckBand.visibility = if (k.ctouchBand) View.VISIBLE else View.GONE
         hinweisZeigen(k)
         hintergrund(k)
         // Widgets ihre Größe mitteilen, sobald sie liegen
@@ -663,6 +670,17 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         val r = Rect()
         v.getGlobalVisibleRect(r)
         if (!AppKatalog.starte(ComponentName(app.paket, app.aktivitaet), r)) meldung("Die App lässt sich nicht starten.")
+    }
+
+    /**
+     * Notausgang im Minimalmodus (5× oben rechts tippen): manche CTOUCH-Boards melden keinen langen Druck.
+     * Öffnet die Einstellungen auch in der Schüler-Ansicht bzw. bei gesperrtem Startbildschirm – die PIN bleibt.
+     */
+    private fun notEinstellungen() {
+        val pin = KonfigSpeicher.konfig.pin
+        if (pin == null || bossAktiv()) oeffnePanel() else frageGeheim("Einstellungen", "PIN eingeben", "pin", pin, zahl = true, falsch = "Falsche PIN.") { f ->
+            f.schliessen(); oeffnePanel()
+        }
     }
 
     override fun langerDruckLeer() {

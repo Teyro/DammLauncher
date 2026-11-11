@@ -21,6 +21,8 @@ data class Konfig(
     val textGroesse: Int = 22,
     val beschriftung: Boolean = true,
     val animationen: Boolean = false,
+    /** Schräges Band „CTOUCH-Modus“ unten rechts: altes Board mit neuer Oberfläche */
+    val ctouchBand: Boolean = false,
     /** Knopf „Alle Apps“ unten in der Mitte (Wischen klappt auf großen Displays nicht immer). */
     val alleAppsKnopf: Boolean = true,
     /** Schrift der App-Namen: [Schrift.SYSTEM] oder eine der Grundschriften. */

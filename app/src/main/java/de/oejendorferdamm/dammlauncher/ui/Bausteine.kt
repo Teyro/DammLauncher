@@ -20,16 +20,16 @@ import android.widget.ScrollView
 import android.widget.SeekBar
 import android.widget.TextView
 
-/** Farben der Bedienung. */
+/** Farben der Bedienung – dieselben wie in DammZeit (alle Schul-Apps sehen gleich aus). */
 object Farben {
-    const val AKZENT = 0xFF2563EB.toInt()
-    const val AKZENT_DUNKEL = 0xFF1D4ED8.toInt()
-    const val TEXT = 0xFF111827.toInt()
-    const val TEXT2 = 0xFF6B7280.toInt()
-    const val FLAECHE = 0xFFF3F4F6.toInt()
+    const val AKZENT = 0xFFE01E3C.toInt()
+    const val AKZENT_DUNKEL = 0xFFB3182F.toInt()
+    const val TEXT = 0xFF1F2124.toInt()
+    const val TEXT2 = 0xFF6B7078.toInt()
+    const val FLAECHE = 0xFFECEEF1.toInt()
     const val KARTE = 0xFFFFFFFF.toInt()
-    const val LINIE = 0xFFE5E7EB.toInt()
-    const val PANEL = 0xF7F3F4F6.toInt()
+    const val LINIE = 0xFFE1E4E8.toInt()
+    const val PANEL = 0xF7ECEEF1.toInt()
     const val ROT = 0xFFDC2626.toInt()
     const val GRUEN = 0xFF16A34A.toInt()
 }
@@ -68,11 +68,14 @@ fun knopf(c: Context, beschriftung: String, haupt: Boolean = false, gefahr: Bool
         haupt -> if (Thema.clevertouch) dunkler(akzent) else Farben.AKZENT_DUNKEL
         else -> 0xFFE5E7EB.toInt()
     }
+    // Pille wie in DammZeit: weiß mit leichtem Schatten, Hauptknopf farbig, beim Drücken federt sie
     background = StateListDrawable().apply {
-        addState(intArrayOf(android.R.attr.state_pressed), runde(gedrueckt, 22f.vp))
-        addState(intArrayOf(-android.R.attr.state_enabled), runde(0xFFF3F4F6.toInt(), 22f.vp, 2.vp, Farben.LINIE))
-        addState(intArrayOf(), runde(grund, 22f.vp, if (haupt || gefahr) 0 else 2.vp, 0xFFD1D5DB.toInt()))
+        addState(intArrayOf(android.R.attr.state_pressed), runde(gedrueckt, 40f.vp))
+        addState(intArrayOf(-android.R.attr.state_enabled), runde(Farben.FLAECHE, 40f.vp, 2.vp, Farben.LINIE))
+        addState(intArrayOf(), runde(grund, 40f.vp))
     }
+    elevation = Leistung.hoehe(3f.vp)
+    feder(this)
     setTextColor(android.content.res.ColorStateList(
         arrayOf(intArrayOf(-android.R.attr.state_enabled), intArrayOf()),
         intArrayOf(0xFFA1A7B0.toInt(), if (haupt || gefahr) Color.WHITE else Farben.TEXT)
@@ -81,6 +84,41 @@ fun knopf(c: Context, beschriftung: String, haupt: Boolean = false, gefahr: Bool
     minWidth = 76.vp
     setPadding(26.vp, 10.vp, 26.vp, 10.vp)
     isClickable = true
+    setOnClickListener { klick() }
+}
+
+/** Knopf gibt beim Drücken nach (wie in DammZeit) – nicht im Sparmodus. */
+fun feder(v: View) {
+    if (Leistung.sparsam) return
+    fun anim(ziel: Float) = android.animation.AnimatorSet().apply {
+        playTogether(
+            android.animation.ObjectAnimator.ofFloat(v, View.SCALE_X, ziel),
+            android.animation.ObjectAnimator.ofFloat(v, View.SCALE_Y, ziel)
+        )
+        duration = if (ziel < 1f) 80 else 220
+        interpolator = if (ziel < 1f) android.view.animation.DecelerateInterpolator() else android.view.animation.OvershootInterpolator(3f)
+    }
+    v.stateListAnimator = android.animation.StateListAnimator().apply {
+        addState(intArrayOf(android.R.attr.state_pressed), anim(0.93f))
+        addState(intArrayOf(), anim(1f))
+    }
+}
+
+/** Auswahl-Chip wie in DammZeit: gewählt dunkel mit weißer Schrift, sonst hellgrau. */
+fun chip(c: Context, beschriftung: String, gewaehlt: Boolean, klick: () -> Unit) = TextView(c).apply {
+    text = beschriftung
+    groesse(24)
+    gravity = Gravity.CENTER
+    typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+    setTextColor(if (gewaehlt) Color.WHITE else Farben.TEXT)
+    background = StateListDrawable().apply {
+        addState(intArrayOf(android.R.attr.state_pressed), runde(if (gewaehlt) Farben.TEXT else 0xFFD3D7DD.toInt(), 40f.vp))
+        addState(intArrayOf(), runde(if (gewaehlt) Farben.TEXT else Farben.LINIE, 40f.vp))
+    }
+    minHeight = 68.vp
+    setPadding(30.vp, 10.vp, 30.vp, 10.vp)
+    isClickable = true
+    feder(this)
     setOnClickListener { klick() }
 }
 
@@ -186,11 +224,11 @@ fun regler(c: Context, name: String, bereich: IntRange, wert: Int, schritt: Int 
         progress = (aktuell - bereich.first) / schritt
         minimumHeight = 70.vp
         setPadding(36.vp, 0, 36.vp, 0)
-        // dicker Daumen, gut zu greifen
-        thumb = runde(if (Thema.clevertouch) Thema.akzent else Farben.AKZENT, 30f.vp).apply { setSize(60.vp, 60.vp) }
+        // dicker Daumen, gut zu greifen (weißer Rand wie in DammZeit)
+        thumb = runde(if (Thema.clevertouch) Thema.akzent else Farben.AKZENT, 30f.vp, 5.vp, Color.WHITE).apply { setSize(60.vp, 60.vp) }
         progressDrawable = android.graphics.drawable.LayerDrawable(
             arrayOf(
-                runde(0xFFD5DCE4.toInt(), 8f.vp),
+                runde(Farben.LINIE, 8f.vp),
                 android.graphics.drawable.ClipDrawable(runde(if (Thema.clevertouch) Thema.akzent else Farben.AKZENT, 8f.vp), Gravity.START, android.graphics.drawable.ClipDrawable.HORIZONTAL)
             )
         ).apply {
@@ -220,9 +258,9 @@ fun regler(c: Context, name: String, bereich: IntRange, wert: Int, schritt: Int 
         addView(LinearLayout(c).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            addView(knopf(c, "−") { setze(aktuell - schritt, false) }, lp(86.vp, 86.vp))
+            addView(knopf(c, "−") { setze(aktuell - schritt, false) }.apply { background = rundKnopf() }, lp(86.vp, 86.vp))
             addView(schieber, lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-            addView(knopf(c, "+") { setze(aktuell + schritt, false) }, lp(86.vp, 86.vp))
+            addView(knopf(c, "+") { setze(aktuell + schritt, false) }.apply { background = rundKnopf() }, lp(86.vp, 86.vp))
             addView(anzeige, lp())
         }, lp(ViewGroup.LayoutParams.MATCH_PARENT))
         setPadding(0, 10.vp, 0, 10.vp)
@@ -232,14 +270,15 @@ fun regler(c: Context, name: String, bereich: IntRange, wert: Int, schritt: Int 
 /** Ein/Aus mit großer Fläche: ganze Zeile antippbar, rechts ein deutlicher Schalter. */
 fun schalter(c: Context, name: String, an: Boolean, aktiv: Boolean = true, aendern: (Boolean) -> Unit): LinearLayout {
     var zustand = an
-    val marke = TextView(c).apply {
-        groesse(24); typeface = Typeface.DEFAULT_BOLD; gravity = Gravity.CENTER
-        minWidth = 130.vp; minHeight = 64.vp
-    }
+    // Schalter wie in DammZeit: Spur rot (an) bzw. hellgrau (aus), weißer runder Knopf
+    val marke = View(c).apply { minimumWidth = 112.vp; minimumHeight = 64.vp }
     fun zeige() {
-        marke.text = if (zustand) "AN" else "AUS"
-        marke.setTextColor(Color.WHITE)
-        marke.background = runde(if (!aktiv) 0xFFB0B6BE.toInt() else if (zustand) Farben.GRUEN else 0xFF8A939E.toInt(), 32f.vp)
+        val spur = runde(if (!aktiv) Farben.LINIE else if (zustand) Farben.AKZENT else 0xFFC4C9D0.toInt(), 32f.vp)
+        val knopf = runde(if (!aktiv) 0xFFF3F4F6.toInt() else Color.WHITE, 26f.vp, 1.vp, 0x22000000)
+        marke.background = android.graphics.drawable.LayerDrawable(arrayOf(spur, knopf)).apply {
+            if (zustand) setLayerInset(1, 54.vp, 6.vp, 6.vp, 6.vp) else setLayerInset(1, 6.vp, 6.vp, 54.vp, 6.vp)
+        }
+        marke.contentDescription = if (zustand) "an" else "aus"
     }
     zeige()
     return LinearLayout(c).apply {
@@ -247,7 +286,7 @@ fun schalter(c: Context, name: String, an: Boolean, aktiv: Boolean = true, aende
         gravity = Gravity.CENTER_VERTICAL
         setPadding(0, 12.vp, 0, 12.vp)
         addView(text(c, name, 26), lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        addView(marke, lp())
+        addView(marke, lp(112.vp, 64.vp))
         isClickable = aktiv
         isEnabled = aktiv
         setOnClickListener {
@@ -349,16 +388,17 @@ class GrossFenster(private val wurzel: FrameLayout, titel: String, breite: Int =
     }
 }
 
-/** Runder, heller Symbolknopf (✕, ◀, ▶). */
+/** Runder weißer Symbolknopf (✕, ‹, ◀, ▶) wie in DammZeit. */
 fun rundKnopf() = StateListDrawable().apply {
-    addState(intArrayOf(android.R.attr.state_pressed), runde(0xFFD1D5DB.toInt(), 60f.vp))
-    addState(intArrayOf(), runde(0xFFE5E7EB.toInt(), 60f.vp))
+    addState(intArrayOf(android.R.attr.state_pressed), runde(Farben.LINIE, 60f.vp))
+    addState(intArrayOf(), runde(Color.WHITE, 60f.vp, if (Leistung.sparsam) 2.vp else 0, Farben.LINIE))
 }
 
 /** Weiße Karte mit runden Ecken – fasst einen Abschnitt der Einstellungen zusammen. */
 fun karte(c: Context) = LinearLayout(c).apply {
     orientation = LinearLayout.VERTICAL
-    background = runde(Farben.KARTE, 26f.vp, 1.vp, Farben.LINIE)
+    background = runde(Farben.KARTE, 26f.vp)
+    elevation = Leistung.hoehe(2f.vp)
     setPadding(30.vp, 22.vp, 30.vp, 24.vp)
 }
 

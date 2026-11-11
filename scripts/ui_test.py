@@ -431,14 +431,37 @@ def main():
     fertig()
     time.sleep(2.5)
     screenshot("14y_minimalmodus.png")
-    lang(w // 2, h * 88 // 100)
+    # 1.9.0: Notausgang – 5× oben rechts tippen öffnet die Einstellungen (statt langem Druck)
+    for _ in range(5):
+        tap(w - 60, 60)
+        time.sleep(0.25)
     time.sleep(2)
+    if knoten("Startbildschirm"):
+        screenshot("14y2_notausgang_einstellungen.png")
+    else:
+        print("WARNUNG: Notausgang hat die Einstellungen nicht geöffnet", file=sys.stderr)
+        lang(w // 2, h * 88 // 100)
+        time.sleep(2)
     tippe("Startbildschirm")
     time.sleep(1.5)
     tippe("Minimalmodus: nur Hintergrund", teil=True)
     time.sleep(1.5)
     adb("shell", "input", "keyevent", "KEYCODE_BACK")
     time.sleep(1.5)
+    # 1.9.0: Band „CTOUCH-Modus“ und Knöpfe/Schalter im DammZeit-Aussehen
+    tippe("Aussehen")
+    time.sleep(1.5)
+    screenshot("14v_aussehen_neue_knoepfe.png")
+    if scrolle_zu("Band „CTOUCH-Modus“ unten rechts", w // 6):
+        time.sleep(1.5)
+        fertig()
+        time.sleep(2)
+        screenshot("14w_ctouch_band.png")
+        lang(w * 85 // 100, h * 70 // 100)
+        time.sleep(2)
+    else:
+        adb("shell", "input", "keyevent", "KEYCODE_BACK")
+        time.sleep(1.5)
     tippe("Verwaltung")
     time.sleep(1.5)
     if scrolle_zu("Boss-Modus …", w // 6):

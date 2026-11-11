@@ -130,4 +130,13 @@ class KonfigTest {
         assertEquals(null, k.pin)
         assertEquals(null, k.boss)
     }
+
+    @Test
+    fun ctouchBandBleibtErhaltenUndFehltOhneFehler() {
+        val k = KonfigJson.lese(KonfigJson.schreibe(Konfig(ctouchBand = true))).konfig
+        assertTrue(k.ctouchBand)
+        val ohne = org.json.JSONObject(KonfigJson.schreibe(Konfig())).apply { remove("ctouchBand") }.toString()
+        assertEquals(false, KonfigJson.lese(ohne).konfig.ctouchBand)
+        assertTrue(KonfigJson.lese(ohne).warnungen.none { it.contains("ctouchBand") })
+    }
 }

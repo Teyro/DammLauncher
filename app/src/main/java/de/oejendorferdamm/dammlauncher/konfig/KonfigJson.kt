@@ -31,6 +31,7 @@ object KonfigJson {
         put("textGroesse", k.textGroesse)
         put("beschriftung", k.beschriftung)
         put("animationen", k.animationen)
+        put("ctouchBand", k.ctouchBand)
         put("alleAppsKnopf", k.alleAppsKnopf)
         put("schrift", k.schrift)
         put("ausgeblendet", JSONArray().apply { k.ausgeblendet.sorted().forEach { put(it) } })
@@ -348,6 +349,7 @@ object KonfigJson {
             textGroesse = zahl(o, "textGroesse", Grenzen.TEXT, std.textGroesse),
             beschriftung = schalter("beschriftung", std.beschriftung),
             animationen = schalter("animationen", std.animationen),
+            ctouchBand = o.optBoolean("ctouchBand", false), // fehlt in älteren Vorlagen – kein Fehler
             alleAppsKnopf = schalter("alleAppsKnopf", std.alleAppsKnopf),
             schrift = schrift,
             gesten = gesten,
