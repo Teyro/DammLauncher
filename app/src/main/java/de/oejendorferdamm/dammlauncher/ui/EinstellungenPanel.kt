@@ -163,7 +163,8 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
 
     /** Abschnitt wie eine Material-3-Gruppe: Überschrift in der Primärfarbe über einem hellen Segment. */
     private fun abschnitt(titel: String) {
-        inhalt.addView(text(c, titel, 23, M3.primaer).apply {
+        // gleicht der Seitentitel (z. B. „Über DammLauncher“), steht er schon oben – nicht doppelt
+        if (titel != seite?.titel) inhalt.addView(text(c, titel, 23, M3.primaer).apply {
             typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
             setPadding(26.vp, 0, 26.vp, 0)
         }, lp(ViewGroup.LayoutParams.MATCH_PARENT, oben = 30.vp))
