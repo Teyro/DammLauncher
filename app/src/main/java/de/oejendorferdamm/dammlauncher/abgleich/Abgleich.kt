@@ -53,7 +53,9 @@ object Abgleich {
     fun pruefen(context: Context, vonHand: Boolean = false): String {
         KonfigSpeicher.init(context)
         Geraet.init(context)
+        val schule = if (Geraet.schulAbgleich) SchulZugang.lese(context) else null
         val ergebnis = try {
+            if (schule != null) pruefenSchule(schule) else {
             if (!vonHand && !Geraet.abgleichAn) return "Automatischer Abgleich ist aus."
             if (Geraet.server.isBlank()) throw Exception("Noch kein Server eingetragen.")
             val (b, p) = leseZugang() ?: throw Exception("Noch keine Zugangsdaten eingetragen.")
@@ -66,6 +68,7 @@ object Abgleich {
                 uebernehmen(dav, ordner, neu)
                 "Neue Vorlage vom ${datum(neu.stand)} übernommen."
             }
+            }
         } catch (e: Exception) {
             // Alte Einrichtung bleibt einfach bestehen
             "Fehler: ${e.message ?: "Abgleich fehlgeschlagen"}"
@@ -73,6 +76,20 @@ object Abgleich {
         Geraet.letzterAbgleich = System.currentTimeMillis()
         Geraet.abgleichMeldung = "${zeit()} – $ergebnis"
         return ergebnis
+    }
+
+    /** Schul-Nextcloud: eigene Klasse, Jahrgang und „Alle“ ansehen – die neueste Vorlage gewinnt */
+    private fun pruefenSchule(z: SchulZugang.Zugang): String {
+        val dav = WebDav(z.dav, z.benutzer, z.passwort)
+        val funde = SchulZugang.ordner(z).mapNotNull { o ->
+            val a = dav.get("$o/$VORLAGE", max = 2 * 1024 * 1024)
+            // eine kaputte Vorlage in einem Ordner hält die anderen nicht auf
+            if (a.code == 404 || a.daten == null) null else runCatching { o to KonfigJson.streng(String(a.daten, Charsets.UTF_8)) }.getOrNull()
+        }
+        val (ordner, neu) = funde.maxByOrNull { it.second.stand } ?: return "In der Schul-Nextcloud liegt noch keine Vorlage."
+        if (neu.stand <= Geraet.vorlageStand) return "Schon aktuell (Vorlage vom ${datum(neu.stand)})."
+        uebernehmen(dav, ordner, neu)
+        return "Neue Vorlage aus „${ordner.removePrefix(SchulZugang.WURZEL + "/")}“ vom ${datum(neu.stand)} übernommen."
     }
 
     private fun datum(ms: Long) = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.GERMAN).format(Date(ms))
@@ -127,8 +144,20 @@ object Abgleich {
     fun hochladen(context: Context, benutzer: String, passwort: String): String = try {
         KonfigSpeicher.init(context)
         if (Geraet.server.isBlank()) throw Exception("Bitte zuerst Server und Ordner eintragen.")
-        val dav = WebDav(Geraet.server, benutzer, passwort)
-        val ordner = Geraet.ordner
+        hochladenNach(WebDav(Geraet.server, benutzer, passwort), Geraet.ordner)
+    } catch (e: Exception) {
+        "Fehler beim Hochladen: ${e.message ?: "unbekannt"}"
+    }
+
+    /** Boss-Modus mit dem Zugang der Schule: in [ordner] (DammLauncher/Alle, …/Jahrgang 2, …/Klasse 2b) */
+    fun hochladenSchule(context: Context, z: SchulZugang.Zugang, ordner: String): String = try {
+        KonfigSpeicher.init(context)
+        hochladenNach(WebDav(z.dav, z.benutzer, z.passwort), ordner).replace("Vorlage hochgeladen", "Vorlage nach „${ordner.removePrefix(SchulZugang.WURZEL + "/")}“ hochgeladen")
+    } catch (e: Exception) {
+        "Fehler beim Hochladen: ${e.message ?: "unbekannt"}"
+    }
+
+    private fun hochladenNach(dav: WebDav, ordner: String): String {
         if (ordner.isNotEmpty()) dav.ordner(ordner)
         val k = KonfigSpeicher.konfig.copy(stand = System.currentTimeMillis())
         val icons = KonfigJson.icons(k)
@@ -142,9 +171,7 @@ object Abgleich {
         // Dieses Gerät hat die Vorlage ja schon
         KonfigSpeicher.ersetze(k)
         Geraet.vorlageStand = k.stand
-        "Vorlage hochgeladen (${datum(k.stand)})."
-    } catch (e: Exception) {
-        "Fehler beim Hochladen: ${e.message ?: "unbekannt"}"
+        return "Vorlage hochgeladen (${datum(k.stand)})."
     }
 
     // ------------------------------------------------------------ Zeitsteuerung
@@ -155,7 +182,7 @@ object Abgleich {
     fun planen(context: Context) {
         Geraet.init(context)
         val js = context.getSystemService(JobScheduler::class.java) ?: return
-        if (!Geraet.abgleichAn || Geraet.server.isBlank()) {
+        if (!faellt(context)) {
             js.cancel(JOB_ID); return
         }
         if (js.getPendingJob(JOB_ID) != null) return
@@ -167,8 +194,11 @@ object Abgleich {
         )
     }
 
+    /** Gibt es überhaupt einen automatischen Abgleich? (eigener Server und Schalter an – oder Zugang der Schule über DammTable) */
+    private fun faellt(context: Context) = (Geraet.abgleichAn && Geraet.server.isNotBlank()) || (Geraet.schulAbgleich && SchulZugang.lese(context) != null)
+
     /** Beim Start: letzte Prüfung über 24 Stunden her? */
-    fun faellig(): Boolean = Geraet.abgleichAn && Geraet.server.isNotBlank() && System.currentTimeMillis() - Geraet.letzterAbgleich > 24 * 60 * 60_000L
+    fun faellig(context: Context): Boolean = faellt(context) && System.currentTimeMillis() - Geraet.letzterAbgleich > 24 * 60 * 60_000L
 }
 
 class AbgleichJob : JobService() {

@@ -24,7 +24,10 @@
         tools:ignore="ProtectedPermissions" />
 
     <!-- Statt QUERY_ALL_PACKAGES: nur Apps mit Startsymbol und Widget-Anbieter sehen -->
+    <!-- Zugang der Schul-Nextcloud aus DammTable (nur Apps mit demselben Signaturschlüssel) -->
+    <uses-permission android:name="de.oejendorferdamm.dammtable.permission.STUNDENPLAN" />
     <queries>
+        <provider android:authorities="de.oejendorferdamm.dammtable.stundenplan" />
         <intent>
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />

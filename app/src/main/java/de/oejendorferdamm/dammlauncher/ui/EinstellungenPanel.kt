@@ -646,7 +646,15 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
     }
 
     private fun teilZentraleVerteilungIServ(k: Konfig) {
-        abschnitt("Zentrale Verteilung (IServ)")
+        val schule = de.oejendorferdamm.dammlauncher.abgleich.SchulZugang.lese(c)
+        if (schule != null) {
+            abschnitt("Zentrale Verteilung (Schul-Nextcloud)")
+            val s = de.oejendorferdamm.dammlauncher.abgleich.SchulZugang
+            add(text(c, "Zugang über DammTable, Klasse ${schule.klasse}. Dieses Board übernimmt die neueste Vorlage aus " +
+                s.ordner(schule).joinToString(", ") { "„${it.removePrefix(s.WURZEL + "/")}“" } + ". Im Boss-Modus fragt „Hochladen“, für wen sie gilt.", 22, Farben.TEXT2))
+            add(schalter(c, "Vorlagen der Schule automatisch übernehmen", Geraet.schulAbgleich) { an -> Geraet.schulAbgleich = an; de.oejendorferdamm.dammlauncher.abgleich.Abgleich.planen(c) })
+        }
+        abschnitt(if (schule != null) "Zentrale Verteilung (IServ, nur ohne Schul-Nextcloud)" else "Zentrale Verteilung (IServ)")
         val boss = a.bossAktiv()
         val stand = Geraet.vorlageStand
         add(text(c, "Vorlage: " + (if (stand > 0) SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.GERMAN).format(Date(stand)) else "noch keine") +
@@ -673,7 +681,7 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
             add(schalter(c, "Automatisch täglich abgleichen", Geraet.abgleichAn) { an -> Geraet.abgleichAn = an })
             add(text(c, "Tafel-Übersicht – Bericht dieses Boards: " + (if (!de.oejendorferdamm.dammlauncher.abgleich.Status.hatZugang()) "kein Status-Zugang" else Geraet.statusMeldung.ifBlank { "noch nicht gesendet" }), 22, Farben.TEXT2), 16)
             knoepfe(knopf(c, "Status-Zugang …") { a.statusZugangEinstellen() }, knopf(c, "Tafel-Übersicht …", haupt = true) { a.tafelnZeigen() })
-            knoepfe(knopf(c, "Als Vorlage für alle Geräte hochladen", haupt = true) { a.hochladen() })
+            knoepfe(knopf(c, "Einrichtung als Vorlage hochladen …", haupt = true) { a.hochladen() })
             knoepfe(knopf(c, "Boss-Modus beenden", gefahr = true) { a.bossAbmelden() })
         } else {
             knoepfe(knopf(c, "Boss-Modus …") { a.bossAnmelden() })

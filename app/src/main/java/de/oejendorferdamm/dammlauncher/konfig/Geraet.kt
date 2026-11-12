@@ -27,6 +27,11 @@ object Geraet {
         get() = p.getBoolean("abgleichAn2", false)
         set(v) = p.edit().putBoolean("abgleichAn2", v).apply()
 
+    /** Vorlagen aus der Schul-Nextcloud (Zugang über DammTable) übernehmen – an, sobald DammTable den Zugang liefert */
+    var schulAbgleich: Boolean
+        get() = p.getBoolean("schulAbgleich", true)
+        set(v) = p.edit().putBoolean("schulAbgleich", v).apply()
+
     var letzterAbgleich: Long
         get() = p.getLong("letzterAbgleich", 0)
         set(v) = p.edit().putLong("letzterAbgleich", v).apply()

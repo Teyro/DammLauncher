@@ -1497,6 +1497,8 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
     /** Schreib-Zugang wird nur für diesen Upload abgefragt und nicht gespeichert. */
     private fun hochladen(beendenDanach: Boolean) {
         if (!bossAktiv()) return
+        val schule = de.oejendorferdamm.dammlauncher.abgleich.SchulZugang.let { s -> s.lese(this)?.let { z -> s to z } }
+        if (schule != null) { hochladenSchule(schule.first, schule.second, beendenDanach); return }
         val f = neuesFenster("Als Vorlage hochladen", 1000)
         f.add(text(this, "Zugang mit SCHREIB-Rechten für ${Geraet.server.ifBlank { "(noch kein Server eingetragen)" }} – wird nicht gespeichert.", 24, Farben.TEXT2))
         val b = eingabe(this, "Benutzername (Schreibzugang)")
@@ -1516,6 +1518,33 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
                 }
             }
         })
+    }
+
+    /** Mit dem Zugang der Schule (aus DammTable): fragen, für wen – Standard ist der Jahrgang */
+    private fun hochladenSchule(s: de.oejendorferdamm.dammlauncher.abgleich.SchulZugang, z: de.oejendorferdamm.dammlauncher.abgleich.SchulZugang.Zugang, beendenDanach: Boolean) {
+        val f = neuesFenster("Einrichtung verteilen", 1100)
+        val jg = s.stufe(z.klasse)?.let { s.jahrgangName(it) }
+        f.add(text(this, "Für wen soll diese Einrichtung gelten? Sie geht in die Nextcloud der Schule (Ordner „${s.WURZEL}“), " +
+            "die Boards übernehmen sie beim nächsten Abgleich (täglich und beim Start). Die neueste Vorlage gewinnt.", 24, Farben.TEXT2))
+        fun los(ordner: String) {
+            f.schliessen()
+            meldung("Lädt hoch …")
+            netz.execute {
+                val t = de.oejendorferdamm.dammlauncher.abgleich.Abgleich.hochladenSchule(this, z, ordner)
+                haupt.post {
+                    meldung(t, lang = true)
+                    if (beendenDanach && !t.startsWith("Fehler")) bossBeenden()
+                    panel?.aufbauen()
+                }
+            }
+        }
+        val knoepfe = listOfNotNull(
+            s.klassenOrdner(z.klasse)?.let { o -> knopf(this, "Nur diese Tafel (${z.klasse})") { los(o) } },
+            knopf(this, "Alle Tafeln") { los(s.ALLE) },
+            s.jahrgangOrdner(z.klasse)?.let { o -> knopf(this, (if (jg == "Vorschule") "Ganze Vorschule" else "Ganzer $jg") + " (Standard)", haupt = true) { los(o) } }
+        )
+        f.knoepfe(*knoepfe.toTypedArray())
+        f.knoepfe(knopf(this, "Abbrechen") { f.schliessen() })
     }
 
     override fun zugangSpeichern(server: String, ordner: String, benutzer: String, passwort: String) {
@@ -2029,7 +2058,7 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
 
     private fun hintergrundPruefungen() {
         zeitPruefen()
-        if (Abgleich.faellig()) netz.execute {
+        if (Abgleich.faellig(this)) netz.execute {
             Abgleich.pruefen(this)
             haupt.post { widgetsAbgleichen(); zeigen() }
         }
