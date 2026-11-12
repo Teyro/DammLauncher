@@ -675,8 +675,14 @@ def main():
     fertig()
     time.sleep(1)
     # 1.11: Geburtstag – Schalter an, dann Antippen = Konfetti und Luftballons (ohne Video im Emulator)
-    lang(w * 85 // 100, h * 70 // 100)
-    time.sleep(2)
+    if not knoten("Aussehen"):
+        lang(w * 85 // 100, h * 70 // 100)
+        time.sleep(2)
+    adb("shell", "input", "keyevent", "KEYCODE_BACK")  # aus einer Unterseite zurück zur Übersicht
+    time.sleep(1.5)
+    if not knoten("Aussehen"):
+        lang(w * 85 // 100, h * 70 // 100)
+        time.sleep(2)
     tippe("Aussehen")
     time.sleep(1.5)
     if scrolle_zu("Geburtstag: Konfetti", w // 6, teil=True):
