@@ -107,15 +107,15 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
         listOf(
             Seite("Aussehen", "🎨", 0xFF7C3AED.toInt(), { k -> (if (k.aussehen == Aussehen.CLEVERTOUCH) "Clevertouch" else "Klassisch") + " · Hintergrund · Schrift" },
                 listOf(::teilAussehen, ::teilHintergrund, ::teilSymboleundSchrift)),
-            Seite("Startbildschirm", "▦", 0xFF2563EB.toInt(), { k -> (if (k.minimal.an) "Minimalmodus · " else "") + "${k.spalten} × ${k.zeilen} Raster · Ränder · Widgets · Apps" },
+            Seite("Startbildschirm", "🖥️", 0xFF2563EB.toInt(), { k -> (if (k.minimal.an) "Minimalmodus · " else "") + "${k.spalten} × ${k.zeilen} Raster · Ränder · Widgets · Apps" },
                 listOf(::teilMinimal, ::teilRaster, ::teilAbstandzumBildschirmrand, ::teilWidgetsundAblage, ::teilApps)),
             Seite("Bedienung", "👆", 0xFF0891B2.toInt(), { k -> (if (k.pin == null) "ohne PIN" else "mit PIN") + (if (k.startQuelle.id.isNotEmpty()) " · Startquelle " + k.startQuelle.name.ifBlank { "an" } else "") + " · Gesten · Seitenleiste " + (if (k.seitenleiste.an) "an" else "aus") },
                 listOf(::teilBedienung, ::teilStartQuelle, ::teilGesten, ::teilSeitenleiste)),
             Seite("Schule", "🏫", 0xFF16A34A.toInt(), { k -> "Stundenplan, Pausen, Hinweise, Schüler-Ansicht" + (if (k.schueler.an) " (an)" else "") },
                 listOf(::teilStundenplanundProfile, ::teilSchulzeiten, ::teilHinweisBand, ::teilSchuelerAnsicht, ::teilAbwesenheiten, ::teilAufraeumen)),
-            Seite("Verwaltung", "☁", 0xFFEA580C.toInt(), { _ -> "Vorlage für alle Boards, Datei, Updates" + (if (a.bossAktiv()) " · Boss-Modus aktiv" else "") },
+            Seite("Verwaltung", "☁️", 0xFFEA580C.toInt(), { _ -> "Vorlage für alle Boards, Datei, Updates" + (if (a.bossAktiv()) " · Boss-Modus aktiv" else "") },
                 listOf(::teilZentraleVerteilungIServ, ::teilNutzung, ::teilDatei, ::teilUpdates, ::teilUhrzeit)),
-            Seite("Über DammLauncher", "ℹ", 0xFF6B7280.toInt(), { _ -> "Version ${BuildConfig.VERSION_NAME} · Lizenzen" }, listOf(::teilUeberDammLauncher))
+            Seite("Über DammLauncher", "ℹ️", 0xFF6B7280.toInt(), { _ -> "Version ${BuildConfig.VERSION_NAME} · Lizenzen" }, listOf(::teilUeberDammLauncher))
         )
     }
 
@@ -187,10 +187,10 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
 
     /** Übersicht im Stil der Android-Einstellungen: je Bereich eine Zeile mit Symbol, Titel und Kurzinfo. */
     private fun uebersicht(k: Konfig) {
-        listOf(seiten.take(3), seiten.drop(3)).forEach { gruppe ->
-            val kk = karte(c).apply { setPadding(10.vp, 10.vp, 10.vp, 10.vp) }
-            gruppe.forEachIndexed { i, s ->
-                if (i > 0) kk.addView(View(c).apply { setBackgroundColor(Farben.LINIE) }, lp(ViewGroup.LayoutParams.MATCH_PARENT, 2.vp).apply { leftMargin = 112.vp })
+        // wie in DammZeit, DammBoard und DammTable: jede Seite eine eigene weiße Karte, Symbol auf zartem Kreis in der Farbe der Seite
+        seiten.forEach { s ->
+            val kk = karte(c).apply { setPadding(10.vp, 4.vp, 10.vp, 4.vp) }
+            run {
                 kk.addView(LinearLayout(c).apply {
                     gravity = Gravity.CENTER_VERTICAL
                     setPadding(16.vp, 18.vp, 16.vp, 18.vp)
@@ -201,9 +201,9 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
                     isClickable = true
                     contentDescription = s.titel
                     setOnClickListener { oeffne(s) }
-                    addView(text(c, s.symbol, 34, android.graphics.Color.WHITE).apply {
+                    addView(text(c, s.symbol, 34, s.farbe).apply {
                         gravity = Gravity.CENTER
-                        background = runde(s.farbe, 40f.vp)
+                        background = runde((s.farbe and 0x00FFFFFF) or 0x2E000000, 40f.vp)
                     }, lp(80.vp, 80.vp, rechts = 24.vp))
                     addView(LinearLayout(c).apply {
                         orientation = LinearLayout.VERTICAL
@@ -213,7 +213,7 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
                     addView(text(c, "›", 44, Farben.TEXT2), lp())
                 }, lp(ViewGroup.LayoutParams.MATCH_PARENT))
             }
-            inhalt.addView(kk, lp(ViewGroup.LayoutParams.MATCH_PARENT, oben = 22.vp))
+            inhalt.addView(kk, lp(ViewGroup.LayoutParams.MATCH_PARENT, oben = 14.vp))
         }
         add(text(c, "Jede Änderung wirkt sofort auf den Startbildschirm daneben. ◀ ▶ schiebt dieses Fenster zur Seite.", 20, Farben.TEXT2).apply { setPadding(12.vp, 0, 12.vp, 0) }, 18)
     }

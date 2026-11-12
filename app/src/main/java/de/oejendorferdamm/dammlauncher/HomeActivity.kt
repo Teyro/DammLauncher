@@ -111,9 +111,23 @@ import java.util.concurrent.Executors
 class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
     internal val haupt = Handler(Looper.getMainLooper())
     /** Kurze Arbeit ohne Netz (Bilder, PIN prüfen) – wartet nie hinter einer hängenden Verbindung. */
-    internal val arbeit = Executors.newSingleThreadExecutor()
+    internal val arbeit = sichererFaden("Arbeit")
     /** Alles mit Netz (Abgleich, Updates, Foto, Berichte) – eigener Faden, Zeitlimits bis zu einer Minute. */
-    internal val netz = Executors.newSingleThreadExecutor()
+    internal val netz = sichererFaden("Netz")
+
+    /**
+     * Ein Faden, der Fehler einer Aufgabe nur protokolliert: sonst reißt eine Ausnahme im Hintergrund den ganzen
+     * Startbildschirm mit. Aufgaben nach dem Beenden (shutdown) werden still verworfen statt abzustürzen.
+     */
+    private fun sichererFaden(name: String) = object : java.util.concurrent.ThreadPoolExecutor(1, 1, 0L, java.util.concurrent.TimeUnit.MILLISECONDS,
+        java.util.concurrent.LinkedBlockingQueue(), { r -> Thread(r, name) }) {
+        override fun execute(command: Runnable) {
+            if (isShutdown) return
+            try {
+                super.execute { try { command.run() } catch (t: Throwable) { android.util.Log.w("DammLauncher", "$name: Aufgabe fehlgeschlagen", t) } }
+            } catch (_: java.util.concurrent.RejectedExecutionException) {}
+        }
+    }
     internal lateinit var wurzel: FrameLayout
     internal lateinit var raster: RasterAnsicht
     private lateinit var kopfzeile: Kopfzeile

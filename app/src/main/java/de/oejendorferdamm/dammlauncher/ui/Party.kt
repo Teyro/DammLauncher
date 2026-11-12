@@ -29,6 +29,9 @@ class PartyAnsicht(context: Context) : View(context) {
     private val ballons = ArrayList<Ballon>()
     private val stift = Paint(Paint.ANTI_ALIAS_FLAG)
     private val schnur = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; color = 0xAAFFFFFF.toInt() }
+    // je Bild wiederverwendet statt neu angelegt – auf alten Boards sonst Ruckeln durch die Speicherbereinigung
+    private val oval = RectF()
+    private val pfad = Path()
     private val text = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER; color = 0xFFFFFFFF.toInt() }
     private var zuletzt = 0L
     private var party: Pair<Long, Pair<Float, Float>>? = null
@@ -89,12 +92,14 @@ class PartyAnsicht(context: Context) : View(context) {
             val x = l.x + sin(jetzt / 600f + l.phase) * 18f * s
             if (l.y < -l.r * 4) { b.remove(); continue }
             stift.color = l.farbe
-            c.drawOval(RectF(x - l.r * 0.82f, l.y - l.r, x + l.r * 0.82f, l.y + l.r), stift)
+            oval.set(x - l.r * 0.82f, l.y - l.r, x + l.r * 0.82f, l.y + l.r); c.drawOval(oval, stift)
             stift.color = 0x55FFFFFF
-            c.drawOval(RectF(x - l.r * 0.45f, l.y - l.r * 0.7f, x - l.r * 0.1f, l.y - l.r * 0.2f), stift)
+            oval.set(x - l.r * 0.45f, l.y - l.r * 0.7f, x - l.r * 0.1f, l.y - l.r * 0.2f); c.drawOval(oval, stift)
             stift.color = l.farbe
-            c.drawPath(Path().apply { moveTo(x, l.y + l.r * 0.95f); lineTo(x - l.r * 0.12f, l.y + l.r * 1.15f); lineTo(x + l.r * 0.12f, l.y + l.r * 1.15f); close() }, stift)
-            c.drawPath(Path().apply { moveTo(x, l.y + l.r * 1.15f); quadTo(x + 14 * s, l.y + l.r * 1.8f, x, l.y + l.r * 2.6f) }, schnur)
+            pfad.reset(); pfad.moveTo(x, l.y + l.r * 0.95f); pfad.lineTo(x - l.r * 0.12f, l.y + l.r * 1.15f); pfad.lineTo(x + l.r * 0.12f, l.y + l.r * 1.15f); pfad.close()
+            c.drawPath(pfad, stift)
+            pfad.reset(); pfad.moveTo(x, l.y + l.r * 1.15f); pfad.quadTo(x + 14 * s, l.y + l.r * 1.8f, x, l.y + l.r * 2.6f)
+            c.drawPath(pfad, schnur)
         }
         // „Party!“ kurz an der Stelle des Fingers
         party?.let { (seit, ort) ->

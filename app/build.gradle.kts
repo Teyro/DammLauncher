@@ -3,10 +3,11 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
-// Version aus dem Git-Tag (Release-Workflow setzt VERSION_NAME, z. B. 1.2.0); sonst die hier eingetragene.
-val versionAusTag: String? = System.getenv("VERSION_NAME")?.removePrefix("v")?.takeIf { it.matches(Regex("\\d+\\.\\d+\\.\\d+")) }
-val versionName0 = versionAusTag ?: "1.0.0"
-val versionCode0 = versionName0.split(".").let { (a, b, c) -> a.toInt() * 10000 + b.toInt() * 100 + c.toInt() }
+// Version aus dem Git-Tag (Release-Workflow setzt VERSION_NAME): Datum des Releases Jahr.Monat.Tag, z. B. v26.11.12
+// (zweites Release am selben Tag: v26.11.12.1); sonst die hier eingetragene.
+val versionAusTag: String? = System.getenv("VERSION_NAME")?.removePrefix("v")?.takeIf { it.matches(Regex("\\d+\\.\\d+\\.\\d+(\\.\\d+)?")) }
+val versionName0 = versionAusTag ?: "26.11.12"
+val versionCode0 = versionName0.split(".").map { it.toInt() }.let { p -> p[0] * 1_000_000 + p[1] * 10_000 + p[2] * 100 + p.getOrElse(3) { 0 } }
 
 android {
     namespace = "de.oejendorferdamm.dammlauncher"
