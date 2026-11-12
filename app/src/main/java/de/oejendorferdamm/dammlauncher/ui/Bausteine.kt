@@ -250,11 +250,11 @@ fun regler(c: Context, name: String, bereich: IntRange, wert: Int, schritt: Int 
         minimumHeight = 70.vp
         setPadding(36.vp, 0, 36.vp, 0)
         // dicker Daumen, gut zu greifen (weißer Rand wie in DammZeit)
-        thumb = runde(if (Thema.clevertouch) Thema.akzent else Farben.AKZENT, 30f.vp, 5.vp, Color.WHITE).apply { setSize(60.vp, 60.vp) }
+        thumb = runde(if (Thema.clevertouch) Thema.akzent else M3.primaer, 30f.vp, 5.vp, Color.WHITE).apply { setSize(60.vp, 60.vp) }
         progressDrawable = android.graphics.drawable.LayerDrawable(
             arrayOf(
-                runde(Farben.LINIE, 8f.vp),
-                android.graphics.drawable.ClipDrawable(runde(if (Thema.clevertouch) Thema.akzent else Farben.AKZENT, 8f.vp), Gravity.START, android.graphics.drawable.ClipDrawable.HORIZONTAL)
+                runde(M3.sekundaerContainer, 8f.vp),
+                android.graphics.drawable.ClipDrawable(runde(if (Thema.clevertouch) Thema.akzent else M3.primaer, 8f.vp), Gravity.START, android.graphics.drawable.ClipDrawable.HORIZONTAL)
             )
         ).apply {
             setId(0, android.R.id.background); setId(1, android.R.id.progress)
@@ -279,7 +279,7 @@ fun regler(c: Context, name: String, bereich: IntRange, wert: Int, schritt: Int 
     })
     return LinearLayout(c).apply {
         orientation = LinearLayout.VERTICAL
-        addView(text(c, name, 24, Farben.TEXT2))
+        addView(text(c, name, 24, M3.text2))
         addView(LinearLayout(c).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
