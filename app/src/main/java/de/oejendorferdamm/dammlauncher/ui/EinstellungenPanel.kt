@@ -85,7 +85,7 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
     private val ebene = FrameLayout(c).apply { isClickable = false }
     private val karte = LinearLayout(c).apply {
         orientation = LinearLayout.VERTICAL
-        background = runde(Farben.PANEL, 36f.vp)
+        background = runde(M3.flaeche, 36f.vp)
         elevation = 30f.vp
         isClickable = true
         setPadding(36.vp, 28.vp, 36.vp, 20.vp)
@@ -123,18 +123,18 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
     private var seite: Seite? = null
     private var letzteSeite: Seite? = null
 
-    private val titel = text(c, "Einstellungen", 36, fett = true).apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END }
-    private val zurueck = knopf(c, "‹") { oeffne(null) }.apply { background = rundKnopf(); contentDescription = "Zurück zur Übersicht"; groesse(40) }
+    private val titel = text(c, "Einstellungen", 38, M3.text).apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END }
+    private val zurueck = knopf(c, "←") { oeffne(null) }.apply { background = rundKnopf(); setTextColor(M3.text); contentDescription = "Zurück zur Übersicht"; groesse(36) }
 
     init {
         karte.addView(LinearLayout(c).apply {
             gravity = Gravity.CENTER_VERTICAL
             addView(zurueck, lp(86.vp, 86.vp, rechts = 16.vp))
             addView(titel, lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-            addView(knopf(c, "◀") { lage = (lage - 1).coerceAtLeast(0); setzeLage() }.apply { background = rundKnopf() }, lp(86.vp, 86.vp, rechts = 10.vp))
-            addView(knopf(c, "▶") { lage = (lage + 1).coerceAtMost(2); setzeLage() }.apply { background = rundKnopf() }, lp(86.vp, 86.vp, rechts = 20.vp))
+            addView(knopf(c, "◀") { lage = (lage - 1).coerceAtLeast(0); setzeLage() }.apply { background = rundKnopf(); setTextColor(M3.text) }, lp(86.vp, 86.vp, rechts = 10.vp))
+            addView(knopf(c, "▶") { lage = (lage + 1).coerceAtMost(2); setzeLage() }.apply { background = rundKnopf(); setTextColor(M3.text) }, lp(86.vp, 86.vp, rechts = 20.vp))
             // Schließen immer oben rechts sichtbar – gleich wie in DammBoard (die Kopfzeile scrollt nicht mit)
-            addView(knopf(c, "✕") { a.panelZu() }.apply { background = rundKnopf(); contentDescription = "Schließen"; groesse(34) }, lp(86.vp, 86.vp))
+            addView(knopf(c, "✕") { a.panelZu() }.apply { background = rundKnopf(); setTextColor(M3.text); contentDescription = "Schließen"; groesse(34) }, lp(86.vp, 86.vp))
         })
         karte.addView(scroll, lp(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f, oben = 16.vp))
         ebene.addView(karte)
@@ -161,10 +161,14 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
     /** Jeder Abschnitt ist eine eigene weiße Karte; [add] füllt immer die zuletzt begonnene. */
     private var aktuelleKarte: LinearLayout? = null
 
+    /** Abschnitt wie eine Material-3-Gruppe: Überschrift in der Primärfarbe über einem hellen Segment. */
     private fun abschnitt(titel: String) {
+        inhalt.addView(text(c, titel, 23, M3.primaer).apply {
+            typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
+            setPadding(26.vp, 0, 26.vp, 0)
+        }, lp(ViewGroup.LayoutParams.MATCH_PARENT, oben = 30.vp))
         val k = karte(c)
-        k.addView(text(c, titel.uppercase(Locale.GERMAN), 21, Farben.AKZENT, fett = true).apply { letterSpacing = 0.06f }, lp(ViewGroup.LayoutParams.MATCH_PARENT))
-        inhalt.addView(k, lp(ViewGroup.LayoutParams.MATCH_PARENT, oben = 22.vp))
+        inhalt.addView(k, lp(ViewGroup.LayoutParams.MATCH_PARENT, oben = 12.vp))
         aktuelleKarte = k
     }
 
@@ -187,16 +191,23 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
 
     /** Übersicht im Stil der Android-Einstellungen: je Bereich eine Zeile mit Symbol, Titel und Kurzinfo. */
     private fun uebersicht(k: Konfig) {
-        // wie in DammZeit, DammBoard und DammTable: jede Seite eine eigene weiße Karte, Symbol auf zartem Kreis in der Farbe der Seite
-        seiten.forEach { s ->
-            val kk = karte(c).apply { setPadding(10.vp, 4.vp, 10.vp, 4.vp) }
-            run {
-                kk.addView(LinearLayout(c).apply {
+        // wie in allen Damm-Apps (Material 3): eigene Bereiche als zusammenhängende Segmente, darunter „Allgemein“
+        listOf(null to seiten.dropLast(2), "Allgemein" to seiten.takeLast(2)).forEach { (gruppe, liste) ->
+            if (gruppe != null) inhalt.addView(text(c, gruppe, 23, M3.primaer).apply {
+                typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL); setPadding(26.vp, 0, 26.vp, 0)
+            }, lp(ViewGroup.LayoutParams.MATCH_PARENT, oben = 30.vp))
+            val gruppeView = LinearLayout(c).apply { orientation = LinearLayout.VERTICAL; clipToOutline = true
+                outlineProvider = object : android.view.ViewOutlineProvider() {
+                    override fun getOutline(v: View, o: android.graphics.Outline) = o.setRoundRect(0, 0, v.width, v.height, 36f.vp)
+                } }
+            inhalt.addView(gruppeView, lp(ViewGroup.LayoutParams.MATCH_PARENT, oben = if (gruppe == null) 8.vp else 12.vp))
+            liste.forEachIndexed { i, s ->
+                gruppeView.addView(LinearLayout(c).apply {
                     gravity = Gravity.CENTER_VERTICAL
-                    setPadding(16.vp, 18.vp, 16.vp, 18.vp)
+                    setPadding(30.vp, 24.vp, 26.vp, 24.vp)
                     background = android.graphics.drawable.StateListDrawable().apply {
-                        addState(intArrayOf(android.R.attr.state_pressed), runde(0xFFE8EDF5.toInt(), 22f.vp))
-                        addState(intArrayOf(), runde(0x00000000, 22f.vp))
+                        addState(intArrayOf(android.R.attr.state_pressed), android.graphics.drawable.ColorDrawable(dunkler(M3.karte)))
+                        addState(intArrayOf(), android.graphics.drawable.ColorDrawable(M3.karte))
                     }
                     isClickable = true
                     contentDescription = s.titel
@@ -207,13 +218,12 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
                     }, lp(80.vp, 80.vp, rechts = 24.vp))
                     addView(LinearLayout(c).apply {
                         orientation = LinearLayout.VERTICAL
-                        addView(text(c, s.titel, 28, fett = true))
-                        addView(text(c, s.zusammenfassung(k), 21, Farben.TEXT2), lp(oben = 2.vp))
+                        addView(text(c, s.titel, 28, M3.text).apply { typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL) })
+                        addView(text(c, s.zusammenfassung(k), 21, M3.text2), lp(oben = 2.vp))
                     }, lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-                    addView(text(c, "›", 44, Farben.TEXT2), lp())
-                }, lp(ViewGroup.LayoutParams.MATCH_PARENT))
+                    addView(text(c, "›", 44, M3.text2), lp())
+                }, lp(ViewGroup.LayoutParams.MATCH_PARENT, oben = if (i > 0) 4.vp else 0))
             }
-            inhalt.addView(kk, lp(ViewGroup.LayoutParams.MATCH_PARENT, oben = 14.vp))
         }
         add(text(c, "Jede Änderung wirkt sofort auf den Startbildschirm daneben. ◀ ▶ schiebt dieses Fenster zur Seite.", 20, Farben.TEXT2).apply { setPadding(12.vp, 0, 12.vp, 0) }, 18)
     }

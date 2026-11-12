@@ -185,6 +185,7 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Geraet.init(this)
+        de.oejendorferdamm.dammlauncher.ui.M3.init(this)
         de.oejendorferdamm.dammlauncher.nutzung.Nutzung.init(this)
         absturzSchutz()
         sicher = Geraet.absturzSchleife()
