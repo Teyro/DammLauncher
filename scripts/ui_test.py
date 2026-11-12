@@ -679,7 +679,7 @@ def main():
     time.sleep(2)
     tippe("Aussehen")
     time.sleep(1.5)
-    if scrolle_zu("🎂 Geburtstag: Konfetti und Luftballons", w // 6):
+    if scrolle_zu("Geburtstag: Konfetti", w // 6, teil=True):
         time.sleep(1)
         screenshot("65_geburtstag_schalter.png")
         fertig()
@@ -694,7 +694,7 @@ def main():
         time.sleep(2)
         tippe("Aussehen")
         time.sleep(1.5)
-        scrolle_zu("🎂 Geburtstag: Konfetti und Luftballons", w // 6)
+        scrolle_zu("Geburtstag: Konfetti", w // 6, teil=True)
         time.sleep(1)
     fertig()
     time.sleep(1)
