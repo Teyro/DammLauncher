@@ -71,6 +71,8 @@ interface PanelAktionen {
     fun minimalQuelleAktivitaet()
     fun zeitJetzt()
     fun nutzung()
+    fun geburtstag(an: Boolean)
+    fun geburtstagVideoWaehlen()
 }
 
 /**
@@ -245,6 +247,10 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
         })
         add(text(c, "Oben Uhr, Suchleiste und Schnelleinstellungen, unten ein Dock mit Lieblings-Apps, Farben passend zum Hintergrund, " +
             "Milchglas – ohne Animationen, damit es auch auf älteren Boards flüssig bleibt. Apps kommen ins Dock über langes Drücken → „Ins Dock legen“.", 21, Farben.TEXT2), 6)
+        add(schalter(c, "🎂 Geburtstag: Konfetti und Luftballons", Geraet.geburtstag) { an -> a.geburtstag(an) }, 12)
+        add(text(c, "Beim ersten Antippen läuft das Geburtstagsvideo, danach löst jede Berührung Konfetti und Luftballons aus – bis zum Ausschalten. " +
+            "Video: " + (if (de.oejendorferdamm.dammlauncher.geburtstag.Geburtstag.vorhanden(c)) "vorhanden" else "noch keins – „geburtstag.mp4“ in den Schul-Ordner (DammLauncher oder DammBoard) legen oder hier wählen") + ".", 21, Farben.TEXT2), 6)
+        knoepfe(knopf(c, "Geburtstagsvideo wählen …") { a.geburtstagVideoWaehlen() })
         add(schalter(c, "Band „CTOUCH-Modus“ unten rechts", k.ctouchBand) { an -> aendere { it.copy(ctouchBand = an) } }, 12)
         add(text(c, "Ein schmales schräges Band über der Ecke zeigt: Das ist ein älteres CTOUCH-Board mit der neuen Oberfläche. " +
             "Es lässt sich nicht antippen, alles darunter bleibt bedienbar.", 21, Farben.TEXT2), 6)

@@ -202,6 +202,13 @@ object Geraet {
     var statusMeldung: String
         get() = p.getString("statusMeldung", "") ?: ""
         set(v) = p.edit().putString("statusMeldung", v.take(300)).apply()
+    /** Geburtstag: Konfetti und Luftballons bei jeder Berührung; das Video läuft beim ersten Antippen nach dem Einschalten */
+    var geburtstag: Boolean
+        get() = p.getBoolean("geburtstag", false)
+        set(v) = p.edit().putBoolean("geburtstag", v).apply()
+    var geburtstagVideoGezeigt: Boolean
+        get() = p.getBoolean("geburtstagVideoGezeigt", false)
+        set(v) = p.edit().putBoolean("geburtstagVideoGezeigt", v).apply()
     /** Online-Meldung zusätzlich per HTTPS an diese Adresse (vorbereitet für ein Dashboard im Schulnetz) */
     var onlineAdresse: String
         get() = p.getString("onlineAdresse", "") ?: ""

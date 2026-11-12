@@ -135,6 +135,8 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
     private lateinit var lehrerKnopf: TextView
     internal lateinit var minimalAnsicht: MinimalAnsicht
     private lateinit var eckBand: EckBand
+    private lateinit var party: de.oejendorferdamm.dammlauncher.ui.PartyAnsicht
+    private var partyVideo: View? = null
     /** Feierabend-Sperre (über allem außer Update-Sperre, Fenstern und Meldungen). */
     private var ruhe: View? = null
     private var schoner: View? = null
@@ -229,6 +231,10 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         // über Raster und Minimalmodus, unter Einstellungen (30) und Meldungen (40)
         eckBand = EckBand(this).apply { visibility = View.GONE; elevation = 25f.vp }
         wurzel.addView(eckBand, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        // Geburtstag: Konfetti über dem Startbildschirm, unter Fenstern und Einstellungen
+        party = de.oejendorferdamm.dammlauncher.ui.PartyAnsicht(this).apply { elevation = 28f.vp }
+        wurzel.addView(party, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        if (Geraet.geburtstag) arbeit.execute { de.oejendorferdamm.dammlauncher.geburtstag.Geburtstag.ausSchulOrdner(this) }
         setContentView(wurzel)
         randlos()
 
@@ -411,6 +417,13 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
 
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
         letzteBeruehrung = System.currentTimeMillis()
+        if (ev.actionMasked == MotionEvent.ACTION_DOWN && Geraet.geburtstag && schoner == null && partyVideo == null) {
+            if (!Geraet.geburtstagVideoGezeigt) {
+                Geraet.geburtstagVideoGezeigt = true
+                if (geburtstagsVideo()) { schlucken = true; return true }
+            }
+            party.knall(ev.rawX, ev.rawY)
+        }
         if (ev.actionMasked == MotionEvent.ACTION_DOWN && schoner != null) {
             schonerWeg()
             schlucken = true
@@ -1273,6 +1286,10 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
             REQ_EXPORT -> if (resultCode == RESULT_OK && uri != null) arbeit.execute {
                 val t = try { Datei.exportieren(this, uri); "Einrichtung exportiert." } catch (e: Exception) { "Export fehlgeschlagen: ${e.message}" }
                 haupt.post { meldung(t) }
+            }
+            REQ_GEBURTSTAG -> if (resultCode == RESULT_OK && uri != null) arbeit.execute {
+                val ok = de.oejendorferdamm.dammlauncher.geburtstag.Geburtstag.ausAuswahl(this, uri)
+                haupt.post { meldung(if (ok) "Geburtstagsvideo übernommen." else "Das ist kein abspielbares Video (oder größer als 150 MB)."); panel?.aufbauen() }
             }
             REQ_NUTZUNG -> if (resultCode == RESULT_OK && uri != null) arbeit.execute {
                 val t = try {
@@ -2182,6 +2199,41 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
     override fun statusZugangEinstellen() = statusZugang()
     override fun tafelnZeigen() = tafelUebersicht()
     override fun nutzung() = nutzungZeigen()
+
+    override fun geburtstag(an: Boolean) {
+        Geraet.geburtstag = an
+        Geraet.geburtstagVideoGezeigt = false
+        if (an) {
+            arbeit.execute { de.oejendorferdamm.dammlauncher.geburtstag.Geburtstag.ausSchulOrdner(this); haupt.post { panel?.aufbauen() } }
+            meldung("🎂 Geburtstag an – beim ersten Antippen läuft das Video, danach gibt es Konfetti.")
+        } else party.leeren()
+    }
+
+    override fun geburtstagVideoWaehlen() = bildAuswahl(REQ_GEBURTSTAG, "video/*")
+
+    /** Geburtstagsvideo im Vollbild; Antippen oder Ende schließt es – dann gibt es gleich Konfetti. true = es läuft */
+    private fun geburtstagsVideo(): Boolean {
+        val datei = de.oejendorferdamm.dammlauncher.geburtstag.Geburtstag.datei(this)
+        if (!de.oejendorferdamm.dammlauncher.geburtstag.Geburtstag.vorhanden(this)) return false
+        val ebene = FrameLayout(this).apply { setBackgroundColor(Color.BLACK); elevation = 97f.vp; isClickable = true }
+        val video = android.widget.VideoView(this)
+        fun zu() {
+            if (partyVideo !== ebene) return
+            try { video.stopPlayback() } catch (_: Exception) {}
+            wurzel.removeView(ebene)
+            partyVideo = null
+            party.post { party.knall(party.width / 2f, party.height / 2f) }
+        }
+        ebene.addView(video, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT, Gravity.CENTER))
+        ebene.setOnClickListener { zu() }
+        video.setOnCompletionListener { zu() }
+        video.setOnErrorListener { _, _, _ -> zu(); true }
+        video.setVideoURI(android.net.Uri.fromFile(datei))
+        wurzel.addView(ebene, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        partyVideo = ebene
+        video.start()
+        return true
+    }
     override fun aufraeumenJetzt() = aufraeumen()
     override fun schnellOeffnen() = schnell()
     override fun minimalQuelleApp() = minimalQuelleAppWaehlen()
@@ -2216,5 +2268,6 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         private const val REQ_EXPORT = 15
         private const val REQ_IMPORT = 16
         private const val REQ_NUTZUNG = 17
+        private const val REQ_GEBURTSTAG = 18
     }
 }
