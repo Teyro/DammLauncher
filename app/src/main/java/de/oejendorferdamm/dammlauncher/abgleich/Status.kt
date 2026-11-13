@@ -84,15 +84,32 @@ object Status {
         .put("appOffen", appVorn)
         .put("version", BuildConfig.VERSION_NAME)
 
-    fun onlineFaellig() = System.currentTimeMillis() - Geraet.letzteOnlineMeldung >= ONLINE_TAKT - 15_000L &&
-        ((Geraet.server.isNotBlank() && hatZugang()) || Geraet.onlineAdresse.startsWith("https://"))
+    fun onlineTaktFaellig() = System.currentTimeMillis() - Geraet.letzteOnlineMeldung >= ONLINE_TAKT - 15_000L
 
-    /** In den Status-Ordner (WebDAV) und – falls eingetragen – per HTTPS an die Dashboard-Adresse */
+    /** Ordner der Online-Meldungen in der Schul-Nextcloud (Zugang über DammTable) – liest das Dashboard */
+    const val SCHUL_STATUS = "DammLauncher/Status"
+
+    /**
+     * In die Schul-Nextcloud (DammLauncher/Status/<kennung>.json, mit Strom-Ausfällen), in den Status-Ordner (IServ-WebDAV)
+     * und – falls eingetragen – per HTTPS an die Dashboard-Adresse. Ohne Ziel passiert nichts.
+     */
     @Synchronized
-    fun onlineSenden(appVorn: Boolean) {
+    fun onlineSenden(context: Context, appVorn: Boolean) {
         Geraet.letzteOnlineMeldung = System.currentTimeMillis()
         val inhalt = onlineBericht(appVorn).toString().toByteArray(Charsets.UTF_8)
-        if (Geraet.server.isNotBlank()) zugang()?.let { (b, p) ->
+        SchulZugang.lese(context)?.let { z ->
+            try {
+                val dav = WebDav(z.dav, z.benutzer, z.passwort)
+                val strom = de.oejendorferdamm.dammlauncher.nutzung.Strom
+                val bericht = onlineBericht(appVorn)
+                    .put("klasse", z.klasse)
+                    .put("seit", System.currentTimeMillis() - android.os.SystemClock.elapsedRealtime())
+                    .put("strom", strom.alsJson(strom.liste(context).takeLast(50)))
+                try { dav.ordner(SCHUL_STATUS) } catch (_: Exception) {}
+                dav.putAtomar("$SCHUL_STATUS/${Geraet.kennung}.json", bericht.toString().toByteArray(Charsets.UTF_8), "application/json")
+            } catch (_: Exception) {}
+        }
+        if (Geraet.server.isNotBlank() && hatZugang()) zugang()?.let { (b, p) ->
             try {
                 val dav = WebDav(Geraet.server, b, p)
                 val ordner = "${Geraet.ordner}/$ORDNER/$ONLINE"

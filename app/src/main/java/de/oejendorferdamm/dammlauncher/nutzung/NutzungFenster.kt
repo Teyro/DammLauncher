@@ -120,6 +120,19 @@ internal fun HomeActivity.nutzungZeigen(anzahl: Int = 7, tagIndex: Int = 0) {
         }
     }, 18)
 
+    // --- Strom: wann das Board ohne Herunterfahren aus war (Stecker gezogen)
+    val ausfaelle = Strom.liste(this).takeLast(20).reversed()
+    val datumUhr = SimpleDateFormat("EE dd.MM. HH:mm", Locale.GERMAN)
+    f.add(karte(this).apply {
+        addView(text(context, "Ausgeschaltet ohne Herunterfahren", 28, fett = true))
+        addView(text(context, "Stecker gezogen oder Strom weg – auf etwa eine Minute genau. Normales Ausschalten steht grau dabei.", 22, Farben.TEXT2), lp(oben = 6.vp))
+        if (ausfaelle.isEmpty()) addView(text(context, "Bisher keine.", 22, Farben.TEXT2), lp(oben = 10.vp))
+        ausfaelle.forEach { e ->
+            addView(text(context, "${datumUhr.format(Date(e.von))} bis ${datumUhr.format(Date(e.bis))}" + if (e.sauber) " · heruntergefahren" else " · ohne Herunterfahren",
+                24, if (e.sauber) Farben.TEXT2 else Farben.TEXT, fett = !e.sauber), lp(oben = 8.vp))
+        }
+    }, 18)
+
     // --- Export, Löschen, Aufzeichnen
     f.add(schalter(this, "Nutzung auf diesem Board aufzeichnen", Nutzung.an) { an -> Nutzung.an = an }, 16)
     f.knoepfe(

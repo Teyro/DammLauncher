@@ -266,9 +266,11 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         // Nutzungs-Statistik: Bildschirm an/aus mitbekommen, jede Minute ein Lebenszeichen (auch wenn eine App vorn ist)
         try {
             registerReceiver(bildschirmEmpfaenger, android.content.IntentFilter().apply {
-                addAction(Intent.ACTION_SCREEN_OFF); addAction(Intent.ACTION_SCREEN_ON)
+                addAction(Intent.ACTION_SCREEN_OFF); addAction(Intent.ACTION_SCREEN_ON); addAction(Intent.ACTION_SHUTDOWN)
             })
         } catch (_: Exception) {}
+        // War das Board seit dem letzten Puls ohne Herunterfahren aus (Stecker gezogen)? Dann vermerken.
+        de.oejendorferdamm.dammlauncher.nutzung.Strom.beimStart(applicationContext)
         puls.run()
         Abgleich.planen(this)
         TagesJob.planen(this)
@@ -363,6 +365,7 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
             when (i.action) {
                 Intent.ACTION_SCREEN_OFF -> de.oejendorferdamm.dammlauncher.nutzung.Nutzung.bildschirmAus()
                 Intent.ACTION_SCREEN_ON -> de.oejendorferdamm.dammlauncher.nutzung.Nutzung.bildschirmAn(vorne)
+                Intent.ACTION_SHUTDOWN -> de.oejendorferdamm.dammlauncher.nutzung.Strom.herunterfahren(c)
             }
         }
     }
@@ -372,9 +375,11 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         override fun run() {
             val an = try { getSystemService(android.os.PowerManager::class.java).isInteractive } catch (_: Exception) { true }
             de.oejendorferdamm.dammlauncher.nutzung.Nutzung.puls(an)
-            if (an && Status.onlineFaellig()) {
-                val appVorn = !vorne && de.oejendorferdamm.dammlauncher.nutzung.Nutzung.appVorn
-                try { netz.execute { Status.onlineSenden(appVorn) } } catch (_: Exception) {}
+            de.oejendorferdamm.dammlauncher.nutzung.Strom.puls(applicationContext)
+            // alle 5 Minuten – auch bei dunklem Bildschirm, damit man sieht, wann ein Board vom Strom ging
+            if (Status.onlineTaktFaellig()) {
+                val appVorn = an && !vorne && de.oejendorferdamm.dammlauncher.nutzung.Nutzung.appVorn
+                netz.execute { Status.onlineSenden(applicationContext, appVorn) }
             }
             haupt.postDelayed(this, 60_000)
         }
