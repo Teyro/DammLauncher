@@ -93,9 +93,9 @@ class H(BaseHTTPRequestHandler):
             if ZUSTAND["update"] != "alt":
                 return self.antwort(503)
             alt = (datetime.datetime.utcnow() - datetime.timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
-            r = {"tag_name": "v9.9.9", "published_at": alt, "body": "Testversion",
+            r = {"tag_name": "v99.12.31", "published_at": alt, "body": "Testversion",
                  "assets": [{"name": "DammLauncher.apk", "size": 100,
-                             "browser_download_url": "https://github.com/Teyro/DammLauncher/releases/download/v9.9.9/DammLauncher.apk"}]}
+                             "browser_download_url": "https://github.com/Teyro/DammLauncher/releases/download/v99.12.31/DammLauncher.apk"}]}
             return self.antwort(200, json.dumps(r).encode(), "application/json")
         if p.startswith("/unsplash/"):
             return self.unsplash(p)
