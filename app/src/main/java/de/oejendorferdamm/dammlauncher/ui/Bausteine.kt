@@ -109,7 +109,27 @@ fun knopf(c: Context, beschriftung: String, haupt: Boolean = false, gefahr: Bool
     minWidth = 76.vp
     setPadding(26.vp, 10.vp, 26.vp, 10.vp)
     isClickable = true
+    // für Dialoge: dort werden Knöpfe zu schlanken Material-Textknöpfen
+    tag = when { gefahr -> "gefahr"; haupt -> "haupt"; else -> null }
     setOnClickListener { klick() }
+}
+
+/** Knopf eines Dialogs im Material-3-Stil: Textknopf in der Primärfarbe (Hauptaktion getönt hinterlegt, Gefahr rot). */
+fun dialogKnopf(v: View) {
+    if (v !is TextView || v.text.length <= 2) return // ✕, ◀ … bleiben
+    val art = v.tag as? String
+    val farbe = if (art == "gefahr") M3.FEHLER else M3.primaer
+    val grund = if (art == "haupt") M3.sekundaerContainer else 0x00000000
+    v.background = StateListDrawable().apply {
+        addState(intArrayOf(android.R.attr.state_pressed), runde(dunkler(if (art == "haupt") M3.sekundaerContainer else M3.flaecheHoch), 40f.vp))
+        addState(intArrayOf(), runde(grund, 40f.vp))
+    }
+    v.setTextColor(android.content.res.ColorStateList(arrayOf(intArrayOf(-android.R.attr.state_enabled), intArrayOf()), intArrayOf(M3.umriss, if (art == "haupt") M3.aufSekundaerContainer else farbe)))
+    v.typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+    v.groesse(25)
+    v.minHeight = 64.vp
+    v.setPadding(28.vp, 8.vp, 28.vp, 8.vp)
+    v.stateListAnimator = null
 }
 
 /** Knopf gibt beim Drücken nach (wie in DammZeit) – nicht im Sparmodus. */
@@ -363,16 +383,19 @@ class GrossFenster(private val wurzel: FrameLayout, titel: String, breite: Int =
     private lateinit var kasten: LinearLayout
 
     init {
+        // Material-3-Dialog: getönte Fläche, stark gerundet, ruhiger Titel, Aktionen als Textknöpfe unten rechts
         kasten = LinearLayout(c).apply {
             orientation = LinearLayout.VERTICAL
-            background = runde(Farben.FLAECHE, 36f.vp)
-            elevation = 30f.vp
-            setPadding(44.vp, 36.vp, 44.vp, 38.vp)
+            background = runde(M3.flaeche, 40f.vp)
+            elevation = Leistung.hoehe(24f.vp)
+            setPadding(44.vp, 36.vp, 36.vp, 28.vp)
             isClickable = true
             addView(LinearLayout(c).apply {
                 gravity = Gravity.CENTER_VERTICAL
-                addView(text(c, titel, 36, fett = true), lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-                addView(knopf(c, "✕") { schliessen() }.apply { background = rundKnopf() }, lp(86.vp, 86.vp))
+                addView(text(c, titel, 34, M3.text), lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+                addView(knopf(c, "✕") { schliessen() }.apply {
+                    background = runde(0x00000000, 40f.vp); setTextColor(M3.text2); groesse(28); elevation = 0f; contentDescription = "Schließen"
+                }, lp(72.vp, 72.vp))
             })
             addView(ScrollView(c).apply { addView(spalte); isVerticalScrollBarEnabled = true }, lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, oben = 16.vp))
         }
@@ -401,8 +424,8 @@ class GrossFenster(private val wurzel: FrameLayout, titel: String, breite: Int =
 
     fun knoepfe(vararg k: View) = add(LinearLayout(c).apply {
         gravity = Gravity.END
-        k.forEach { addView(it, lp(rechts = 14.vp)) }
-    }, 26)
+        k.forEach { dialogKnopf(it); addView(it, lp(rechts = 8.vp)) }
+    }, 22)
 
     var offen = true
         private set

@@ -2104,6 +2104,8 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
 
     private fun updatePruefenStill(vonHand: Boolean = false) {
         if (pruefungLaeuft) return
+        // automatisch nur in ruhigen Zeiten (Pausen, vor/nach dem Unterricht) – kein Update-Fenster mitten in der Stunde
+        if (!vonHand && !de.oejendorferdamm.dammlauncher.update.UpdateZeit.erlaubt()) return
         pruefungLaeuft = true
         val automatisch = Geraet.autoUpdate && Update.darfInstallieren(this)
         netz.execute {
@@ -2153,7 +2155,7 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
     }
 
     private val autoInstallation = Runnable {
-        val ruhig = vorne && fenster.isEmpty() && panel == null && uebersicht == null && !laedt
+        val ruhig = vorne && fenster.isEmpty() && panel == null && uebersicht == null && !laedt && de.oejendorferdamm.dammlauncher.update.UpdateZeit.erlaubt()
         if (!ruhig) return@Runnable
         letzteAutoInstallation = System.currentTimeMillis()
         meldung("DammLauncher wird aktualisiert …")
