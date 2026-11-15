@@ -10,6 +10,7 @@ val versionName0 = versionAusTag ?: "26.11.14"
 val versionCode0 = versionName0.split(".").map { it.toInt() }.let { p -> p[0] * 1_000_000 + p[1] * 10_000 + p[2] * 100 + p.getOrElse(3) { 0 } }
 
 android {
+    sourceSets["main"].java.srcDir("../core/src-core")
     namespace = "de.oejendorferdamm.dammlauncher"
     compileSdk = 34
 
