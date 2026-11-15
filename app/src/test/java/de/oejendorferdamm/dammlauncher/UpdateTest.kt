@@ -49,6 +49,11 @@ class UpdateTest {
         assertTrue(Update.istNeuer("2.0.0", "1.9.9"))
         assertFalse(Update.istNeuer("1.0.0", "1.0.0"))
         assertFalse(Update.istNeuer("1.0.0", "1.0.1-debug"))
+        // Datumsschema (gemeinsame damm-core-Logik): numerisch, nicht als Text
+        assertTrue(Update.istNeuer("26.11.14", "26.11.9"))      // 14 > 9, nicht "14" < "9"
+        assertTrue(Update.istNeuer("26.11.14.1", "26.11.14"))   // zweites Release am selben Tag
+        assertFalse(Update.istNeuer("26.11.14", "26.11.14.1"))
+        assertTrue(Update.istNeuer("26.12.1", "26.11.30"))
         assertEquals(7, Update.SPERRE_NACH_TAGEN)
     }
 }
