@@ -36,15 +36,19 @@ object Bildwahl {
         "\\b(" + listOf(
             "war", "wars", "krieg", "bomb", "bombe", "bombs", "atom", "tank", "tanks", "panzer", "army", "armee",
             "gun", "guns", "rifle", "pistol", "missile", "soldier", "soldiers", "soldat", "battle", "nazi", "ss",
-            "cross", "crosses", "nude", "naked", "nackt", "sex", "dead", "grave", "graves", "skull", "blood", "icon", "troop", "troops"
+            "cross", "crosses", "nude", "naked", "nackt", "sex", "grave", "graves", "skull", "blood", "icon", "troop", "troops",
+            // „christ“ nur als Wort: sonst träfe es „Christmas“ und „Christchurch“; „gore“ sonst „Gorenjska“ (Slowenien, viele Commons-Landschaften)
+            "christ", "gore"
         ).joinToString("|") + ")\\b"
     )
 
     /** Eindeutige Zeichenketten überall sperren (auch als Teilwort, z. B. „bombing“, „kriegsschiff“). */
     private val TEIL = listOf(
         // Religiöse Figuren und Darstellungen (Gebäude wie Kirchen bleiben erlaubt)
-        "jesus", "christ", "crucifix", "kruzifix", "crucifixion", "kreuzigung", "gipfelkreuz", "madonna", "buddha",
+        "jesus", "christus", "crucifix", "kruzifix", "crucifixion", "kreuzigung", "gipfelkreuz", "madonna", "buddha",
         "hindu", "biblical", "biblisch", "religion", "religiös", "religios", "prayer", "worship", "heiligenfigur",
+        // stecken oft in Alpen-Landschaften und Kirchen-Innenansichten
+        "calvary", "kalvarienberg", "wegkreuz", "bildstock", "marterl", "pieta", "pietà", "altar", "nativity",
         // Krieg / Militär / Nuklear
         "nuclear", "nuklear", "atombombe", "mushroom cloud", "hiroshima", "nagasaki", "weapon", "waffe", "military",
         "militär", "wehrmacht", "hitler", "swastika", "hakenkreuz", "holocaust", "concentration camp", "artillery",
@@ -53,7 +57,7 @@ object Bildwahl {
         "engraving", "lithograph", "woodcut", "etching", "reenactment", "manuscript", "portrait of", "painting of",
         "drawing of", "sketch of",
         // Allgemein nichts für die Grundschule
-        "corpse", "leiche", "funeral", "beerdigung", "friedhof", "cemetery", "totenkopf", "erotic", "gore"
+        "corpse", "leiche", "funeral", "beerdigung", "friedhof", "cemetery", "totenkopf", "erotic"
     )
 
     /** true = darf gezeigt werden. [text] = Titel + Beschreibung + Tags + Kategorien (Groß/Klein egal). */
@@ -80,9 +84,19 @@ object Bildwahl {
     }
 
     /**
+     * Suchbegriffe von eng nach weit: mit Wetter, ohne Wetter, nur Thema. Viele Begriffe zusammen finden bei
+     * Unsplash oft nichts (404) – dann wird der nächste, weitere probiert statt gar kein Foto zu holen.
+     */
+    fun unsplashQueries(thema: String, jz: Jahreszeit, wetterWort: String?): List<String> = listOf(
+        unsplashQuery(thema, jz, wetterWort),
+        unsplashQuery(thema, jz, null),
+        thema.trim().ifEmpty { "landscape" }.lowercase()
+    ).distinct()
+
+    /**
      * Commons-Kategorien („Featured pictures of …“) passend zur Jahreszeit, gemischt mit Gebäuden.
      * [winterWetter] zieht die Auswahl unabhängig vom Kalender in Richtung Schnee/Winter.
-     * Ungültige Kategorienamen sind unkritisch – FotoDesTages probiert mehrere und nimmt die erste, die trägt.
+     * Alle Namen am 16.11.2026 gegen die Commons-API geprüft (buildings 345, castles 64, bridges 157, trees 193, snow 40 Bilder …).
      */
     fun commonsKategorien(jz: Jahreszeit, winterWetter: Boolean): List<String> {
         val basis = listOf(
@@ -92,16 +106,18 @@ object Bildwahl {
         val season = when (if (winterWetter) Jahreszeit.WINTER else jz) {
             Jahreszeit.FRUEHLING -> listOf("Featured pictures of flowers", "Featured pictures of forests", "Featured pictures of landscapes")
             Jahreszeit.SOMMER -> listOf("Featured pictures of beaches", "Featured pictures of coasts", "Featured pictures of lakes")
-            Jahreszeit.HERBST -> listOf("Featured pictures of forests", "Featured pictures of landscapes", "Featured pictures of waterfalls")
+            Jahreszeit.HERBST -> listOf("Featured pictures of forests", "Featured pictures of trees", "Featured pictures of waterfalls")
             Jahreszeit.WINTER -> listOf("Featured pictures of snow", "Featured pictures of forests", "Featured pictures of mountains")
         }
-        val gebaeude = listOf("Featured pictures of buildings", "Featured pictures of architecture", "Featured pictures of castles")
+        val gebaeude = listOf("Featured pictures of buildings", "Featured pictures of castles", "Featured pictures of bridges")
         return basis + season + gebaeude
     }
 
+    private val SCHNEE = setOf(71, 73, 75, 77, 85, 86)
+
     /** WMO-Wettercode (open-meteo) + Temperatur → ein Suchwort fürs Wetter, oder null (neutral). */
     fun wetterWort(code: Int, tempC: Double): String? = when {
-        code in intArrayOf(71, 73, 75, 77, 85, 86).toList() || tempC <= -1 -> "snow"
+        code in SCHNEE || tempC <= -1 -> "snow"
         code in 95..99 -> "storm clouds"
         code in 45..48 -> "fog mist"
         code in 51..67 || code in 80..82 -> "rain"

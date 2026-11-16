@@ -175,17 +175,29 @@ object FotoDesTages {
     // ------------------------------------------------------------ Unsplash
 
     private fun unsplash(schluessel: String, thema: String, jz: Bildwahl.Jahreszeit, wetter: String?): Foto {
-        val q = URLEncoder.encode(Bildwahl.unsplashQuery(thema, jz, wetter), "UTF-8")
-        // count=12 statt eines einzigen Fotos: so bleibt nach dem Grundschul-Filter noch Auswahl übrig.
-        val text = String(anfrage("$UNSPLASH_API/photos/random?orientation=landscape&content_filter=high&count=12&query=$q", schluessel, 1024 * 1024), Charsets.UTF_8)
-        val arr = JSONArray(text)
-        for (i in 0 until arr.length()) {
-            val o = arr.optJSONObject(i) ?: continue
-            if (!Bildwahl.erlaubt(unsplashText(o))) continue
-            ausObjekt(o, Geraet.bildBreite, Geraet.bildHoehe)?.let { return it }
+        var letzter: IOException = IOException("Kein passendes Foto gefunden")
+        // Von eng (Thema + Jahreszeit + Wetter) nach weit (nur Thema): sonst gäbe es bei „nichts gefunden“ heute kein Foto.
+        for (suche in Bildwahl.unsplashQueries(thema, jz, wetter)) {
+            val q = URLEncoder.encode(suche, "UTF-8")
+            val text = try {
+                // count=12 statt eines einzigen Fotos: so bleibt nach dem Grundschul-Filter noch Auswahl übrig.
+                String(anfrage("$UNSPLASH_API/photos/random?orientation=landscape&content_filter=high&count=12&query=$q", schluessel, 1024 * 1024), Charsets.UTF_8)
+            } catch (e: IOException) {
+                if (e is KeinTreffer) { letzter = e; continue }
+                throw e // falscher Schlüssel, zu viele Anfragen, Netz weg: weitere Versuche würden nur Anfragen verbrauchen
+            }
+            val arr = try { JSONArray(text) } catch (_: Exception) { throw IOException("Unerwartete Antwort von Unsplash") }
+            for (i in 0 until arr.length()) {
+                val o = arr.optJSONObject(i) ?: continue
+                if (!Bildwahl.erlaubt(unsplashText(o))) continue
+                ausObjekt(o, Geraet.bildBreite, Geraet.bildHoehe)?.let { return it }
+            }
         }
-        throw IOException("Kein passendes Foto gefunden")
+        throw letzter
     }
+
+    /** 404 der Bildquelle: zu diesem Suchbegriff gibt es nichts – ein weiterer Begriff darf es noch einmal versuchen. */
+    private class KeinTreffer : IOException("Kein Foto zu diesem Thema gefunden")
 
     /** Titel/Beschreibung/Schlagwörter eines Unsplash-Fotos für den Grundschul-Filter zusammenfassen. */
     private fun unsplashText(o: JSONObject): String {
@@ -254,7 +266,7 @@ object FotoDesTages {
                 200 -> Unit
                 401 -> throw IOException("Unsplash-Schlüssel ungültig")
                 403, 429 -> throw IOException("Zu viele Anfragen – später noch einmal")
-                404 -> throw IOException("Kein Foto zu diesem Thema gefunden")
+                404 -> throw KeinTreffer()
                 else -> throw IOException("Bildquelle antwortet nicht (HTTP $code)")
             }
             val aus = ByteArrayOutputStream()

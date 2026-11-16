@@ -29,6 +29,27 @@ class BildwahlTest {
         assertTrue(Bildwahl.erlaubt("Old castle on a hill above the river"))
         // kurze Wörter dürfen harmlose Begriffe nicht fälschlich treffen (war in toward/warm, cross in across)
         assertTrue(Bildwahl.erlaubt("A warm path leading toward the lake, across the valley"))
+        // häufige Landschaften, die ein zu grober Filter verlieren würde
+        assertTrue(Bildwahl.erlaubt("Christmas market in the snow"))
+        assertTrue(Bildwahl.erlaubt("Lake Bled|Gorenjska|Featured pictures of Slovenia"))
+        assertTrue(Bildwahl.erlaubt("Dead Vlei at sunrise, Namibia"))
+        assertTrue(Bildwahl.erlaubt("Christchurch botanic gardens in autumn"))
+    }
+
+    @Test
+    fun religioeseMotiveInLandschaften() {
+        assertFalse(Bildwahl.erlaubt("Christ the Redeemer above Rio"))
+        assertFalse(Bildwahl.erlaubt("Kalvarienberg im Winter"))
+        assertFalse(Bildwahl.erlaubt("Wegkreuz am Feldrand"))
+        assertFalse(Bildwahl.erlaubt("Interior with main altar"))
+    }
+
+    @Test
+    fun unsplashSucheWirdSchrittweiseWeiter() {
+        val q = Bildwahl.unsplashQueries("landscape", Jahreszeit.HERBST, "rain")
+        assertEquals(listOf("landscape autumn rain nature", "landscape autumn nature", "landscape"), q)
+        // ohne Wetter keine doppelten Versuche
+        assertEquals(2, Bildwahl.unsplashQueries("landscape", Jahreszeit.HERBST, null).size)
     }
 
     @Test
