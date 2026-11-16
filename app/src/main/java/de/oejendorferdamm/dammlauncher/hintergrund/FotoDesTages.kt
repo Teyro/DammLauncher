@@ -9,6 +9,7 @@ import de.oejendorferdamm.dammlauncher.konfig.Datei
 import de.oejendorferdamm.dammlauncher.konfig.Geraet
 import de.oejendorferdamm.dammlauncher.konfig.Hintergrund
 import de.oejendorferdamm.dammlauncher.konfig.KonfigSpeicher
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -37,13 +38,9 @@ object FotoDesTages {
     /** Nach einem Fehlschlag frühestens so viel später noch einmal versuchen. */
     private const val PAUSE = 30 * 60_000L
     private val KENNUNG = "DammLauncher/${BuildConfig.VERSION_NAME} (https://github.com/Teyro/DammLauncher)"
-
-    /** Exzellente Bilder auf Commons – Landschaften doppelt, damit sie am häufigsten kommen. */
-    private val KATEGORIEN = listOf(
-        "Featured pictures of landscapes", "Featured pictures of landscapes", "Featured pictures of mountains",
-        "Featured pictures of lakes", "Featured pictures of coasts", "Featured pictures of forests",
-        "Featured pictures of beaches", "Featured pictures of waterfalls"
-    )
+    /** Schulort (Öjendorfer Damm, Hamburg) für den Wetterbericht – grob, nur zur Bildwahl. */
+    private const val ORT_LAT = 53.573
+    private const val ORT_LON = 10.150
 
     /** [nachweis] steht klein unten rechts (Fotograf, Lizenz, Quelle) – die Lizenzen verlangen das. */
     data class Foto(val bild: String, val nachweis: String, val seite: String, val zaehlen: String = "")
@@ -91,7 +88,10 @@ object FotoDesTages {
                 foto = Foto("", "Schul-Ordner · ${name.substringBeforeLast('.')}", "")
                 Datei.einpassen(daten, Geraet.bildBreite, Geraet.bildHoehe, datei())
             } else {
-                foto = if (h.quelle == Hintergrund.UNSPLASH) unsplash(h.schluessel, h.thema) else commons()
+                val jz = Bildwahl.jahreszeitJetzt()
+                val wetter = wetterWort()   // best effort; null = Wetter unbekannt, dann nur nach Jahreszeit
+                foto = if (h.quelle == Hintergrund.UNSPLASH) unsplash(h.schluessel, h.thema, jz, wetter)
+                       else commons(jz, wetter == "snow")
                 Datei.einpassen(bildHolen(foto.bild), Geraet.bildBreite, Geraet.bildHoehe, datei())
             }
             Geraet.unsplashTag = heute()
@@ -123,34 +123,43 @@ object FotoDesTages {
 
     // ------------------------------------------------------------ Wikimedia Commons
 
-    private fun commons(): Foto {
+    private fun commons(jz: Bildwahl.Jahreszeit, winter: Boolean): Foto {
         // Commons liefert Vorschaubilder nur in festen Breiten – 1920 oder 3840
         val breite = if (Geraet.bildBreite > 1920) 3840 else 1920
-        repeat(4) {
-            val kategorie = URLEncoder.encode("Category:" + KATEGORIEN.random(), "UTF-8")
+        val kategorien = Bildwahl.commonsKategorien(jz, winter)
+        repeat(6) {
+            val kategorie = URLEncoder.encode("Category:" + kategorien.random(), "UTF-8")
             val start = ('A'..'Z').random()
             val text = String(anfrage(
                 "$COMMONS_API?action=query&format=json&formatversion=2&generator=categorymembers&gcmtitle=$kategorie" +
                     "&gcmtype=file&gcmlimit=40&gcmstartsortkeyprefix=$start&prop=imageinfo&iiprop=url%7Csize%7Cmime%7Cextmetadata" +
-                    "&iiurlwidth=$breite&iiextmetadatafilter=Artist%7CLicenseShortName", null, 512 * 1024
+                    "&iiurlwidth=$breite&iiextmetadatafilter=Artist%7CLicenseShortName%7CImageDescription%7CCategories%7CObjectName", null, 512 * 1024
             ), Charsets.UTF_8)
             commonsAuswerten(text).randomOrNull()?.let { return it }
         }
         throw IOException("Kein passendes Foto gefunden")
     }
 
-    /** Antwort der Commons-API lesen: nur breite Querformat-JPEGs von den Wikimedia-Bildservern (testbar). */
+    /**
+     * Antwort der Commons-API lesen: nur breite Querformat-JPEGs von den Wikimedia-Bildservern, und nur solche,
+     * die der Grundschul-Filter (Bildwahl.erlaubt) durchlässt – kein Jesus/Krieg/Historie usw. (testbar).
+     */
     fun commonsAuswerten(json: String): List<Foto> = try {
         val seiten = JSONObject(json).optJSONObject("query")?.optJSONArray("pages")
         (0 until (seiten?.length() ?: 0)).mapNotNull { i ->
-            val info = seiten!!.optJSONObject(i)?.optJSONArray("imageinfo")?.optJSONObject(0) ?: return@mapNotNull null
+            val seite = seiten!!.optJSONObject(i) ?: return@mapNotNull null
+            val info = seite.optJSONArray("imageinfo")?.optJSONObject(0) ?: return@mapNotNull null
             val b = info.optInt("width")
             val h = info.optInt("height")
             val bild = info.optString("thumburl").ifEmpty { info.optString("url") }
             val meta = info.optJSONObject("extmetadata")
             val wer = ohneHtml(meta?.optJSONObject("Artist")?.optString("value").orEmpty()).ifEmpty { "Unbekannt" }.take(50)
             val lizenz = ohneHtml(meta?.optJSONObject("LicenseShortName")?.optString("value").orEmpty()).take(30)
-            if (info.optString("mime") != "image/jpeg" || b < 1600 || b < h * 1.3 || !commonsBild(bild)) null
+            val beschreibung = ohneHtml(meta?.optJSONObject("ImageDescription")?.optString("value").orEmpty())
+            val kategorien = ohneHtml(meta?.optJSONObject("Categories")?.optString("value").orEmpty())
+            val objekt = ohneHtml(meta?.optJSONObject("ObjectName")?.optString("value").orEmpty())
+            val pruef = "${seite.optString("title")} $objekt $beschreibung $kategorien"
+            if (info.optString("mime") != "image/jpeg" || b < 1600 || b < h * 1.3 || !commonsBild(bild) || !Bildwahl.erlaubt(pruef)) null
             else Foto(bild, listOf(wer, lizenz, "Wikimedia Commons").filter { it.isNotEmpty() }.joinToString(" · "), info.optString("descriptionurl"))
         }
     } catch (_: Exception) {
@@ -165,16 +174,32 @@ object FotoDesTages {
 
     // ------------------------------------------------------------ Unsplash
 
-    private fun unsplash(schluessel: String, thema: String): Foto {
-        val q = URLEncoder.encode(thema, "UTF-8")
-        val text = String(anfrage("$UNSPLASH_API/photos/random?orientation=landscape&content_filter=high&query=$q", schluessel, 256 * 1024), Charsets.UTF_8)
-        return auswerten(text, Geraet.bildBreite, Geraet.bildHoehe) ?: throw IOException("Unerwartete Antwort von Unsplash")
+    private fun unsplash(schluessel: String, thema: String, jz: Bildwahl.Jahreszeit, wetter: String?): Foto {
+        val q = URLEncoder.encode(Bildwahl.unsplashQuery(thema, jz, wetter), "UTF-8")
+        // count=12 statt eines einzigen Fotos: so bleibt nach dem Grundschul-Filter noch Auswahl übrig.
+        val text = String(anfrage("$UNSPLASH_API/photos/random?orientation=landscape&content_filter=high&count=12&query=$q", schluessel, 1024 * 1024), Charsets.UTF_8)
+        val arr = JSONArray(text)
+        for (i in 0 until arr.length()) {
+            val o = arr.optJSONObject(i) ?: continue
+            if (!Bildwahl.erlaubt(unsplashText(o))) continue
+            ausObjekt(o, Geraet.bildBreite, Geraet.bildHoehe)?.let { return it }
+        }
+        throw IOException("Kein passendes Foto gefunden")
+    }
+
+    /** Titel/Beschreibung/Schlagwörter eines Unsplash-Fotos für den Grundschul-Filter zusammenfassen. */
+    private fun unsplashText(o: JSONObject): String {
+        val tags = o.optJSONArray("tags")
+        val tagText = (0 until (tags?.length() ?: 0)).joinToString(" ") { tags!!.optJSONObject(it)?.optString("title").orEmpty() }
+        return "${o.optString("description")} ${o.optString("alt_description")} $tagText"
     }
 
     /** Antwort von /photos/random lesen (ohne Netz, testbar). null = unbrauchbar. */
-    fun auswerten(json: String, breite: Int, hoehe: Int): Foto? {
+    fun auswerten(json: String, breite: Int, hoehe: Int): Foto? =
+        try { ausObjekt(JSONObject(json), breite, hoehe) } catch (_: Exception) { null }
+
+    private fun ausObjekt(o: JSONObject, breite: Int, hoehe: Int): Foto? {
         return try {
-            val o = JSONObject(json)
             val roh = o.getJSONObject("urls").getString("raw")
             val links = o.getJSONObject("links")
             val bild = "$roh${if ('?' in roh) '&' else '?'}w=$breite&h=$hoehe&fit=crop&crop=entropy&q=82&fm=jpg"
@@ -185,6 +210,17 @@ object FotoDesTages {
         } catch (_: Exception) {
             null
         }
+    }
+
+    /** Aktuelles Wetter am Schulort (open-meteo, ohne Schlüssel) → ein Suchwort, oder null, wenn nicht erreichbar. */
+    private fun wetterWort(): String? = try {
+        val text = String(anfrage(
+            "https://api.open-meteo.com/v1/forecast?latitude=$ORT_LAT&longitude=$ORT_LON&current=temperature_2m,weather_code", null, 16 * 1024
+        ), Charsets.UTF_8)
+        val c = JSONObject(text).optJSONObject("current")
+        if (c == null) null else Bildwahl.wetterWort(c.optInt("weather_code", -1), c.optDouble("temperature_2m", 99.0))
+    } catch (_: Exception) {
+        null
     }
 
     // ------------------------------------------------------------ Netz
