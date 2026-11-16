@@ -26,7 +26,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v3
 
       - name: Tag prüfen (vX.Y.Z)
-        run: echo "${GITHUB_REF_NAME}" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'
+        run: echo "${GITHUB_REF_NAME}" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?$'
 
       - name: Release-Keystore aus den Secrets holen
         run: echo "$RELEASE_KEYSTORE_BASE64" | base64 -d > app/release-keystore.p12
