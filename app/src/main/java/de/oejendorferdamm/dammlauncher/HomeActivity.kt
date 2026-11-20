@@ -308,6 +308,26 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         }
     }
 
+    /**
+     * Navigationsleiste ausblenden: Clevertouch zeigt auf dem Startbildschirm sonst den runden Knopf mit Punkten
+     * (erst nach dem ersten App-Wechsel nur den Wisch-Streifen). Hochwischen am unteren Rand holt die Leiste kurz zurück.
+     */
+    @Suppress("DEPRECATION")
+    private fun leisteAus() {
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= 30) window.insetsController?.let {
+                it.systemBarsBehavior = android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                it.hide(android.view.WindowInsets.Type.navigationBars())
+            } else wurzel.systemUiVisibility = wurzel.systemUiVisibility or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
+                View.SYSTEM_UI_FLAG_LAYOUT_STABLE or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+        } catch (_: Exception) {}
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) leisteAus()
+    }
+
     /** Abstürze merken: mehrere in kurzer Zeit → beim nächsten Start sicherer Modus (keine Absturzschleife). */
     private fun absturzSchutz() {
         val vorher = Thread.getDefaultUncaughtExceptionHandler()
@@ -347,6 +367,7 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
             panel?.aufbauen()
         }
         vorne = true
+        leisteAus()
         de.oejendorferdamm.dammlauncher.nutzung.Nutzung.launcherVorn()
         RandGesten.vorne(true)
         RandGesten.abgleichen(this)
