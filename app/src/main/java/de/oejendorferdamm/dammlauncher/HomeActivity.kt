@@ -590,7 +590,7 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
             scharf(RandGesten.DAMMBOARD, R.drawable.symbol_dammboard_vordergrund, getDrawable(R.drawable.symbol_dammboard_hintergrund)!!),
             scharf(RandGesten.DAMMZEIT, R.drawable.symbol_dammzeit_vordergrund, ColorDrawable(0xFFF6F7F9.toInt())),
             "Quelle", quelleGeht,
-            if (quelleGeht) null else "Minimalmodus · Zum Clevertouch-Startbildschirm bitte am Board die Quelle wechseln")
+            if (quelleGeht) null else "Minimalmodus · Bildschirm teilen nicht möglich\nBitte am Board die Quelle auf „clever“ wechseln")
     }
 
     private fun hintergrund(k: Konfig) {
@@ -1327,7 +1327,8 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
     }
 
     internal fun einrichtungUebernehmen(ergebnis: de.oejendorferdamm.dammlauncher.konfig.KonfigJson.Ergebnis) {
-        KonfigSpeicher.ersetze(ergebnis.konfig)
+        // Das Band „CTOUCH-Modus“ gehört zu diesem Board – eine übernommene Einrichtung (z. B. Schul-Vorlage) stellt es nicht um
+        KonfigSpeicher.ersetze(ergebnis.konfig.copy(ctouchBand = KonfigSpeicher.konfig.ctouchBand))
         hintergrundStand = -1
         widgetFreigabeGefragt = false
         widgetsAbgleichen()

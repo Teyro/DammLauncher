@@ -46,6 +46,33 @@ class UhrAnsicht(context: Context, transparent: Boolean = false, stil: UhrStil =
     /** Zuletzt berechnete Schriftgrößen – nur neu rechnen, wenn sich Größe oder Text ändern. */
     private var gemessenFuer = ""
 
+    /**
+     * Weiches Rollen beim Wechsel (wie StandBy am iPhone): die neue Zahl kommt von oben herein, die alte gleitet nach
+     * unten weg. Nur mit voller Leistung (Leistung.sparsam = aus) – auf schwachen Boards springt die Zahl wie bisher.
+     */
+    private var gezeigt = ""
+    private var vorher = ""
+    private var rollen = 1f
+    private val roller = android.animation.ValueAnimator.ofFloat(0f, 1f).apply {
+        interpolator = android.view.animation.PathInterpolator(0.3f, 0f, 0.2f, 1f)   // sanft an, weich aus
+        addUpdateListener { rollen = it.animatedValue as Float; invalidate() }
+    }
+
+    /** Neue Uhrzeit: Rollen starten, wenn erlaubt und sichtbar (beim ersten Zeichnen nicht). */
+    private fun wechsel(z: String) {
+        if (z == gezeigt) return
+        if (gezeigt.isNotEmpty() && gezeigt.length == z.length && !Leistung.sparsam && isShown) {
+            vorher = gezeigt
+            roller.cancel()
+            roller.duration = if (stil.sekunden) 420L else 700L
+            roller.start()
+        } else {
+            roller.cancel()
+            rollen = 1f
+        }
+        gezeigt = z
+    }
+
     var transparent = transparent
         set(v) {
             if (field == v) return
@@ -121,6 +148,8 @@ class UhrAnsicht(context: Context, transparent: Boolean = false, stil: UhrStil =
 
     override fun onDetachedFromWindow() {
         removeCallbacks(sekundenTakt)
+        roller.cancel()
+        rollen = 1f
         try { context.unregisterReceiver(takt) } catch (_: Exception) {}
         super.onDetachedFromWindow()
     }
@@ -143,6 +172,7 @@ class UhrAnsicht(context: Context, transparent: Boolean = false, stil: UhrStil =
 
         val jetzt = Date(de.oejendorferdamm.dammlauncher.pflege.ZeitAbgleich.jetzt())
         val z = uhrzeit.format(jetzt)
+        wechsel(z)
         val d = tag.format(jetzt)
         // Flach und breit: nur die Uhrzeit
         val mitDatum = stil.datum != UhrStil.AUS && h > w * 0.24f
@@ -201,9 +231,27 @@ class UhrAnsicht(context: Context, transparent: Boolean = false, stil: UhrStil =
                 zeit.textAlign = Paint.Align.CENTER
                 x += punkt + 2 * luecke
             }
-            canvas.drawText(teil, x + ziffern / 2f, grundlinie, zeit)
+            val alt = vorher.split(':').getOrNull(i)
+            if (rollen < 1f && alt != null && alt != teil) rollend(canvas, alt, teil, x, ziffern, grundlinie)
+            else canvas.drawText(teil, x + ziffern / 2f, grundlinie, zeit)
             x += ziffern
         }
+    }
+
+    /** Eine Zifferngruppe beim Wechsel: alt gleitet nach unten und blendet aus, neu kommt von oben – nur innerhalb ihres Felds. */
+    private fun rollend(canvas: Canvas, alt: String, neu: String, x: Float, breite: Float, grundlinie: Float) {
+        val fm = zeit.fontMetrics
+        val weg = (fm.descent - fm.ascent) * 0.85f
+        val p = rollen
+        val deckkraft = zeit.alpha
+        canvas.save()
+        canvas.clipRect(x - breite * 0.05f, grundlinie + fm.ascent, x + breite * 1.05f, grundlinie + fm.descent)
+        zeit.alpha = ((1f - p) * deckkraft).toInt()
+        canvas.drawText(alt, x + breite / 2f, grundlinie + p * weg, zeit)
+        zeit.alpha = (p * deckkraft).toInt()
+        canvas.drawText(neu, x + breite / 2f, grundlinie - (1f - p) * weg, zeit)
+        zeit.alpha = deckkraft
+        canvas.restore()
     }
 
     private fun passendeZeit(b: Float, h: Float): Float {

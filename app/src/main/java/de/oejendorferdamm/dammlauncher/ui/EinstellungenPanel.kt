@@ -105,7 +105,7 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
 
     private val seiten: List<Seite> by lazy {
         listOf(
-            Seite("Aussehen", "🎨", 0xFF7C3AED.toInt(), { k -> (if (k.aussehen == Aussehen.CLEVERTOUCH) "Clevertouch" else "Klassisch") + " · Hintergrund · Schrift" },
+            Seite("Aussehen", "🎨", 0xFF7C3AED.toInt(), { k -> (if (k.aussehen == Aussehen.CLEVERTOUCH) "Clevertouch" else "Klassisch") + (if (k.ctouchBand) " · Band CTOUCH-Modus" else "") + " · Hintergrund · Schrift" },
                 listOf(::teilAussehen, ::teilHintergrund, ::teilSymboleundSchrift)),
             Seite("Startbildschirm", "🖥️", 0xFF2563EB.toInt(), { k -> (if (k.minimal.an) "Minimalmodus · " else "") + "${k.spalten} × ${k.zeilen} Raster · Ränder · Widgets · Apps" },
                 listOf(::teilMinimal, ::teilRaster, ::teilAbstandzumBildschirmrand, ::teilWidgetsundAblage, ::teilApps)),
@@ -264,7 +264,7 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
         knoepfe(knopf(c, "Geburtstagsvideo wählen …") { a.geburtstagVideoWaehlen() })
         add(schalter(c, "Band „CTOUCH-Modus“ unten rechts", k.ctouchBand) { an -> aendere { it.copy(ctouchBand = an) } }, 12)
         add(text(c, "Ein schmales schräges Band über der Ecke zeigt: Das ist ein älteres CTOUCH-Board mit der neuen Oberfläche. " +
-            "Es lässt sich nicht antippen, alles darunter bleibt bedienbar.", 21, Farben.TEXT2), 6)
+            "Es lässt sich nicht antippen, alles darunter bleibt bedienbar. Gilt nur für dieses Board – die Schul-Vorlage stellt es nicht um.", 21, Farben.TEXT2), 6)
         auswahl("Form der App-Symbole", listOf(SymbolForm.ORIGINAL to "Original", SymbolForm.RUND to "Abgerundet", SymbolForm.KREIS to "Kreis"), k.symbolForm) { v -> aendere { it.copy(symbolForm = v) } }
         if (ct) add(text(c, "Im Dock: " + (if (k.dock.isEmpty()) "noch keine Apps" else k.dock.joinToString(", ") { d -> d.titel ?: AppKatalog.finde(d.paket, d.aktivitaet)?.name ?: d.paket }), 22, Farben.TEXT2), 10)
     }

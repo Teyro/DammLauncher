@@ -109,7 +109,8 @@ object Abgleich {
                 protokoll.add("Symbol $name: ${e.message}")
             }
         }
-        var k = neu
+        // Das Band „CTOUCH-Modus“ gehört zu diesem Board (altes CTOUCH) – die Vorlage für alle darf es nicht umstellen
+        var k = neu.copy(ctouchBand = KonfigSpeicher.konfig.ctouchBand)
         if (neu.hintergrund.bild) {
             val ok = try {
                 val d = dav.get("$ordner/$BILD", max = 20 * 1024 * 1024).daten
@@ -160,6 +161,8 @@ object Abgleich {
     private fun hochladenNach(dav: WebDav, ordner: String): String {
         if (ordner.isNotEmpty()) dav.ordner(ordner)
         val k = KonfigSpeicher.konfig.copy(stand = System.currentTimeMillis())
+        // Gerätesache: das Band dieses Boards nicht an alle Boards verteilen
+        val vorlage = k.copy(ctouchBand = false)
         val icons = KonfigJson.icons(k)
         if (icons.isNotEmpty()) dav.ordner("$ordner/icons")
         for (name in icons) {
@@ -167,7 +170,7 @@ object Abgleich {
             if (f.exists()) dav.putAtomar("$ordner/icons/$name", f.readBytes(), "image/png")
         }
         if (k.hintergrund.bild && KonfigSpeicher.hintergrundDatei.exists()) dav.putAtomar("$ordner/$BILD", KonfigSpeicher.hintergrundDatei.readBytes(), "image/jpeg")
-        dav.putAtomar("$ordner/$VORLAGE", KonfigJson.schreibe(k).toByteArray(Charsets.UTF_8), "application/json")
+        dav.putAtomar("$ordner/$VORLAGE", KonfigJson.schreibe(vorlage).toByteArray(Charsets.UTF_8), "application/json")
         // Dieses Gerät hat die Vorlage ja schon
         KonfigSpeicher.ersetze(k)
         Geraet.vorlageStand = k.stand
