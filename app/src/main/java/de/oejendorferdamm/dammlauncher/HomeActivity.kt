@@ -572,7 +572,10 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         if (Thema.clevertouch) dock.setze(k.dock, mitAlle = !ohneApps)
         lehrerKnopf.visibility = if (k.schueler.an && !schueler) View.VISIBLE else View.GONE
         minimalZeigen(k)
-        eckBand.visibility = if (k.ctouchBand) View.VISIBLE else View.GONE
+        // Alte CTOUCH-Boards (unter Android 10): im normalen Betrieb immer das Band, im Minimalmodus nie; sonst wie eingestellt
+        val altesBoard = android.os.Build.VERSION.SDK_INT < 29
+        val band = if (altesBoard) !k.minimal.an else k.ctouchBand && !k.minimal.an
+        eckBand.visibility = if (band) View.VISIBLE else View.GONE
         hinweisZeigen(k)
         hintergrund(k)
         // Widgets ihre Größe mitteilen, sobald sie liegen

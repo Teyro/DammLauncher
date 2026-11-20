@@ -11,7 +11,7 @@ import android.graphics.Typeface
 import android.view.View
 
 /**
- * Schräges Band über der Ecke unten rechts („CTOUCH-Modus“): zeigt dezent, dass hier ein älteres Board
+ * Schräges Band über der Ecke oben links (unten rechts lag es über dem Stundenplan) („CTOUCH-Modus“): zeigt dezent, dass hier ein älteres Board
  * mit der neuen Oberfläche läuft. Nimmt keine Berührungen an – darunter bleibt alles bedienbar.
  */
 @SuppressLint("ViewConstructor")
@@ -37,8 +37,8 @@ class EckBand(context: Context, private val text: String = "CTOUCH-Modus") : Vie
         val abstand = 250f.vp // doppelter Abstand der Bandmitte von der Ecke – so passt der Text ganz aufs Band
         schrift.textSize = 24f.vp
         c.save()
-        // Ecke unten rechts: Band quer über die Ecke, 45° gedreht
-        c.translate(width - abstand / 2f, height - abstand / 2f)
+        // Ecke oben links: Band quer über die Ecke, 45° gedreht
+        c.translate(abstand / 2f, abstand / 2f)
         c.rotate(-45f)
         c.drawRect(-abstand * 1.5f, -dicke / 2f, abstand * 1.5f, dicke / 2f, flaeche)
         c.drawText(text, 0f, -(schrift.descent() + schrift.ascent()) / 2f, schrift)

@@ -262,7 +262,7 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
         add(text(c, "Beim ersten Antippen läuft das Geburtstagsvideo, danach löst jede Berührung Konfetti und Luftballons aus – bis zum Ausschalten. " +
             "Video: " + (if (de.oejendorferdamm.dammlauncher.geburtstag.Geburtstag.vorhanden(c)) "vorhanden" else "noch keins – „geburtstag.mp4“ in den Schul-Ordner (DammLauncher oder DammBoard) legen oder hier wählen") + ".", 21, Farben.TEXT2), 6)
         knoepfe(knopf(c, "Geburtstagsvideo wählen …") { a.geburtstagVideoWaehlen() })
-        add(schalter(c, "Band „CTOUCH-Modus“ unten rechts", k.ctouchBand) { an -> aendere { it.copy(ctouchBand = an) } }, 12)
+        add(schalter(c, "Band „CTOUCH-Modus“ oben links (unter Android 10 immer)", k.ctouchBand) { an -> aendere { it.copy(ctouchBand = an) } }, 12)
         add(text(c, "Ein schmales schräges Band über der Ecke zeigt: Das ist ein älteres CTOUCH-Board mit der neuen Oberfläche. " +
             "Es lässt sich nicht antippen, alles darunter bleibt bedienbar. Gilt nur für dieses Board – die Schul-Vorlage stellt es nicht um.", 21, Farben.TEXT2), 6)
         auswahl("Form der App-Symbole", listOf(SymbolForm.ORIGINAL to "Original", SymbolForm.RUND to "Abgerundet", SymbolForm.KREIS to "Kreis"), k.symbolForm) { v -> aendere { it.copy(symbolForm = v) } }
