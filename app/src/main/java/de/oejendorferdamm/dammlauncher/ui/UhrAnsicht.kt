@@ -232,7 +232,16 @@ class UhrAnsicht(context: Context, transparent: Boolean = false, stil: UhrStil =
                 x += punkt + 2 * luecke
             }
             val alt = vorher.split(':').getOrNull(i)
-            if (rollen < 1f && alt != null && alt != teil) rollend(canvas, alt, teil, x, ziffern, grundlinie)
+            if (rollen < 1f && alt != null && alt != teil && alt.length == teil.length) {
+                // Nur die Ziffer rollt, die sich ändert (12:39 → 12:40: Zehner und Einer, 12:41 → 12:42: nur der Einer)
+                var cx = x + (ziffern - zeit.measureText(teil)) / 2f
+                teil.forEachIndexed { j, c ->
+                    val w = zeit.measureText(c.toString())
+                    if (alt[j] != c) rollend(canvas, alt[j].toString(), c.toString(), cx, w, grundlinie)
+                    else canvas.drawText(c.toString(), cx + w / 2f, grundlinie, zeit)
+                    cx += w
+                }
+            } else if (rollen < 1f && alt != null && alt != teil) rollend(canvas, alt, teil, x, ziffern, grundlinie)
             else canvas.drawText(teil, x + ziffern / 2f, grundlinie, zeit)
             x += ziffern
         }
