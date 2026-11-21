@@ -199,12 +199,12 @@ def main():
     time.sleep(5)
     screenshot("68_aquarium.png")
     ms = min(w, h) / 1080
-    for _ in range(8):  # „+ Fisch“ ist der fünfte Knopf von rechts
-        tap(int(w - 70 * ms - 4 * 2.3 * 44 * ms), int(h - 82 * ms))
+    for _ in range(8):  # „+ Fisch“ unten links
+        tap(int(70 * ms), int(h - 82 * ms))
         time.sleep(0.5)
     time.sleep(2)
     screenshot("69_aquarium_fische.png")
-    tap(int(w - 70 * ms - 3 * 2.3 * 44 * ms), int(h - 82 * ms))  # Hai
+    tap(int(70 * ms + 2.3 * 44 * ms), int(h - 82 * ms))  # Hai
     time.sleep(1.6)
     screenshot("69b_aquarium_hai.png")
     adb("shell", "input", "keyevent", "KEYCODE_BACK")

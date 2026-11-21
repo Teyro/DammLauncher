@@ -266,6 +266,8 @@ class AquariumAnsicht(context: Context, private val mitMikrofon: Boolean, privat
         val w = width.toFloat(); val h = height.toFloat()
 
         // Wasser
+        // deckend: der Pinsel trägt sonst die Durchsichtigkeit der Blasen vom letzten Bild mit
+        p.color = Color.WHITE
         if (spar) { c.drawColor(0xFF1F86C6.toInt()) } else { p.shader = wasser; c.drawRect(0f, 0f, w, h, p); p.shader = null }
         if (!spar) lichtstrahlen(c, w, h)
         sand(c, w, h)
@@ -299,7 +301,8 @@ class AquariumAnsicht(context: Context, private val mitMikrofon: Boolean, privat
         var x = 0f
         while (x <= w) { pfad.lineTo(x, h * 0.86f + sin(x / (180 * s)) * 12 * s); x += 20 * s }
         pfad.lineTo(w, h); pfad.close()
-        if (spar) p.color = 0xFFE6C98C.toInt() else p.shader = sandShader
+        p.color = if (spar) 0xFFE6C98C.toInt() else Color.WHITE
+        if (!spar) p.shader = sandShader
         c.drawPath(pfad, p); p.shader = null
         if (!spar) {
             // Seestern und Muscheln
@@ -564,18 +567,17 @@ class AquariumAnsicht(context: Context, private val mitMikrofon: Boolean, privat
             oval.set(w / 2 - tb / 2 + 40 * s, ty + 10 * s, w / 2 - tb / 2 + 40 * s + breite, ty + 16 * s); c.drawRoundRect(oval, 3 * s, 3 * s, p)
         }
 
-        // Knöpfe unten rechts
+        // Knöpfe: rechts Schließen, Neu, Pause – links „+ Fisch“ und „Hai“ (von Hand, auch ohne Mikrofon)
         val r = 44 * s
-        var x = w - 70 * s
-        for ((name, symbol) in listOf("zu" to "✕", "neu" to "↺", "pause" to (if (pausiert) "▶" else "⏸"), "hai" to "🦈", "fisch" to "+🐟")) {
-            val y = h - 70 * s - (if (name == "fisch" || name == "hai") 0f else 0f)
-            p.color = 0x66000000; c.drawCircle(x, y - 12 * s, r, p)
+        val ky = h - 82 * s
+        fun knopf(name: String, symbol: String, x: Float) {
+            p.color = 0x66000000; c.drawCircle(x, ky, r, p)
             schrift.color = Color.WHITE; schrift.textSize = (if (symbol.length > 1) 30 else 38) * s
-            c.drawText(symbol, x, y - 12 * s + schrift.textSize * 0.35f, schrift)
-            knoepfe[name] = RectF(x - r, y - 12 * s - r, x + r, y - 12 * s + r)
-            x -= 2.3f * r
-            if (x < w / 2 + tb / 2 + r) break
+            c.drawText(symbol, x, ky + schrift.textSize * 0.35f, schrift)
+            knoepfe[name] = RectF(x - r, ky - r, x + r, ky + r)
         }
+        listOf("zu" to "✕", "neu" to "↺", "pause" to (if (pausiert) "▶" else "❚❚")).forEachIndexed { i, (n, sy) -> knopf(n, sy, w - 70 * s - i * 2.3f * r) }
+        listOf("fisch" to "+🐟", "hai" to "🦈").forEachIndexed { i, (n, sy) -> knopf(n, sy, 70 * s + i * 2.3f * r) }
     }
 
     @SuppressLint("ClickableViewAccessibility")
