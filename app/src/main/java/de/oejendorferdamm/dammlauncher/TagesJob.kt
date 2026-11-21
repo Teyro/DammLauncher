@@ -54,6 +54,9 @@ class TagesJob : JobService() {
             if (Geraet.autoUpdate && System.currentTimeMillis() - Geraet.letzterUpdateCheck > 20 * 60 * 60_000L) updateVorladen(context)
             // Tafel-Übersicht: Bericht dieses Boards (nur mit Status-Zugang)
             if (de.oejendorferdamm.dammlauncher.abgleich.Status.faellig()) de.oejendorferdamm.dammlauncher.abgleich.Status.senden(context)
+            // Nutzungsstatistik auf den eigenen Webserver (einmal am Tag, wenn eingerichtet)
+            de.oejendorferdamm.dammlauncher.nutzung.StatistikServer.init(context)
+            if (de.oejendorferdamm.dammlauncher.nutzung.Nutzung.an && de.oejendorferdamm.dammlauncher.nutzung.StatistikServer.faellig()) de.oejendorferdamm.dammlauncher.nutzung.StatistikServer.hochladen(context)
         }
 
         @Synchronized

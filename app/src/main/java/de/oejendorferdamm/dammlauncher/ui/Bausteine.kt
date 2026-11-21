@@ -464,3 +464,43 @@ fun oeffneFDroidRepo(c: Context): Boolean {
     }
     return false
 }
+
+/** Gezeichnete Kopf-Symbole (statt Schriftzeichen wie ← ◀ ▶ ✕, die je nach Board-Schrift schief oder dünn aussehen). */
+class KopfSymbol(private val art: Art, farbe: Int) : android.graphics.drawable.Drawable() {
+    enum class Art { ZURUECK, LINKS, RECHTS, ZU }
+    private val stift = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        color = farbe; style = android.graphics.Paint.Style.STROKE; strokeCap = android.graphics.Paint.Cap.ROUND; strokeJoin = android.graphics.Paint.Join.ROUND
+    }
+    override fun draw(canvas: android.graphics.Canvas) {
+        val b = bounds
+        val s = minOf(b.width(), b.height()).toFloat()
+        val cx = b.exactCenterX(); val cy = b.exactCenterY()
+        stift.strokeWidth = s * 0.1f
+        val p = android.graphics.Path()
+        val h = s * 0.3f
+        when (art) {
+            Art.ZURUECK -> { // Pfeil nach links: Schaft + Spitze
+                p.moveTo(cx + h, cy); p.lineTo(cx - h, cy)
+                p.moveTo(cx - h * 0.1f, cy - h * 0.9f); p.lineTo(cx - h, cy); p.lineTo(cx - h * 0.1f, cy + h * 0.9f)
+            }
+            Art.LINKS -> { p.moveTo(cx + h * 0.45f, cy - h); p.lineTo(cx - h * 0.45f, cy); p.lineTo(cx + h * 0.45f, cy + h) }
+            Art.RECHTS -> { p.moveTo(cx - h * 0.45f, cy - h); p.lineTo(cx + h * 0.45f, cy); p.lineTo(cx - h * 0.45f, cy + h) }
+            Art.ZU -> { val k = h * 0.8f; p.moveTo(cx - k, cy - k); p.lineTo(cx + k, cy + k); p.moveTo(cx + k, cy - k); p.lineTo(cx - k, cy + k) }
+        }
+        canvas.drawPath(p, stift)
+    }
+    override fun setAlpha(alpha: Int) { stift.alpha = alpha }
+    override fun setColorFilter(cf: android.graphics.ColorFilter?) { stift.colorFilter = cf }
+    @Deprecated("Deprecated in Java") override fun getOpacity() = android.graphics.PixelFormat.TRANSLUCENT
+}
+
+/** Runder Kopfknopf mit gezeichnetem Symbol */
+fun symbolKnopf(c: Context, art: KopfSymbol.Art, beschreibung: String, klick: () -> Unit) = android.widget.ImageView(c).apply {
+    setImageDrawable(KopfSymbol(art, M3.text))
+    scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+    setPadding(22.vp, 22.vp, 22.vp, 22.vp)
+    background = rundKnopf()
+    contentDescription = beschreibung
+    isClickable = true; isFocusable = true
+    setOnClickListener { klick() }
+}

@@ -147,7 +147,7 @@ internal fun HomeActivity.nutzungZeigen(anzahl: Int = 7, tagIndex: Int = 0) {
 }
 
 /** Bericht als .odt erzeugen (Grafiken in fester Größe, unabhängig vom Bildschirm) */
-internal fun HomeActivity.nutzungBericht(anzahl: Int): ByteArray {
+internal fun Context.nutzungBericht(anzahl: Int): ByteArray {
     val jetzt = System.currentTimeMillis()
     val tage = Auswertung.tage(Nutzung.sitzungen(jetzt - (anzahl + 1) * 24 * 60 * 60_000L), jetzt, anzahl)
     val jeApp = Auswertung.jeApp(tage)

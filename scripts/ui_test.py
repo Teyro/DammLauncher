@@ -702,6 +702,22 @@ def main():
         time.sleep(1.5)
         scrolle_zu("Geburtstag: Konfetti", w // 6, teil=True)
         time.sleep(1)
+        # Leise-Aquarium: Mikrofon erlauben (Emulator: Stille), starten, Fische und Hai per Knopf
+        adb("shell", "pm", "grant", PAKET, "android.permission.RECORD_AUDIO")
+        if scrolle_zu("Aquarium starten", w // 6):
+            time.sleep(4)
+            screenshot("68_aquarium.png")
+            ms = min(w, h) / 1080
+            for _ in range(6):  # „+ Fisch“ ist der fünfte Knopf von rechts
+                tap(int(w - 70 * ms - 4 * 2.3 * 44 * ms), int(h - 82 * ms))
+                time.sleep(0.4)
+            tap(int(w - 70 * ms - 3 * 2.3 * 44 * ms), int(h - 82 * ms))  # Hai
+            time.sleep(1.2)
+            screenshot("69b_aquarium_hai.png")
+            time.sleep(2)
+            screenshot("69_aquarium_fische.png")
+            adb("shell", "input", "keyevent", "KEYCODE_BACK")
+            time.sleep(1.5)
     fertig()
     time.sleep(1)
     # Feierabend-Sperre: ab jetzt gesperrt, „Entsperren“ (ohne PIN) gibt frei

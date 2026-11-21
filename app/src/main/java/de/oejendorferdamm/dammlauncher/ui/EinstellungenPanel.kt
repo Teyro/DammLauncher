@@ -73,6 +73,7 @@ interface PanelAktionen {
     fun nutzung()
     fun geburtstag(an: Boolean)
     fun geburtstagVideoWaehlen()
+    fun aquariumStarten()
 }
 
 /**
@@ -124,17 +125,17 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
     private var letzteSeite: Seite? = null
 
     private val titel = text(c, "Einstellungen", 38, M3.text).apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END }
-    private val zurueck = knopf(c, "←") { oeffne(null) }.apply { background = rundKnopf(); setTextColor(M3.text); contentDescription = "Zurück zur Übersicht"; groesse(36) }
+    private val zurueck = symbolKnopf(c, KopfSymbol.Art.ZURUECK, "Zurück zur Übersicht") { oeffne(null) }
 
     init {
         karte.addView(LinearLayout(c).apply {
             gravity = Gravity.CENTER_VERTICAL
             addView(zurueck, lp(86.vp, 86.vp, rechts = 16.vp))
             addView(titel, lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-            addView(knopf(c, "◀") { lage = (lage - 1).coerceAtLeast(0); setzeLage() }.apply { background = rundKnopf(); setTextColor(M3.text) }, lp(86.vp, 86.vp, rechts = 10.vp))
-            addView(knopf(c, "▶") { lage = (lage + 1).coerceAtMost(2); setzeLage() }.apply { background = rundKnopf(); setTextColor(M3.text) }, lp(86.vp, 86.vp, rechts = 20.vp))
+            addView(symbolKnopf(c, KopfSymbol.Art.LINKS, "Fenster nach links") { lage = (lage - 1).coerceAtLeast(0); setzeLage() }, lp(86.vp, 86.vp, rechts = 10.vp))
+            addView(symbolKnopf(c, KopfSymbol.Art.RECHTS, "Fenster nach rechts") { lage = (lage + 1).coerceAtMost(2); setzeLage() }, lp(86.vp, 86.vp, rechts = 20.vp))
             // Schließen immer oben rechts sichtbar – gleich wie in DammBoard (die Kopfzeile scrollt nicht mit)
-            addView(knopf(c, "✕") { a.panelZu() }.apply { background = rundKnopf(); setTextColor(M3.text); contentDescription = "Schließen"; groesse(34) }, lp(86.vp, 86.vp))
+            addView(symbolKnopf(c, KopfSymbol.Art.ZU, "Schließen") { a.panelZu() }, lp(86.vp, 86.vp))
         })
         karte.addView(scroll, lp(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f, oben = 16.vp))
         ebene.addView(karte)
@@ -262,6 +263,7 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
         add(text(c, "Beim ersten Antippen läuft das Geburtstagsvideo, danach löst jede Berührung Konfetti und Luftballons aus – bis zum Ausschalten. " +
             "Video: " + (if (de.oejendorferdamm.dammlauncher.geburtstag.Geburtstag.vorhanden(c)) "vorhanden" else "noch keins – „geburtstag.mp4“ in den Schul-Ordner (DammLauncher oder DammBoard) legen oder hier wählen") + ".", 21, Farben.TEXT2), 6)
         knoepfe(knopf(c, "Geburtstagsvideo wählen …") { a.geburtstagVideoWaehlen() })
+        teilAquarium()
         add(schalter(c, "Band „CTOUCH-Modus“ oben links (unter Android 10 immer)", k.ctouchBand) { an -> aendere { it.copy(ctouchBand = an) } }, 12)
         add(text(c, "Ein schmales schräges Band über der Ecke zeigt: Das ist ein älteres CTOUCH-Board mit der neuen Oberfläche. " +
             "Es lässt sich nicht antippen, alles darunter bleibt bedienbar. Gilt nur für dieses Board – die Schul-Vorlage stellt es nicht um.", 21, Farben.TEXT2), 6)
@@ -639,6 +641,7 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
         add(text(c, "Wann war das Board an, welche App lief wann – letzte 7 oder 14 Tage, als Übersicht und zum Exportieren (OpenOffice-Datei auf den USB-Stick). " +
             "Bleibt auf diesem Board. " + if (de.oejendorferdamm.dammlauncher.nutzung.Nutzung.an) "Aufzeichnung: an." else "Aufzeichnung: aus.", 22, Farben.TEXT2))
         knoepfe(knopf(c, "Statistik ansehen …", haupt = true) { a.nutzung() })
+        teilStatistikServer()
         add(text(c, "Online-Meldung für ein Dashboard (alle 5 Minuten, nur „an“ und „App offen ja/nein“): in den Status-Ordner, sobald der Status-Zugang eingetragen ist. " +
             "Zusätzlich an eine eigene Adresse im Schulnetz (https://…, leer = aus):", 21, Farben.TEXT2), 16)
         val adresse = eingabe(c, "https://dashboard.schule.local/melden", Geraet.onlineAdresse)
@@ -648,6 +651,49 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
             if (t.isNotEmpty() && !t.startsWith("https://")) a.meldung("Bitte eine https://-Adresse eintragen.")
             else { Geraet.onlineAdresse = t; a.meldung(if (t.isEmpty()) "Keine eigene Adresse." else "Adresse gespeichert.") }
         })
+    }
+
+    /** Leise-Aquarium: Ruhe bringt Fische, Lärm holt den Hai */
+    private fun teilAquarium() {
+        val e = AquariumAnsicht.Einstellung
+        add(text(c, "🐠 Leise-Aquarium", 26, M3.text, fett = true), 22)
+        add(text(c, "Ist die Klasse eine Weile leise, schwimmt ein Fisch herein; wird es zu laut, kommt ein Hai und frisst einen. Ist das Aquarium voll, öffnet sich die Schatztruhe. " +
+            "Das Mikrofon misst nur die Lautstärke – nichts wird aufgenommen. Ohne Mikrofon per Fingertipp. Aufwendige Grafik, im Sparmodus schlicht.", 21, Farben.TEXT2), 6)
+        add(regler(c, "Fische bis zur Schatztruhe", 10..60, e.ziel(c), 5) { e.setzeZiel(c, it) })
+        add(regler(c, "Ruhe je Fisch", 5..120, e.takt(c), 5, " s") { e.setzeTakt(c, it) })
+        add(regler(c, "Strenge (1 = verzeiht viel, 10 = sehr streng)", 1..10, e.strenge(c)) { e.setzeStrenge(c, it) })
+        knoepfe(knopf(c, "Aquarium starten", haupt = true) { a.aquariumStarten() })
+    }
+
+    /** Statistik per WebDAV auf einen eigenen Webserver (Bericht .odt + Rohdaten .csv + Zusammenfassung .json) */
+    private fun teilStatistikServer() {
+        val sv = de.oejendorferdamm.dammlauncher.nutzung.StatistikServer
+        sv.init(c)
+        add(text(c, "Auf einen Webserver (WebDAV, z. B. Nextcloud oder IServ): je Board ein Ordner mit dem Bericht (.odt), den Rohdaten (.csv) und einer Zusammenfassung (.json).", 21, Farben.TEXT2), 18)
+        val adresse = eingabe(c, "https://cloud.schule.de/remote.php/dav/files/statistik/Boards", sv.adresse)
+        val benutzer = eingabe(c, "Benutzername", sv.zugang()?.first ?: "")
+        val passwort = eingabe(c, if (sv.zugang() != null) "Passwort (gespeichert – leer lassen = behalten)" else "Passwort / App-Passwort", geheim = true)
+        add(adresse, 8); add(benutzer, 8); add(passwort, 8)
+        add(schalter(c, "Täglich automatisch hochladen", sv.automatisch) { sv.automatisch = it }, 8)
+        if (sv.meldung.isNotEmpty()) add(text(c, sv.meldung, 20, Farben.TEXT2), 6)
+        fun speichern(): Boolean {
+            val u = adresse.text.toString().trim()
+            if (!u.startsWith("https://")) { a.meldung("Bitte eine https://-Adresse eintragen."); return false }
+            val b = benutzer.text.toString().trim(); val pw = passwort.text.toString().ifEmpty { sv.zugang()?.second ?: "" }
+            if (b.isEmpty() || pw.isEmpty()) { a.meldung("Benutzername und Passwort fehlen."); return false }
+            sv.adresse = u
+            if (!sv.speichereZugang(b, pw)) { a.meldung("Zugang ließ sich nicht sicher speichern."); return false }
+            return true
+        }
+        knoepfe(knopf(c, "Speichern") { if (speichern()) a.meldung("Webserver gespeichert.") },
+            knopf(c, "Jetzt hochladen", haupt = true) {
+                if (!speichern()) return@knopf
+                a.meldung("Lädt hoch …")
+                Thread {
+                    val t = sv.hochladen(c)
+                    android.os.Handler(android.os.Looper.getMainLooper()).post { a.meldung(t); aufbauen() }
+                }.start()
+            })
     }
 
     private fun teilDatei(k: Konfig) {

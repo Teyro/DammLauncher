@@ -526,6 +526,7 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         when {
             sperre != null -> Unit // gesperrt: nur das Update hilft
             fenster.isNotEmpty() -> fenster.last().schliessen()
+            aquarium != null -> aquariumBeenden()
             ruhe != null -> Unit // Feierabend: nur „Entsperren“ hilft
             uebersicht != null -> uebersichtZu()
             panel != null -> if (panel?.zurueck() != true) panelZu()
@@ -1825,7 +1826,7 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
 
     /** Dunkel, gedimmt, Foto des Tages und eine Uhr, die jede Minute ein Stück wandert (kein Einbrennen). */
     internal fun zeigeSchoner() {
-        if (schoner != null || !vorne) return
+        if (schoner != null || !vorne || aquarium != null) return
         raster.abbrechen()
         val ebene = FrameLayout(this).apply {
             setBackgroundColor(Color.BLACK)
@@ -2287,6 +2288,42 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
 
     override fun geburtstagVideoWaehlen() = bildAuswahl(REQ_GEBURTSTAG, "video/*")
 
+    // ------------------------------------------------------------ Leise-Aquarium
+
+    private var aquarium: de.oejendorferdamm.dammlauncher.ui.AquariumAnsicht? = null
+
+    /** Aquarium im Vollbild; fragt einmal nach dem Mikrofon (ohne geht es per Fingertipp) */
+    override fun aquariumStarten() {
+        if (aquarium != null) return
+        val erlaubt = checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        if (!erlaubt && !aquariumGefragt) {
+            aquariumGefragt = true
+            requestPermissions(arrayOf(android.Manifest.permission.RECORD_AUDIO), REQ_MIKRO)
+            return
+        }
+        panelZu()
+        val a = de.oejendorferdamm.dammlauncher.ui.AquariumAnsicht(this, erlaubt) { aquariumBeenden() }.apply { elevation = 35f.vp }
+        aquarium = a
+        wurzel.addView(a, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+    }
+
+    private fun aquariumBeenden() {
+        aquarium?.let { wurzel.removeView(it) }
+        aquarium = null
+        window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+    }
+    private var aquariumGefragt = false
+
+    @Deprecated("Deprecated in Java")
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == REQ_MIKRO) {
+            if (grantResults.firstOrNull() != android.content.pm.PackageManager.PERMISSION_GRANTED) meldung("Ohne Mikrofon: Fische und Hai per Fingertipp.")
+            aquariumStarten()
+        }
+    }
+
     /** Geburtstagsvideo im Vollbild; Antippen oder Ende schließt es – dann gibt es gleich Konfetti. true = es läuft */
     private fun geburtstagsVideo(): Boolean {
         val datei = de.oejendorferdamm.dammlauncher.geburtstag.Geburtstag.datei(this)
@@ -2345,5 +2382,6 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         private const val REQ_IMPORT = 16
         private const val REQ_NUTZUNG = 17
         private const val REQ_GEBURTSTAG = 18
+        private const val REQ_MIKRO = 19
     }
 }

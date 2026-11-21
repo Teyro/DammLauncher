@@ -4,6 +4,8 @@
 
     <!-- Update-Check (GitHub) und Vorlagen-Abgleich (IServ-WebDAV) -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Leise-Aquarium: nur der Lärmpegel, nichts wird aufgenommen -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <!-- Abgleich nur, wenn Netz da ist -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- Update-APK an den System-Installer übergeben -->
