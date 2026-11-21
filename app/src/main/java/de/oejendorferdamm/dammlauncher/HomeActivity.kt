@@ -513,6 +513,8 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
     /** Home-Taste, während der Launcher schon vorne ist: alles schließen. */
     override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
+        // Testversion: Aquarium direkt öffnen (Bildschirmfotos)
+        if (BuildConfig.DEBUG && intent?.getBooleanExtra("aquarium_test", false) == true) { aquariumGefragt = true; haupt.postDelayed({ aquariumStarten() }, 800) }
         raster.abbrechen()
         fenster.toList().forEach { it.schliessen() }
         uebersichtZu()

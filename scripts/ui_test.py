@@ -193,6 +193,24 @@ def main():
         sys.exit(1)
     screenshot("00_standard_einrichtung.png")  # Schul-Standard: fehlende Apps als Platzhalter
 
+    # Leise-Aquarium direkt (Testeinstieg): Mikrofon erlaubt (Emulator = Stille), Fische und Hai per Knopf
+    adb("shell", "pm", "grant", PAKET, "android.permission.RECORD_AUDIO")
+    adb("shell", "am", "start", "-n", f"{PAKET}/.HomeActivity", "--ez", "aquarium_test", "true")
+    time.sleep(5)
+    screenshot("68_aquarium.png")
+    ms = min(w, h) / 1080
+    for _ in range(8):  # „+ Fisch“ ist der fünfte Knopf von rechts
+        tap(int(w - 70 * ms - 4 * 2.3 * 44 * ms), int(h - 82 * ms))
+        time.sleep(0.5)
+    time.sleep(2)
+    screenshot("69_aquarium_fische.png")
+    tap(int(w - 70 * ms - 3 * 2.3 * 44 * ms), int(h - 82 * ms))  # Hai
+    time.sleep(1.6)
+    screenshot("69b_aquarium_hai.png")
+    adb("shell", "input", "keyevent", "KEYCODE_BACK")
+    time.sleep(1.5)
+
+
     # Aus der Mitte nach oben wischen → Alle Apps
     adb("shell", "input", "swipe", str(w * 58 // 100), str(h * 70 // 100), str(w * 58 // 100), str(h * 25 // 100), "400")
     time.sleep(2)
@@ -702,22 +720,6 @@ def main():
         time.sleep(1.5)
         scrolle_zu("Geburtstag: Konfetti", w // 6, teil=True)
         time.sleep(1)
-        # Leise-Aquarium: Mikrofon erlauben (Emulator: Stille), starten, Fische und Hai per Knopf
-        adb("shell", "pm", "grant", PAKET, "android.permission.RECORD_AUDIO")
-        if scrolle_zu("Aquarium starten", w // 6):
-            time.sleep(4)
-            screenshot("68_aquarium.png")
-            ms = min(w, h) / 1080
-            for _ in range(6):  # „+ Fisch“ ist der fünfte Knopf von rechts
-                tap(int(w - 70 * ms - 4 * 2.3 * 44 * ms), int(h - 82 * ms))
-                time.sleep(0.4)
-            tap(int(w - 70 * ms - 3 * 2.3 * 44 * ms), int(h - 82 * ms))  # Hai
-            time.sleep(1.2)
-            screenshot("69b_aquarium_hai.png")
-            time.sleep(2)
-            screenshot("69_aquarium_fische.png")
-            adb("shell", "input", "keyevent", "KEYCODE_BACK")
-            time.sleep(1.5)
     fertig()
     time.sleep(1)
     # Feierabend-Sperre: ab jetzt gesperrt, „Entsperren“ (ohne PIN) gibt frei
