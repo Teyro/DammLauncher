@@ -660,7 +660,10 @@ class EinstellungenPanel(private val wurzel: FrameLayout, private val a: PanelAk
         add(text(c, "Ist die Klasse eine Weile leise, schwimmt ein Fisch herein; wird es zu laut, kommt ein Hai und frisst einen. Ist das Aquarium voll, öffnet sich die Schatztruhe. " +
             "Das Mikrofon misst nur die Lautstärke – nichts wird aufgenommen. Ohne Mikrofon per Fingertipp. Aufwendige Grafik, im Sparmodus schlicht.", 21, Farben.TEXT2), 6)
         add(regler(c, "Fische bis zur Schatztruhe", 10..60, e.ziel(c), 5) { e.setzeZiel(c, it) })
-        add(regler(c, "Ruhe je Fisch", 5..120, e.takt(c), 5, " s") { e.setzeTakt(c, it) })
+        auswahl("Wie lange bis zur Schatztruhe (wenn es leise ist)", listOf("-1" to "Bis Stundenende", "20" to "20 Minuten", "10" to "10 Minuten", "0" to "Fester Takt"), e.dauer(c).toString()) { v -> e.setzeDauer(c, v.toInt()); aufbauen() }
+        add(text(c, if (e.dauer(c) != 0) "Die Fische kommen erst langsam, dann immer schneller – bei Ruhe ist das Aquarium genau nach dieser Zeit voll. Jede Runde beginnt leer."
+            else "Jeder Fisch braucht gleich lange Ruhe.", 21, Farben.TEXT2), 6)
+        if (e.dauer(c) == 0) add(regler(c, "Ruhe je Fisch", 5..120, e.takt(c), 5, " s") { e.setzeTakt(c, it) })
         add(regler(c, "Strenge (1 = verzeiht viel, 10 = sehr streng)", 1..10, e.strenge(c)) { e.setzeStrenge(c, it) })
         knoepfe(knopf(c, "Aquarium starten", haupt = true) { a.aquariumStarten() })
     }

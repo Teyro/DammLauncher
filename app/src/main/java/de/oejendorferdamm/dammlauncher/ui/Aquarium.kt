@@ -41,6 +41,25 @@ class AquariumAnsicht(context: Context, private val mitMikrofon: Boolean, privat
 
     // ---------------------------------------------------------------- Einstellungen & Stand
 
+    companion object {
+        /** Stärke der Beschleunigung: der letzte Fisch kommt etwa 7-mal schneller als der erste */
+        private const val A = 2.0
+
+        /** Abstand (Sekunden Ruhe) vom Fisch [k] zum nächsten, wenn [n] Fische in [dauer] Sekunden kommen sollen: t(k) = D·ln(1 + (e^A − 1)·k/n)/A */
+        fun abstand(k: Int, n: Int, dauer: Float): Float {
+            fun t(i: Int) = dauer * kotlin.math.ln(1 + (kotlin.math.exp(A) - 1) * i.coerceIn(0, n) / n) / A
+            return (t(k + 1) - t(k)).toFloat().coerceAtLeast(1f)
+        }
+
+        /** Minuten bis zum Ende der laufenden Stunde (Stundenzeiten des Launchers, sonst Raster der Schule); null = gerade keine Stunde */
+        fun bisStundenende(jetzt: java.util.Calendar): Int? {
+            val m = jetzt.get(java.util.Calendar.HOUR_OF_DAY) * 60 + jetzt.get(java.util.Calendar.MINUTE)
+            val stunden = de.oejendorferdamm.dammlauncher.konfig.KonfigSpeicher.konfig.stunden.map { it.von to it.bis }
+                .ifEmpty { listOf(510 to 555, 555 to 600, 625 to 670, 670 to 715, 740 to 785, 785 to 810) }
+            return stunden.firstOrNull { m >= it.first && m < it.second }?.let { it.second - m }
+        }
+    }
+
     object Einstellung {
         private fun p(c: Context): SharedPreferences = c.applicationContext.getSharedPreferences("aquarium", Context.MODE_PRIVATE)
         fun ziel(c: Context) = p(c).getInt("ziel", 40)
@@ -51,12 +70,25 @@ class AquariumAnsicht(context: Context, private val mitMikrofon: Boolean, privat
         /** 1 = verzeiht viel, 10 = sehr streng */
         fun strenge(c: Context) = p(c).getInt("strenge", 5)
         fun setzeStrenge(c: Context, v: Int) = p(c).edit().putInt("strenge", v.coerceIn(1, 10)).apply()
+        /** Dauer bis zur Schatztruhe (bei Ruhe): 0 = fester Takt je Fisch, 10/20 = Minuten, -1 = bis zum Ende der Stunde */
+        fun dauer(c: Context) = p(c).getInt("dauer", -1)
+        fun setzeDauer(c: Context, v: Int) = p(c).edit().putInt("dauer", v).apply()
         fun anzahl(c: Context) = p(c).getInt("anzahl", 3)
         fun setzeAnzahl(c: Context, v: Int) = p(c).edit().putInt("anzahl", v).apply()
     }
 
     private val ziel = Einstellung.ziel(context)
     private val takt = Einstellung.takt(context).toFloat()
+    /** Mit Dauer: Sekunden bis zur Truhe (bei durchgehender Ruhe), sonst null = fester [takt] */
+    private val dauerSek: Float? = Einstellung.dauer(context).let { d ->
+        when {
+            d > 0 -> d * 60f
+            d == -1 -> (bisStundenende(java.util.Calendar.getInstance()) ?: 20) * 60f
+            else -> null
+        }?.coerceAtLeast(180f)
+    }
+    /** Ruhe, die der nächste Fisch braucht: mit Dauer anfangs lang, dann immer kürzer – nach [dauerSek] ist das Aquarium voll */
+    private fun naechsterTakt(): Float = dauerSek?.let { abstand(anzahl, ziel, it) } ?: takt
     private val strenge = Einstellung.strenge(context)
     // Schwellen in „dB“ (grob, je Board verschieden): strenger = niedrigere Schwellen
     private val grenzeGelb = 66f - strenge * 2.2f
@@ -82,7 +114,8 @@ class AquariumAnsicht(context: Context, private val mitMikrofon: Boolean, privat
     private val schriften = ArrayList<Schrift>()
     private val muenzen = ArrayList<Muenze>()
     private var hai: Hai? = null
-    private var anzahl = Einstellung.anzahl(context).coerceIn(0, ziel)
+    // mit Dauer beginnt jede Runde leer, damit die Zeit stimmt
+    private var anzahl = if (dauerSek != null) 0 else Einstellung.anzahl(context).coerceIn(0, ziel)
 
     // ---------------------------------------------------------------- Lärm
 
@@ -216,7 +249,7 @@ class AquariumAnsicht(context: Context, private val mitMikrofon: Boolean, privat
                 when {
                     pegel >= grenzeRot -> { laut += sek; if (laut > 1.5f && haiPause <= 0f) haiKommt() }
                     pegel >= grenzeGelb -> { laut = max(0f, laut - sek) }
-                    else -> { laut = max(0f, laut - sek * 2); ruhe += sek; if (ruhe >= takt) fischDazu() }
+                    else -> { laut = max(0f, laut - sek * 2); ruhe += sek; if (ruhe >= naechsterTakt()) fischDazu() }
                 }
             }
             haiPause = max(0f, haiPause - sek)
@@ -563,7 +596,7 @@ class AquariumAnsicht(context: Context, private val mitMikrofon: Boolean, privat
         schrift.color = 0xFF1F2937.toInt(); c.drawText(text, w / 2, ty - 2 * s, schrift)
         // Fortschritt zum nächsten Fisch
         if (mitMikrofon && !mikroFehler && anzahl < ziel && hai == null) {
-            p.color = 0xFF22C55E.toInt(); val breite = (tb - 80 * s) * (ruhe / takt).coerceIn(0f, 1f)
+            p.color = 0xFF22C55E.toInt(); val breite = (tb - 80 * s) * (ruhe / naechsterTakt()).coerceIn(0f, 1f)
             oval.set(w / 2 - tb / 2 + 40 * s, ty + 10 * s, w / 2 - tb / 2 + 40 * s + breite, ty + 16 * s); c.drawRoundRect(oval, 3 * s, 3 * s, p)
         }
 

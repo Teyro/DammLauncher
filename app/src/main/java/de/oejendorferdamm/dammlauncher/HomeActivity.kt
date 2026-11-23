@@ -246,6 +246,9 @@ class HomeActivity : Activity(), RasterAktionen, PanelAktionen {
         // über Raster und Minimalmodus, unter Einstellungen (30) und Meldungen (40)
         eckBand = EckBand(this).apply { visibility = View.GONE; elevation = 25f.vp }
         wurzel.addView(eckBand, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        // Kleiner Fisch unten links: Leise-Aquarium mit einem Tipp
+        wurzel.addView(de.oejendorferdamm.dammlauncher.ui.FischKnopf(this) { aquariumStarten() }.apply { elevation = 26f.vp },
+            FrameLayout.LayoutParams(44.vp, 44.vp, Gravity.BOTTOM or Gravity.START).apply { leftMargin = 14.vp; bottomMargin = 14.vp })
         // Geburtstag: Konfetti über dem Startbildschirm, unter Fenstern und Einstellungen
         party = de.oejendorferdamm.dammlauncher.ui.PartyAnsicht(this).apply { elevation = 28f.vp }
         wurzel.addView(party, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
